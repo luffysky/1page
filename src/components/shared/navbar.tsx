@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 export interface NavLink {
@@ -16,6 +17,9 @@ export interface NavLink {
  * 選用原生 <dialog> 而非自行拼裝面板的理由：
  * focus trap、Escape 關閉、背景 inert 都是瀏覽器原生行為，
  * 手刻這三件事很容易做得半殘，而無障礙半殘等同沒做（Spec §35）。
+ *
+ * 所有站內連結一律用 next/link：`<a>` 會觸發整頁重新載入，
+ * 在有多個頁面之後那是實際可感知的退步，不只是 lint 規則。
  */
 export function Navbar({ links, cta }: { links: NavLink[]; cta: NavLink }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -38,28 +42,33 @@ export function Navbar({ links, cta }: { links: NavLink[]; cta: NavLink }) {
   return (
     <header className="border-brand-line bg-brand-bg/85 sticky top-0 z-20 border-b backdrop-blur-md">
       <div className="mx-auto flex h-[4.5rem] w-full max-w-page items-center justify-between gap-5 px-gutter lg:px-gutter-lg">
-        <a href="#top" className="flex items-center gap-3">
+        {/* 品牌回首頁。原本指向 #top，但那個錨點只存在於首頁 */}
+        <Link href="/" className="flex items-center gap-3">
           <span className="bg-brand-ink text-brand-on-ink grid h-10 w-10 place-items-center rounded-md text-xl font-black">
             1
           </span>
           <span className="text-heading-2">一頁起家</span>
-        </a>
+        </Link>
 
         <nav aria-label="主要導覽" className="text-body-sm hidden gap-7 md:flex">
           {links.map((link) => (
-            <a key={link.href} href={link.href} className="text-brand-muted hover:text-brand-ink">
+            <Link
+              key={link.href}
+              href={link.href}
+              className="text-brand-muted hover:text-brand-ink"
+            >
               {link.label}
-            </a>
+            </Link>
           ))}
         </nav>
 
         <div className="flex items-center gap-3">
-          <a
+          <Link
             href={cta.href}
             className="bg-brand-accent-strong text-brand-on-accent text-body-sm hidden rounded-pill px-5 py-3 font-bold md:inline-flex"
           >
             {cta.label}
-          </a>
+          </Link>
 
           <button
             type="button"
@@ -81,7 +90,7 @@ export function Navbar({ links, cta }: { links: NavLink[]; cta: NavLink }) {
         id="mobile-nav"
         ref={dialogRef}
         aria-label="行動版選單"
-        className="bg-brand-paper text-brand-ink m-0 h-full max-h-none w-full max-w-none p-gutter backdrop:bg-brand-ink/40"
+        className="bg-brand-paper text-brand-ink backdrop:bg-brand-ink/40 m-0 h-full max-h-none w-full max-w-none p-gutter"
       >
         <div className="flex items-center justify-between">
           <span className="text-heading-2">一頁起家</span>
@@ -97,24 +106,24 @@ export function Navbar({ links, cta }: { links: NavLink[]; cta: NavLink }) {
 
         <nav aria-label="行動版導覽" className="mt-10 flex flex-col gap-2">
           {links.map((link) => (
-            <a
+            <Link
               key={link.href}
               href={link.href}
               onClick={close}
               className="text-heading-1 border-brand-line border-b py-4"
             >
               {link.label}
-            </a>
+            </Link>
           ))}
         </nav>
 
-        <a
+        <Link
           href={cta.href}
           onClick={close}
           className="bg-brand-accent-strong text-brand-on-accent mt-10 inline-flex rounded-pill px-6 py-3.5 font-bold"
         >
           {cta.label}
-        </a>
+        </Link>
       </dialog>
     </header>
   );

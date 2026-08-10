@@ -1,7 +1,7 @@
 # 一頁起家 Web Platform V1 Implementation Spec
 
 **Project:** 一頁起家  
-**Version:** V1.1  
+**Version:** V1.2  
 **Stack:** Next.js + TypeScript + Tailwind CSS + Framer Motion + Supabase  
 **定位:** AI-assisted Digital Studio / Interactive Sales Platform  
 **狀態:** 🔒 **FROZEN — Source of Truth**
@@ -9,10 +9,12 @@
 > 本文件已封版。實作期間不得為了遷就實作方便而修改本文件。
 >
 > 若實作中發現規格有誤或不可行，流程為：
-> 記錄於 Implementation Plan 的「規格衝突」區 → 人工裁決 → 才發 V1.2。
+> 記錄於 §47 Change Request → 人工裁決 → 才升版本。
 >
 > 不接受「邊做邊改 Spec」。
 
+> V1.2 變更（CR-001）：物件儲存由 Supabase Storage 改為 Cloudflare R2，影響 §1、§8.9、§36。
+>
 > V1.1 變更：§3 視覺沿用政策、§4 IA 補回 Template Experience、§6 Goal Selector 升級為 Context Controller、新增 §8.15 Template Experience Section、§26 補上呈現形式約束、新增 §45 Demo 偏離清單。詳見 §46 Changelog。
 
 ---
@@ -75,8 +77,10 @@ Framer Motion
 
 Supabase
 ├── PostgreSQL
-├── Auth
-└── Storage
+└── Auth
+
+Cloudflare R2
+└── Object Storage（S3 相容）
 
 AI Layer
 ├── Agent Orchestrator
@@ -800,7 +804,34 @@ Publish
 
 # 8.9 Media Upload
 
-使用 Supabase Storage。
+使用 **Cloudflare R2**（S3 相容物件儲存）。
+
+> V1.2 變更（CR-001）：原訂 Supabase Storage，改為 Cloudflare R2。
+> 詳見 §47 Change Request 紀錄。
+
+## ⚠️ R2 沒有 RLS —— 授權模型與資料庫不同
+
+Supabase Storage 與資料庫共用同一套 RLS，policy 是宣告式的。
+R2 沒有這個機制。因此：
+
+```text
+資料庫授權   Supabase RLS（宣告式，policy 寫在 migration）
+物件儲存授權 只剩我們自己的 server 在把關
+```
+
+**上傳一律經由自家 server route 驗證 admin 身分後簽發 presigned URL。**
+
+禁止：
+
+```text
+❌ 前端直接持有 R2 access key
+❌ 未經驗證即可呼叫的 presign endpoint
+❌ 公開可列舉（list）的 bucket
+```
+
+若哪天有人加了一個不檢查身分的 presign endpoint，那就等同開放公開寫入——
+資料庫那側的 RLS 完全保護不到這裡。這是 §41「不要只靠前端隱藏按鈕」
+在物件儲存上的對應要求。
 
 流程：
 
@@ -1852,15 +1883,17 @@ Preview：
 - URL validation
 - image source validation
 
-Portfolio Upload：
+Portfolio Upload（R2，見 §8.9）：
 
 - MIME allowlist
 - file size limit
 - extension validation
 - SVG sanitize or disable raw inline rendering
 - filename sanitize
-- storage policy
-- admin-only write permission
+- presigned URL 由 server 簽發，簽發前驗證 admin
+- presigned URL 短期有效
+- bucket 不可公開列舉
+- admin-only write permission（由 server 強制，非 R2 policy）
 
 ---
 
@@ -2372,3 +2405,34 @@ P2
 P0 與 P1 的區分依據是**「不先做會不會造成重寫」**，不是重要性。
 六級價格很重要，但它是 config 修改；Goal Context 沒那麼「醒目」，
 卻決定首頁能不能組裝起來。
+
+
+---
+
+# 47. Change Request 紀錄
+
+封版後的規格變更一律記錄於此。流程見文件開頭：
+發現問題 → 停止該項實作 → 提 CR → 人工裁決 → 升版本 → 恢復實作。
+
+## CR-001 — 物件儲存改用 Cloudflare R2
+
+| 項目 | 內容 |
+|---|---|
+| 日期 | 2026-08-10 |
+| 提出時機 | Phase 2C 開工前 |
+| 影響章節 | §1、§8.9、§36 |
+| 原規格 | Portfolio 媒體使用 Supabase Storage |
+| 變更為 | 使用 Cloudflare R2（S3 相容） |
+| 裁決 | 已裁決採用 |
+| 版本 | V1.1 → V1.2 |
+
+**主要後果：授權模型改變。**
+
+Supabase Storage 與資料庫共用 RLS，policy 是宣告式的、寫在 migration 裡，
+可被 `pnpm test:db` 驗證。R2 沒有 RLS——上傳授權只剩自家 server 把關。
+
+因此 §8.9 新增明確禁令（前端不得持有 access key、presign endpoint 必須驗證身分、
+bucket 不可公開列舉），§36 的 Upload 檢查清單同步調整。
+
+**不受影響：** §39 資料庫結構、§8.5 媒體資料模型、路徑慣例
+`portfolio/{projectId}/{uuid}.{ext}`。R2 換的是儲存後端，不是資料模型。

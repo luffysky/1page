@@ -1,5 +1,6 @@
 import type { HomeGoal } from "@/config/home-goals";
 
+import { DETAIL_BY_SLUG } from "./in-memory-detail";
 import {
   filterByGoal,
   filterForList,
@@ -92,5 +93,26 @@ export const inMemoryPortfolioRepository: PortfolioRepository = {
 
   async listPublished(filter: PortfolioListFilter) {
     return filterForList(SEED, filter);
+  },
+
+  async getBySlug(slug: string) {
+    return DETAIL_BY_SLUG.get(slug) ?? null;
+  },
+
+  async listRelated(slug: string, limit: number) {
+    const current = DETAIL_BY_SLUG.get(slug);
+    if (!current) return [];
+
+    const categories = new Set(current.categories);
+
+    // 同分類優先；不足時以其餘作品補滿，避免相關作品區時有時無。
+    const sameCategory = SEED.filter(
+      (item) => item.id !== current.id && item.categories.some((c) => categories.has(c)),
+    );
+    const others = SEED.filter(
+      (item) => item.id !== current.id && !item.categories.some((c) => categories.has(c)),
+    );
+
+    return [...sameCategory, ...others].slice(0, limit);
   },
 };

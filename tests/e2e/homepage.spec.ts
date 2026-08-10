@@ -104,7 +104,9 @@ test("Hero 次要 CTA 導向作品，而非服務（Spec §5 / §45.1）", async
   await page.goto("/");
   const secondary = page.getByRole("link", { name: "看看我們做過什麼" });
   await expect(secondary).toBeVisible();
-  await expect(secondary).toHaveAttribute("href", "#work");
+  // 用 /#work 而非 #work：同一個 Hero 元件若日後出現在其他頁面，
+  // 純錨點會失效。導向的目標仍是作品區。
+  await expect(secondary).toHaveAttribute("href", "/#work");
 });
 
 test("Footer 呈現 AI Disclosure（Spec §28）", async ({ page }) => {

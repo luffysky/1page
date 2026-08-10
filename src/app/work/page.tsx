@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { PortfolioFilter } from "@/components/portfolio/portfolio-filter";
 import { PortfolioLayout } from "@/components/portfolio/portfolio-layout";
@@ -88,12 +89,12 @@ export default async function WorkPage({ searchParams }: PageProps<"/work">) {
               <p className="text-body-sm text-brand-muted mt-3">
                 不代表做不到。直接告訴我們你想完成什麼，我們會說明可以先看哪個方向。
               </p>
-              <a
+              <Link
                 href="/work"
                 className="border-brand-ink text-body-sm mt-8 inline-flex rounded-pill border px-5 py-3 font-bold"
               >
                 清除篩選
-              </a>
+              </Link>
             </div>
           )}
         </section>

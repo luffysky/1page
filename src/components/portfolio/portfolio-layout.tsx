@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 
 import { PROJECT_TYPE_LABELS, type PortfolioProjectType } from "@/features/portfolio/project-type";
 
@@ -71,9 +72,9 @@ function Card({ item, featured }: { item: PortfolioCard; featured: boolean }) {
       <div className="from-brand-ink/85 text-brand-on-ink absolute inset-x-0 bottom-0 bg-gradient-to-t to-transparent p-6">
         <p className="text-caption opacity-80">{item.kicker}</p>
         <h3 className="text-heading-1 mt-1.5">
-          <a href={item.href} className="after:absolute after:inset-0">
+          <Link href={item.href} className="after:absolute after:inset-0">
             {item.title}
-          </a>
+          </Link>
         </h3>
       </div>
     </article>

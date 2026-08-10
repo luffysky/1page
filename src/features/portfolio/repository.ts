@@ -1,4 +1,5 @@
 import type { PortfolioCard } from "@/components/portfolio/portfolio-layout";
+import type { PortfolioDetail } from "@/features/portfolio/detail";
 import { getHomeGoal, type HomeGoal, isFilteringGoal } from "@/config/home-goals";
 import {
   ALL_CATEGORIES,
@@ -39,6 +40,14 @@ export interface PortfolioRepository {
   listByGoal(goal: HomeGoal): Promise<PortfolioListItem[]>;
   /** `/work` 列表（Spec §8.7）。只回傳已發布作品 */
   listPublished(filter: PortfolioListFilter): Promise<PortfolioListItem[]>;
+  /**
+   * `/work/[slug]` 詳細頁（Spec §8.10）。
+   * 找不到或未發布一律回傳 null，由呼叫端 404——
+   * 不區分「不存在」與「未發布」，否則可從回應差異推出草稿的存在。
+   */
+  getBySlug(slug: string): Promise<PortfolioDetail | null>;
+  /** 詳細頁底部的 Related Projects（Spec §8.10） */
+  listRelated(slug: string, limit: number): Promise<PortfolioListItem[]>;
 }
 
 /**

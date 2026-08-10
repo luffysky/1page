@@ -17,8 +17,8 @@ export const HERO_COPY = {
    */
   titleLines: ["從第一頁，", "開始你的生意。"],
   lead: "網站、品牌、內容、設計與 AI 自動化。從想法、設計到真正可以使用的產品。",
-  primaryCta: { label: "看看你的網站可以長怎樣", href: "#try" },
-  secondaryCta: { label: "看看我們做過什麼", href: "#work" },
+  primaryCta: { label: "看看你的網站可以長怎樣", href: "/#advisor" },
+  secondaryCta: { label: "看看我們做過什麼", href: "/#work" },
 } as const;
 
 /** Spec §4 IA 中各 Section 的標題文案 */
@@ -76,5 +76,5 @@ export const FINAL_CTA_COPY = {
   /** 轉換前最後一句話，斷點依句意而非依剩餘寬度 */
   titleLines: ["你不需要", "先知道怎麼做。"],
   lead: "只需要告訴我們，你想完成什麼。",
-  cta: { label: "開始一個專案", href: "#contact" },
+  cta: { label: "開始一個專案", href: "/#contact" },
 } as const;

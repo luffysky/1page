@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 /**
  * Dark CTA Block（Spec §30 / §3.1）
  *
@@ -29,12 +31,12 @@ export function DarkCtaBlock({
               ))}
             </h2>
             <p className="text-lead mt-6 opacity-75">{lead}</p>
-            <a
+            <Link
               href={cta.href}
               className="bg-brand-accent-strong text-brand-on-accent mt-10 inline-flex rounded-pill px-6 py-4 font-bold"
             >
               {cta.label}
-            </a>
+            </Link>
           </div>
           {children ? <div>{children}</div> : null}
         </div>

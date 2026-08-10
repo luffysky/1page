@@ -552,3 +552,83 @@ uniform   /work 用。等權重網格，md 兩欄 / xl 三欄
 
 「假資料中不出現 Client Project」原本掃全頁，抓到的是**篩選器選項**而非作品卡。
 改為只掃 `<article>`。
+
+---
+
+## 2C — `/work/[slug]` + SEO
+
+**日期：** 2026-08-10  
+**結果：** ✅ 全數通過
+
+### Gate 五項
+
+| # | 項目 | 結果 |
+|---|---|---|
+| 1 | typecheck | ✅ |
+| 2 | lint | ✅ 0 error / 0 warning |
+| 3 | test | ✅ 70 tests / 9 files（2B 58 → 2C 70） |
+| 4 | build | ✅ |
+| 5 | visual + 行為 | ✅ 截圖 40 張、e2e 79/79 |
+
+### 出口條件核對
+
+| 出口條件 | 結果 |
+|---|---|
+| 每件作品有獨立 title/description/OG/canonical | ✅ e2e 逐一驗證，並確認換作品時 metadata 會跟著換 |
+| 來源類型標示明確 | ✅ 放在 Hero 而非埋在頁尾 |
+| Related Projects 與 CTA 就位 | ✅ 不含自己、同分類優先 |
+| 未發布作品回 404 | ✅ 找不到與未發布走同一條路徑 |
+
+### 「不顯示空 Section」是設計出來的，不是靠自律
+
+Spec §8.10：「如果沒有完整 Case Study 資料，只顯示存在的區塊。」
+
+種子資料刻意做成詳盡程度不一：
+
+```text
+interior-studio      完整五段 Case Study + 連結 + AI 揭露
+yipage-identity      只有 problem / solution
+ai-website-workshop  完全沒有 Case Study
+```
+
+全部填滿的種子驗證不了這條規則——就像 2A 的 seed 必須放一筆 draft
+才驗得了「草稿讀不到」。e2e 逐一驗證三種詳盡程度，
+且確認**標題本身也不出現**，而不是留一個標題配空白。
+
+### 未發布與不存在回同一種回應
+
+`getBySlug` 找不到與未發布一律回 `null`，頁面一律 404。
+若兩者回應不同，就能從差異推出「有一筆你看不到的草稿存在」。
+
+### ⚠️ 順手抓到兩個死連結
+
+ESLint 提示內部導航應使用 `next/link` 時，順著檢查發現：
+
+```text
+Hero 主 CTA      → #try      首頁根本沒有 #try（實際區塊是 #advisor）
+Final CTA        → #contact  在 /work 與詳細頁上不存在該錨點
+Navbar 品牌 logo → #top      同樣只存在於首頁
+```
+
+三個都沒有任何既有測試抓到。錨點連結特別容易腐爛：
+改了 section id 不會有東西壞掉，直到有人真的點下去才發現什麼都沒發生。
+
+處置：
+1. 站內連結全面改用 `next/link`（`<a>` 會觸發整頁重新載入，
+   在有多個頁面之後是實際可感知的退步，不只是 lint 規則）
+2. 錨點一律寫成 `/#section` 而非 `#section`，讓同一個元件出現在任何頁面都有效
+3. **新增 `tests/e2e/no-dead-links.spec.ts`**：掃三個路由的所有站內連結，
+   錨點檢查目標元素是否存在，路由檢查 HTTP 狀態
+
+### 測試工具的兩個絆腳石
+
+| 問題 | 實情 |
+|---|---|
+| `CSS.escape` 在 Playwright 測試中 undefined | 那是瀏覽器 API，Node 端沒有。改用 `[id="..."]` 屬性選擇器 |
+| 首頁 CTA 斷言失敗 | 斷言寫死 `#work`，而 href 已改為 `/#work`。意圖（導向作品）不變，更新斷言 |
+
+### Sitemap 改為資料驅動
+
+作品詳細頁由 repository 供應而非手抄，2D 換 Supabase 後自動反映真實資料，
+且只列出已發布作品。採白名單（明列要收錄的）而非黑名單（排除 `/_dev`）——
+白名單不容易漏。

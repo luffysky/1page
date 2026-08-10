@@ -1,17 +1,30 @@
 import type { MetadataRoute } from "next";
 
+import { absoluteUrl } from "@/config/site";
+import { inMemoryPortfolioRepository } from "@/features/portfolio/in-memory-repository";
+
 /**
- * Plan §11 C.1：`/_dev/*` 不得被 sitemap 收錄。
+ * Sitemap（Spec §32）
  *
- * Phase 1 只有首頁一條公開路由。`/work`、`/work/[slug]`、`/service/*`
- * 於 Phase 2 起加入（Spec §32 要求 Portfolio detail 有獨立 metadata）。
+ * Plan §11 C.1：`/_dev/*` 不得被收錄。此處以「明確列出要收錄的路由」
+ * 而非「排除不要的」——白名單比黑名單不容易漏。
+ *
+ * 作品詳細頁由 repository 供應，2D 換 Supabase 後自動反映真實資料，
+ * 且只會列出已發布作品（`listPublished` 的語意）。
  */
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const projects = await inMemoryPortfolioRepository.listPublished({
+    category: "all",
+    projectType: "all",
+  });
+
   return [
-    {
-      url: "https://1page.tw/",
-      changeFrequency: "weekly",
-      priority: 1,
-    },
+    { url: absoluteUrl("/"), changeFrequency: "weekly", priority: 1 },
+    { url: absoluteUrl("/work"), changeFrequency: "weekly", priority: 0.8 },
+    ...projects.map((project) => ({
+      url: absoluteUrl(project.href),
+      changeFrequency: "monthly" as const,
+      priority: 0.6,
+    })),
   ];
 }

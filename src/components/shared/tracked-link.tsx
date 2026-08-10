@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { track, type AnalyticsEvent } from "@/lib/analytics/track";
 
 /**
@@ -20,8 +22,8 @@ export function TrackedLink({
   children: React.ReactNode;
 }) {
   return (
-    <a href={href} className={className} onClick={() => track(event, { href })}>
+    <Link href={href} className={className} onClick={() => track(event, { href })}>
       {children}
-    </a>
+    </Link>
   );
 }

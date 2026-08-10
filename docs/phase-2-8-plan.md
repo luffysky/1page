@@ -68,7 +68,8 @@ Zeabur 上的 Supabase 是自架版，與 Supabase Cloud 有幾點不同，
 supabase link            針對 Supabase Cloud API，自架通常不適用
 migration 套用           改用 supabase db push --db-url <postgres-url> 或 psql
 型別產生                 supabase gen types typescript --db-url <url>
-Storage / Auth           自架版需自行確認已啟用並設定
+Auth                     自架版需自行確認已啟用並設定
+Storage                  不使用（改用 Cloudflare R2，見 CR-001）
 ```
 
 ---
@@ -116,13 +117,20 @@ in-memory 版保留作測試替身。
 **出口：** 非 admin 一律 404 或導離；權限在 server 端與 RLS 雙重把關，
 **不得只靠前端隱藏按鈕**（Spec §41）。
 
-### 2F — Media Upload ⏸
+### 2F — Media Upload（Cloudflare R2）⏸
 
-Supabase Storage、MIME allowlist、大小限制、副檔名驗證、檔名 sanitize、
-唯一路徑、上傳進度、失敗重試、拖曳排序（Spec §8.9、§36）。
+**CR-001：** 物件儲存改用 Cloudflare R2，Spec 已升 V1.2。
 
-**出口：** SVG 經 sanitize 或停用 inline 渲染；上傳路徑為
-`portfolio/{projectId}/{uuid}.{ext}`；非 admin 無法寫入 Storage。
+MIME allowlist、大小限制、副檔名驗證、檔名 sanitize、唯一路徑、
+上傳進度、失敗重試、拖曳排序（Spec §8.9、§36）。
+
+⚠️ **R2 沒有 RLS。** 資料庫那側的 policy 保護不到物件儲存，
+上傳授權只剩自家 server route 把關。
+
+**出口：** presigned URL 由 server 簽發且簽發前驗證 admin；
+前端不持有 access key；bucket 不可公開列舉；
+SVG 經 sanitize 或停用 inline 渲染；
+路徑為 `portfolio/{projectId}/{uuid}.{ext}`。
 
 ---
 

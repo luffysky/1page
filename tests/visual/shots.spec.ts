@@ -14,6 +14,7 @@ const ROUTES = [
   { name: "home", path: "/" },
   { name: "dev-tokens", path: "/_dev/tokens" },
   { name: "work", path: "/work" },
+  { name: "work-detail", path: "/work/interior-studio" },
   { name: "dev-primitives", path: "/_dev/primitives" },
 ];
 
