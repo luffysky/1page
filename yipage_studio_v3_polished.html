@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>一頁起家｜AI 輔助數位工作室</title>
+  <meta name="description" content="一頁式網站、品牌設計、內容與 AI 自動化。AI 輔助製作，人工品質把關。" />
+  <style>
+    :root{
+      --bg:#f4efe7;
+      --paper:#fffdf9;
+      --ink:#141414;
+      --muted:#726d66;
+      --line:#d8d0c7;
+      --red:#ef3e2f;
+      --red2:#ff6a57;
+      --cream:#efe5d8;
+      --shadow:0 24px 70px rgba(24,18,12,.10);
+      --shadow-soft:0 10px 30px rgba(24,18,12,.07);
+      --radius:30px;
+      --max:1220px;
+    }
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{
+      margin:0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI","Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+      color:var(--ink);
+      background:
+        radial-gradient(circle at 78% 8%, rgba(239,62,47,.09), transparent 24%),
+        radial-gradient(circle at 10% 24%, rgba(0,0,0,.035), transparent 18%),
+        linear-gradient(rgba(0,0,0,.022) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,0,0,.022) 1px, transparent 1px),
+        var(--bg);
+      background-size:auto,auto,34px 34px,34px 34px;
+    }
+    a{text-decoration:none;color:inherit}
+    button,input,select,textarea{font:inherit}
+    .wrap{width:min(var(--max),calc(100% - 40px));margin:auto}
+    .nav{
+      position:sticky;top:0;z-index:20;
+      backdrop-filter:blur(16px);
+      background:rgba(246,241,233,.82);
+      border-bottom:1px solid rgba(0,0,0,.06);
+    }
+    .navin{height:78px;display:flex;align-items:center;justify-content:space-between;gap:20px}
+    .brand{display:flex;align-items:center;gap:12px;font-weight:900;letter-spacing:-.02em}
+    .mark{
+      width:42px;height:42px;border-radius:14px;background:var(--ink);color:white;
+      display:grid;place-items:center;font-weight:1000;font-size:24px;position:relative;box-shadow:var(--shadow)
+    }
+    .mark:after{
+      content:"";position:absolute;width:11px;height:11px;border-radius:50%;background:var(--red);
+      right:-3px;top:5px;box-shadow:-5px 8px 0 -3px var(--red)
+    }
+    .links{display:flex;gap:24px;color:var(--muted);font-size:14px}
+    .btn{
+      display:inline-flex;align-items:center;justify-content:center;gap:9px;
+      padding:14px 20px;border-radius:999px;border:1px solid var(--ink);
+      background:var(--ink);color:#fff;font-weight:800;cursor:pointer;transition:.2s ease;
+    }
+    .btn:hover{transform:translateY(-2px)}
+    .btn.ghost{background:transparent;color:var(--ink)}
+    .btn.red{background:var(--red);border-color:var(--red)}
+    .eyebrow{
+      display:inline-flex;gap:10px;align-items:center;padding:8px 12px;border:1px solid var(--line);
+      background:rgba(255,255,255,.48);border-radius:999px;color:var(--muted);font-size:13px;font-weight:700
+    }
+    .dot{width:8px;height:8px;background:var(--red);border-radius:50%}
+    .hero{padding:96px 0 72px}
+    .hero-grid{display:grid;grid-template-columns:1.08fr .92fr;gap:58px;align-items:center}
+    h1{font-size:clamp(52px,8vw,96px);line-height:.95;letter-spacing:-.065em;margin:20px 0 26px}
+    .lead{font-size:20px;line-height:1.75;color:var(--muted);max-width:720px}
+    .actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:34px}
+    .hero-card{
+      background:var(--paper);border:1px solid var(--line);border-radius:34px;padding:18px;
+      box-shadow:var(--shadow);transform:rotate(1.5deg)
+    }
+    .browser{background:#fff;border:1px solid #dedede;border-radius:22px;overflow:hidden}
+    .bar{height:44px;border-bottom:1px solid #eee;display:flex;align-items:center;gap:7px;padding:0 14px}
+    .ball{width:9px;height:9px;border-radius:50%;background:#ddd}
+    .mini{padding:30px;background:linear-gradient(140deg,#fff 0,#fff7f3 60%,#ffe9e3 100%)}
+    .mini h3{font-size:30px;margin:0 0 12px}
+    .mini p{color:#777;line-height:1.6}
+    .mini-cta{display:inline-block;padding:10px 14px;background:var(--red);color:#fff;border-radius:999px;font-weight:800}
+    section{padding:88px 0}
+    .section-head{display:flex;justify-content:space-between;gap:30px;align-items:end;margin-bottom:32px}
+    .kicker{font-size:13px;color:var(--red);font-weight:900;letter-spacing:.12em;text-transform:uppercase}
+    h2{font-size:clamp(36px,5vw,60px);line-height:1.05;letter-spacing:-.045em;margin:10px 0 0}
+    .sub{color:var(--muted);max-width:580px;line-height:1.8}
+    .goals{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+    .card{
+      border:1px solid var(--line);background:rgba(255,250,243,.78);border-radius:var(--radius);
+      padding:26px;min-height:185px;transition:.2s ease
+    }
+    .card:hover{transform:translateY(-4px);box-shadow:var(--shadow)}
+    .icon{font-size:28px}
+    .card h3{font-size:22px;margin:18px 0 8px}
+    .card p{color:var(--muted);line-height:1.65;margin:0}
+    .lab{
+      display:grid;grid-template-columns:340px 1fr;gap:18px;border:1px solid var(--line);
+      border-radius:32px;background:rgba(255,255,255,.55);padding:18px
+    }
+    .controls{padding:10px}
+    label{display:block;font-size:13px;font-weight:800;margin:18px 0 8px}
+    input,select,textarea{
+      width:100%;padding:13px 14px;border-radius:14px;border:1px solid var(--line);background:#fff;color:var(--ink)
+    }
+    input[type="color"]{height:48px;padding:6px}
+    .preview-shell{background:#202020;border-radius:22px;padding:10px;min-height:470px}
+    .preview-top{color:#aaa;font-size:12px;padding:4px 6px 10px}
+    .site-preview{height:420px;border-radius:16px;background:#fff;overflow:hidden;display:flex;flex-direction:column}
+    .site-nav{padding:18px 22px;display:flex;justify-content:space-between;align-items:center;font-size:13px}
+    .site-logo{font-weight:900}
+    .site-hero{flex:1;padding:46px;display:flex;flex-direction:column;justify-content:center;background:#f7f7f7;transition:.2s}
+    .site-hero h4{font-size:40px;line-height:1.02;max-width:520px;margin:0 0 16px}
+    .site-hero p{max-width:520px;color:#666;line-height:1.65}
+    .site-btn{margin-top:14px;display:inline-block;width:max-content;padding:11px 16px;border-radius:999px;color:#fff;font-weight:800}
+    .compare{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+    .compare .card{min-height:320px}
+    .flow{display:grid;gap:13px;margin-top:26px}
+    .flow div{padding:14px 16px;border-radius:16px;background:#fff;border:1px solid var(--line);font-weight:750}
+    .flow.good div:last-child{background:var(--ink);color:#fff}
+    .services{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+    .price-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+    .price{position:relative}
+    .price.featured{border:2px solid var(--red);transform:translateY(-6px)}
+    .tag{position:absolute;right:18px;top:18px;background:var(--red);color:white;padding:6px 9px;border-radius:999px;font-size:12px;font-weight:900}
+    .money{font-size:34px;font-weight:950;margin:18px 0 6px}
+    .tiny{color:var(--muted);font-size:13px}
+    .process{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+    .step{padding:22px;border-top:2px solid var(--ink)}
+    .num{font-size:12px;color:var(--red);font-weight:900}
+    .step h3{margin:14px 0 8px}
+    .formbox{
+      display:grid;grid-template-columns:.85fr 1.15fr;gap:38px;
+      border-radius:36px;background:var(--ink);color:#fff;padding:42px
+    }
+    .formbox .sub{color:#bbb}
+    .formbox input,.formbox select,.formbox textarea{background:#272727;border-color:#3b3b3b;color:#fff}
+    .formgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .full{grid-column:1/-1}
+    footer{padding:40px 0 70px;color:var(--muted);font-size:14px}
+    .foot{display:flex;justify-content:space-between;gap:20px;border-top:1px solid var(--line);padding-top:26px}
+    @media (max-width:900px){
+      .links{display:none}
+      .hero-grid,.lab,.formbox{grid-template-columns:1fr}
+      .goals,.services,.price-grid,.process{grid-template-columns:1fr 1fr}
+      .hero-card{transform:none}
+    }
+    @media (max-width:620px){
+      .wrap{width:min(100% - 24px,var(--max))}
+      .navin{height:66px}
+      .hero{padding-top:64px}
+      .goals,.services,.price-grid,.process,.compare,.formgrid{grid-template-columns:1fr}
+      .site-hero{padding:28px}
+      .site-hero h4{font-size:30px}
+      .section-head{display:block}
+      .formbox{padding:26px}
+    }
+  
+    .nav{box-shadow:0 1px 0 rgba(255,255,255,.5)}
+    .hero{padding:112px 0 88px}
+    .hero-grid{gap:78px}
+    .hero .lead{font-size:21px}
+    .hero-card{position:relative;transform:rotate(1.2deg);border-radius:38px;padding:14px}
+    .hero-card:before{
+      content:"";position:absolute;inset:-18px -12px auto auto;width:110px;height:110px;
+      background:radial-gradient(circle,rgba(239,62,47,.20),transparent 68%);filter:blur(2px);z-index:-1
+    }
+    .browser{box-shadow:0 20px 50px rgba(0,0,0,.08)}
+    .mini{padding:42px 34px 38px}
+    .mini h3{font-size:38px;letter-spacing:-.04em}
+    .section-head{margin-bottom:38px}
+    .card{box-shadow:0 0 0 rgba(0,0,0,0)}
+    .card:hover{box-shadow:var(--shadow-soft)}
+    .goals .card{position:relative;overflow:hidden}
+    .goals .card:after{
+      content:"";position:absolute;right:-40px;bottom:-48px;width:120px;height:120px;border-radius:50%;
+      background:rgba(239,62,47,.06)
+    }
+    .goals .card:nth-child(2n):after{background:rgba(0,0,0,.045)}
+    .agent-panel{
+      background:linear-gradient(180deg,rgba(255,253,249,.94),rgba(255,248,241,.94));
+      border:1px solid var(--line);border-radius:36px;padding:22px;box-shadow:var(--shadow)
+    }
+    .agent-grid{display:grid;grid-template-columns:.9fr 1.1fr;gap:22px}
+    .agent-title{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:16px}
+    .agent-title small{color:var(--muted)}
+    .agent-chatlog{height:300px;overflow:auto;display:flex;flex-direction:column;gap:11px;padding:6px 2px 16px}
+    .bubble-ai,.bubble-user{max-width:88%;padding:13px 15px;border-radius:18px;line-height:1.6;font-size:14px}
+    .bubble-ai{background:#fff;border:1px solid var(--line);align-self:flex-start;border-bottom-left-radius:6px}
+    .bubble-user{background:var(--ink);color:#fff;align-self:flex-end;border-bottom-right-radius:6px}
+    .agent-controls{display:grid;grid-template-columns:1fr auto;gap:9px}
+    .preview-wrap{background:#181818;border-radius:28px;padding:12px}
+    .preview-toolbar{display:flex;justify-content:space-between;align-items:center;color:#aaa;font-size:11px;font-weight:850;letter-spacing:.08em;padding:3px 4px 10px}
+    .preview-toolbar .live{display:flex;align-items:center;gap:7px}
+    .preview-toolbar .live:before{content:"";width:7px;height:7px;border-radius:50%;background:#58d68d}
+    .preview-theme-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+    .preview-theme-actions button{padding:9px 12px}
+    .workshop-gate{
+      margin-top:14px;display:flex;justify-content:space-between;align-items:center;gap:24px;
+      background:linear-gradient(135deg,#171717,#25201e);color:#fff;border-radius:24px;padding:20px
+    }
+    .workshop-gate p{color:#bcb7b2;margin:6px 0 0;line-height:1.55;font-size:13px}
+    .workshop-gate strong{display:block;font-size:18px}
+    .funnel-strip{
+      display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:16px
+    }
+    .funnel-strip>div{
+      border:1px solid var(--line);background:rgba(255,255,255,.6);border-radius:18px;padding:16px
+    }
+    .funnel-strip span{font-size:10px;color:var(--red);font-weight:950;letter-spacing:.1em}
+    .funnel-strip strong{display:block;margin:5px 0 4px}
+    .funnel-strip small{color:var(--muted);line-height:1.5}
+    .work-grid{display:grid;grid-template-columns:1.2fr .8fr .8fr;gap:16px}
+    .work-card{position:relative;overflow:hidden;border-radius:28px;min-height:340px;border:1px solid var(--line);background:#fff;box-shadow:var(--shadow-soft)}
+    .work-card.large{min-height:440px}
+    .work-thumb{position:absolute;inset:0;background-size:cover;background-position:center;transition:transform .4s ease}
+    .work-card:hover .work-thumb{transform:scale(1.025)}
+    .work-overlay{position:absolute;inset:auto 0 0 0;padding:24px;background:linear-gradient(transparent,rgba(0,0,0,.76));color:#fff}
+    .work-overlay small{opacity:.76}
+    .work-overlay h3{font-size:24px;margin:6px 0 0}
+    .work-badge{position:absolute;top:16px;left:16px;padding:7px 10px;border-radius:999px;background:rgba(255,255,255,.86);backdrop-filter:blur(10px);font-size:11px;font-weight:900}
+    .service-band{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+    .service-band .card{min-height:210px;background:rgba(255,255,255,.54)}
+    .price-grid .card{background:rgba(255,255,255,.66)}
+    .price-grid .featured{background:#171717;color:#fff}
+    .price-grid .featured p,.price-grid .featured .tiny{color:#bcbcbc}
+    .process .step{background:rgba(255,255,255,.35);border-radius:0 0 18px 18px}
+    .formbox{box-shadow:var(--shadow)}
+    @media(max-width:900px){
+      .agent-grid,.work-grid,.service-band,.funnel-strip{grid-template-columns:1fr 1fr}
+      .work-card.large{grid-column:1/-1}
+      .workshop-gate{align-items:flex-start;flex-direction:column}
+    }
+    @media(max-width:620px){
+      .agent-grid,.work-grid,.service-band,.funnel-strip{grid-template-columns:1fr}
+      .work-card.large{grid-column:auto}
+      .agent-controls{grid-template-columns:1fr}
+      .hero{padding-top:76px}
+    }
+
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <div class="wrap navin">
+      <a class="brand" href="#top"><span class="mark">1</span><span>一頁起家</span></a>
+      <div class="links">
+        <a href="#work">作品</a><a href="#try">AI 顧問</a>
+        <a href="#services">服務</a>
+        <a href="#pricing">價格</a>
+        <a href="#process">流程</a>
+      </div>
+      <a class="btn red" href="#contact">開始一個專案 ↗</a>
+    </div>
+  </nav>
+
+  <main id="top">
+    <section class="hero">
+      <div class="wrap hero-grid">
+        <div>
+          <span class="eyebrow"><span class="dot"></span> AI-assisted · Human-reviewed</span>
+          <h1>從第一頁，<br>開始你的生意。</h1>
+          <p class="lead">網站、品牌、內容、設計與 AI 自動化。不是丟一個 Prompt 就交件，而是把模糊的想法，做成真正可以使用、可以上線、可以拿去做生意的成果。</p>
+          <div class="actions">
+            <a class="btn red" href="#try">看看你的網站可以長怎樣</a>
+            <a class="btn ghost" href="#services">瀏覽所有服務</a>
+          </div>
+        </div>
+        <div class="hero-card">
+          <div class="browser">
+            <div class="bar"><span class="ball"></span><span class="ball"></span><span class="ball"></span></div>
+            <div class="mini">
+              <div class="kicker">Demo / Interior Studio</div>
+              <h3>讓空間，替生活說話。</h3>
+              <p>從住宅到商業空間，以乾淨的比例、材質與光線，讓每個空間都有自己的節奏。</p>
+              <span class="mini-cta">預約諮詢</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <div class="section-head">
+          <div><div class="kicker">01 / Goals</div><h2>你今天想完成什麼？</h2></div>
+          <p class="sub">不用先學會網站術語。告訴我們你的目標，我們再把它拆成能執行的工作。</p>
+        </div>
+        <div class="goals">
+          <div class="card"><div class="icon">🌐</div><h3>我要一個網站</h3><p>品牌頁、Landing Page、作品集、活動頁，一頁把最重要的事情講清楚。</p></div>
+          <div class="card"><div class="icon">🎨</div><h3>我要建立品牌</h3><p>Logo、品牌識別、視覺方向與商業素材，讓品牌不要每張圖都像不同家公司。</p></div>
+          <div class="card"><div class="icon">📣</div><h3>我要開始行銷</h3><p>社群內容、廣告素材、Landing Page、SEO 內容與 Campaign 規劃。</p></div>
+          <div class="card"><div class="icon">✍️</div><h3>我要有人做內容</h3><p>網站文案、SEO 文章、社群貼文、腳本與品牌語氣整理。</p></div>
+          <div class="card"><div class="icon">🤖</div><h3>我要導入 AI</h3><p>流程診斷、Prototype、Workflow、自動化與可落地的小型 AI 應用。</p></div>
+          <div class="card"><div class="icon">🧩</div><h3>我還不知道要什麼</h3><p>沒關係。先說你現在卡在哪，我們一起把需求翻譯成人話。</p></div>
+        </div>
+      </div>
+    </section>
+
+    
+    
+    <section id="work">
+      <div class="wrap">
+        <div class="section-head">
+          <div><div class="kicker">SELECTED WORK</div><h2>不只說我們會做，直接給你看。</h2></div>
+          <p class="sub">作品可依 Web、UI/UX、Brand、Content、Video、AI、Automation 等分類。Demo、內部產品與真實客戶案會明確標示，不混在一起。</p>
+        </div>
+
+        <div class="work-grid">
+          <article class="work-card large">
+            <div class="work-thumb" style="background:
+              linear-gradient(135deg,rgba(22,22,22,.12),rgba(22,22,22,.02)),
+              linear-gradient(145deg,#d9ccb8 0%,#f8f4ed 45%,#8d755e 100%);"></div>
+            <span class="work-badge">DEMO · WEB</span>
+            <div class="work-overlay">
+              <small>Premium Brand Landing Page</small>
+              <h3>山序設計 / Interior Studio</h3>
+            </div>
+          </article>
+
+          <article class="work-card">
+            <div class="work-thumb" style="background:
+              radial-gradient(circle at 70% 30%,rgba(255,255,255,.55),transparent 25%),
+              linear-gradient(145deg,#ef3e2f 0%,#ff8b74 48%,#f9d8c8 100%);"></div>
+            <span class="work-badge">INTERNAL · BRAND</span>
+            <div class="work-overlay">
+              <small>Identity / System</small>
+              <h3>一頁起家</h3>
+            </div>
+          </article>
+
+          <article class="work-card">
+            <div class="work-thumb" style="background:
+              linear-gradient(160deg,#121212 0%,#29221f 55%,#b8916b 100%);"></div>
+            <span class="work-badge">DEMO · AI</span>
+            <div class="work-overlay">
+              <small>Agent + Website Engine</small>
+              <h3>AI Website Workshop</h3>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+<section id="try">
+      <div class="wrap">
+        <div class="section-head">
+          <div><div class="kicker">02 / AI WEBSITE ADVISOR</div><h2>先聊需求，再讓網站長出來。</h2></div>
+          <p class="sub">免費階段負責理解需求、推薦方案與基礎試穿。當 AI 開始替你規劃架構、寫內容、操作網站，就進入可付費的 Website Workshop。</p>
+        </div>
+
+        <div class="agent-panel">
+          <div class="agent-grid">
+            <div>
+              <div class="agent-title">
+                <div>
+                  <strong style="font-size:20px">一頁 AI 顧問</strong><br>
+                  <small>有邊界的自由對話，不是免費 ChatGPT 分店。</small>
+                </div>
+                <span class="eyebrow"><span class="dot"></span> 免費諮詢模式</span>
+              </div>
+
+              <div id="chat" class="agent-chatlog">
+                <div class="bubble-ai">嗨，直接告訴我你想做什麼。你不用先知道該買哪個方案。</div>
+                <div class="bubble-user">我想幫一家甜點店做網站，要有質感但不要太黑。</div>
+                <div class="bubble-ai">這類需求很適合先從一頁式開始。我先替你切成「溫暖精品」方向。免費階段可以試基本方向；要我繼續排 Section、寫文案並修改網站，就會進入 Workshop。</div>
+              </div>
+
+              <div class="agent-controls">
+                <input id="agentInput" placeholder="例如：我開咖啡店，只有 IG 和照片">
+                <button id="agentSend" class="btn red">問 AI 顧問</button>
+              </div>
+
+              <div class="scope-note" style="margin-top:12px">
+                <strong>免費：</strong>服務、案例、方案、價格區間、初步需求、基礎試穿。<br>
+                <strong>付費成果：</strong>Blueprint、Section、文案、版型操作、多輪 Preview。
+              </div>
+            </div>
+
+            <div>
+              <div class="preview-wrap">
+                <div class="preview-toolbar">
+                  <span class="live">AGENT-CONTROLLED LIVE PREVIEW</span>
+                  <span>Desktop</span>
+                </div>
+                <div class="site-preview">
+                  <div class="site-nav"><div class="site-logo">暮光甜室</div><div>STORY　MENU　VISIT</div></div>
+                  <div id="siteHero" class="site-hero" style="background:#f4e6d5">
+                    <div class="kicker">甜點品牌</div>
+                    <h4>把今天的甜，留久一點。</h4>
+                    <p>手作甜點、季節風味與一點剛好的儀式感。讓第一次認識品牌，就成為想親自來一趟的理由。</p>
+                    <span id="previewBtn" class="site-btn" style="background:#b65d43">看看今日甜點</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="preview-theme-actions">
+                <button class="chip look" data-look="warm">暖一點</button>
+                <button class="chip look" data-look="luxury">精品一點</button>
+                <button class="chip look" data-look="minimal">更極簡</button>
+              </div>
+
+              <div class="workshop-gate">
+                <div>
+                  <span class="paid-label">WEBSITE WORKSHOP</span>
+                  <strong>想讓 AI 繼續替你把網站做下去？</strong>
+                  <p>解鎖需求 Blueprint、Section 規劃、文案初稿、Theme / Layout 操作與多輪 Preview。正式委託建站時可折抵。</p>
+                </div>
+                <button id="unlock" class="btn red">NT$ 990 起 · 解鎖工作坊</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="funnel-strip">
+            <div><span>FREE</span><strong>AI Website Advisor</strong><small>聊需求・推薦方案・基礎試穿</small></div>
+            <div><span>PAID</span><strong>Website Workshop</strong><small>Blueprint・文案・Agent 操作網站</small></div>
+            <div><span>BUILD</span><strong>正式建站</strong><small>人工 QA・RWD・部署・交付</small></div>
+            <div><span>CARE</span><strong>維護合作</strong><small>內容更新・功能追加・持續優化</small></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <div class="section-head">
+          <div><div class="kicker">03 / AI philosophy</div><h2>會用 AI，跟能用 AI 做出產品，是兩回事。</h2></div>
+          <p class="sub">我們不隱瞞 AI，也不販賣 AI。你付的不是生成費，而是完成費。</p>
+        </div>
+        <div class="compare">
+          <div class="card">
+            <div class="kicker">只會使用 AI</div>
+            <div class="flow">
+              <div>輸入 Prompt</div><div>AI 生成</div><div>看起來差不多</div><div>直接交付</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="kicker">一頁起家的工作方式</div>
+            <div class="flow good">
+              <div>理解需求與商業目標</div><div>AI 協作 + 專業判斷</div><div>設計 / 開發 / 測試</div><div>人工 Review 後正式交付</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="services">
+      <div class="wrap">
+        <div class="section-head">
+          <div><div class="kicker">04 / Services</div><h2>需要的是成果，不是一長串工具名稱。</h2></div>
+          <p class="sub">我們把服務收斂成四條產品線，依專案組合，不讓首頁變成數位菜市場。</p>
+        </div>
+        <div class="service-band">
+          <div class="card"><div class="icon">🌐</div><h3>Web</h3><p>一頁式網站、Landing Page、UI/UX、網站優化與部署。</p></div>
+          <div class="card"><div class="icon">🎨</div><h3>Brand & Design</h3><p>品牌識別、Logo、商業視覺、社群與廣告素材。</p></div>
+          <div class="card"><div class="icon">✍️</div><h3>Content & Growth</h3><p>品牌文案、SEO、社群內容、廣告文案與 Campaign。</p></div>
+          <div class="card"><div class="icon">🤖</div><h3>AI & Automation</h3><p>流程診斷、Prototype、Workflow、Agent 與自動化。</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="pricing">
+      <div class="wrap">
+        <div class="section-head">
+          <div><div class="kicker">05 / PRODUCT LADDER</div><h2>先試，再決定要做到多深。</h2></div>
+          <p class="sub">價格依責任範圍與客製程度，不按「只有一頁」亂算。Workshop 是成果製作的付費起點，正式建站則包含人工 QA 與交付責任。</p>
+        </div>
+        <div class="price-grid">
+          <div class="card price"><h3>AI Advisor</h3><div class="money">免費</div><p>需求探索、方案推薦、價格區間與基礎網站試穿。</p></div>
+          <div class="card price featured"><span class="tag">POPULAR</span><h3>Website Workshop</h3><div class="money">NT$ 990<span class="tiny"> 起</span></div><p>Blueprint、Section、文案與 Agent 網站操作；正式建站可折抵。</p></div>
+          <div class="card price"><h3>Custom</h3><div class="money">NT$ 30,000<span class="tiny"> 起</span></div><p>依品牌與需求重新設計，不被模板限制。</p></div>
+          <div class="card price"><h3>Strategy</h3><div class="money">專案報價</div><p>策略、內容、UX/UI、開發與追蹤一起處理。</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="process">
+      <div class="wrap">
+        <div class="section-head">
+          <div><div class="kicker">06 / Process</div><h2>合作流程，別搞得像解支線任務。</h2></div>
+        </div>
+        <div class="process">
+          <div class="step"><div class="num">01</div><h3>需求</h3><p>告訴我們想完成什麼。</p></div>
+          <div class="step"><div class="num">02</div><h3>方向與報價</h3><p>確認 Scope、工期與費用。</p></div>
+          <div class="step"><div class="num">03</div><h3>製作與 Review</h3><p>設計、開發、測試與修改。</p></div>
+          <div class="step"><div class="num">04</div><h3>上線 🚀</h3><p>正式交付，後續需要再進維護。</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="contact">
+      <div class="wrap">
+        <div class="formbox">
+          <div>
+            <div class="kicker">07 / Start</div>
+            <h2>你不需要先知道怎麼做。</h2>
+            <p class="sub">只要告訴我們，你現在想完成什麼。剩下的，我們一起拆。</p>
+          </div>
+          <form onsubmit="event.preventDefault(); document.getElementById('thanks').style.display='block';">
+            <div class="formgrid">
+              <div><label>姓名 / 品牌</label><input required placeholder="例如：小山咖啡" /></div>
+              <div><label>想做什麼</label><select><option>一頁式網站</option><option>品牌設計</option><option>內容 / 行銷</option><option>AI 自動化</option><option>還不確定</option></select></div>
+              <div><label>預算範圍</label><select><option>1 萬以下</option><option>1–3 萬</option><option>3–5 萬</option><option>5 萬以上</option><option>還不確定</option></select></div>
+              <div><label>希望完成時間</label><input placeholder="例如：三週內" /></div>
+              <div class="full"><label>描述你的想法</label><textarea rows="5" placeholder="不用寫規格書，人話就好。"></textarea></div>
+              <div class="full"><button class="btn red" type="submit">送出需求 ↗</button></div>
+              <div id="thanks" class="full" style="display:none;color:#9fe3b1;font-weight:800">收到。這是 Demo 表單，目前不會真的送出資料。</div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap foot">
+      <div class="brand"><span class="mark">1</span><span>一頁起家</span></div>
+      <div>AI-assisted · Human-reviewed · Concept V1</div>
+    </div>
+  </footer>
+
+  <script>
+const chat=document.getElementById("chat"),inp=document.getElementById("agentInput");
+function say(t,me){let d=document.createElement("div");d.textContent=t;d.style.cssText="padding:12px;border-radius:15px;line-height:1.55;"+(me?"background:#161616;color:white;margin-left:35px":"background:white;border:1px solid #d9d0c4");chat.appendChild(d);chat.scrollTop=chat.scrollHeight}
+document.getElementById("agentSend").onclick=()=>{let q=inp.value.trim();if(!q)return;say(q,1);inp.value="";setTimeout(()=>say("我可以先免費幫你判斷方向與適合方案。若要我直接替你規劃完整架構、生成文案並操作右側網站，就會提示進入 Website Workshop。"),200)}
+document.querySelectorAll(".look").forEach(x=>x.onclick=()=>{let h=document.getElementById("siteHero"),b=document.getElementById("previewBtn");if(x.dataset.look=="warm"){h.style.background="#f4e6d5";h.style.color="#2a211c";b.style.background="#b65d43"}if(x.dataset.look=="luxury"){h.style.background="#28231f";h.style.color="#f5eadc";b.style.background="#b98b5c"}if(x.dataset.look=="minimal"){h.style.background="#f3f2ee";h.style.color="#171717";b.style.background="#171717"}})
+document.getElementById("unlock").onclick=()=>say("正式版這裡會進入付款／登入後的 Website Workshop。這份 Demo 只展示「免費諮詢 → 付費成果」的邊界，不會真的收款。")
+</script>
+</body>
+</html>
