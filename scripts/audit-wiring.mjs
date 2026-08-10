@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 
 import { config } from "dotenv";
 
@@ -218,6 +218,107 @@ if (media.length === 0) {
     `${media.length} 筆媒體網址都屬於已設定的網域`,
     orphans.length > 0 ? `${orphans.length} 筆不符（會在畫面上消失）` : "",
   );
+}
+
+// ── 8. 路由可達性 ──────────────────────────────────────────────
+//
+// 這一項是為了一類特定的失敗補的：**功能做完了，但畫面上沒有任何地方進得去。**
+//
+// 實例：`/login` 從 2E 就存在並且能用，導覽列卻沒有任何入口；
+// 登入之後也沒有登出。typecheck 過、lint 過、測試全綠、build 成功、
+// e2e 的 no-dead-links 也過——因為它查的是「連結指向的目標存在嗎」，
+// 反方向的「這個目標有連結指向它嗎」沒有任何東西在看。
+//
+// 做法：從 / 開始爬同源連結，跟檔案系統上的路由清單對帳。
+// 沒被連到的路由，要嘛是漏接，要嘛必須在下面的例外表裡寫明理由。
+console.log("\n【8】路由可達性（畫面上真的進得去嗎）");
+
+// 例外＝刻意不連的，每一條都要有理由。理由寫不出來就是漏接。
+const UNLINKED_BY_DESIGN = [
+  [/^\/admin(\/|$)/, "後台走密路徑改寫，公開頁面不得出現任何入口（見 admin-security.spec.ts）"],
+  [/^\/_dev(\/|$)/, "開發用頁面，Guardrail 1 規定不得混入產品訊號"],
+  [/^\/icon-maskable$/, "由 manifest.webmanifest 引用，不是給人點的"],
+];
+
+function routesOnDisk() {
+  const found = [];
+  const walk = (dir, urlPath) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const next = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) {
+        // (group) 不影響網址；@slot 是平行路由。
+        // 資料夾名稱可能是百分比編碼：Next 把 `_` 開頭的資料夾視為私有，
+        // 要產生 /_dev 這種網址，資料夾必須命名為 `%5Fdev`。
+        const segment = /^[(@]/.test(entry.name) ? "" : `/${decodeURIComponent(entry.name)}`;
+        walk(next, `${urlPath}${segment}`);
+      } else if (/^(page|route)\.tsx?$/.test(entry.name)) {
+        found.push(urlPath === "" ? "/" : urlPath);
+      }
+    }
+  };
+  walk("src/app", "");
+  return [...new Set(found)];
+}
+
+/** 動態路由在磁碟上是 /work/[slug]，爬到的是 /work/interior-studio。 */
+function matchesRoute(route, visitedPaths) {
+  const pattern = new RegExp(
+    `^${route.replace(/\[\.\.\.[^\]]+\]/g, ".+").replace(/\[[^\]]+\]/g, "[^/]+")}$`,
+  );
+  return visitedPaths.some((path) => pattern.test(path));
+}
+
+const visited = new Set();
+const queue = ["/"];
+const brokenLinks = new Set();
+
+while (queue.length > 0) {
+  const path = queue.shift();
+  if (visited.has(path)) continue;
+  visited.add(path);
+
+  let response;
+  try {
+    response = await fetch(`${siteUrl}${path}`, { redirect: "manual" });
+  } catch {
+    continue;
+  }
+  if (response.status !== 200) {
+    if (path !== "/") brokenLinks.add(`${path} → HTTP ${response.status}`);
+    continue;
+  }
+  if (!response.headers.get("content-type")?.includes("text/html")) continue;
+
+  const html = await response.text();
+  for (const match of html.matchAll(/href="([^"]+)"/g)) {
+    const href = match[1];
+    if (!href.startsWith("/") || href.startsWith("//")) continue;
+    const clean = href.split(/[?#]/)[0].replace(/(.)\/$/, "$1");
+    if (clean && !visited.has(clean)) queue.push(clean);
+  }
+}
+
+const disk = routesOnDisk();
+const visitedPaths = [...visited];
+const orphans = disk.filter((route) => {
+  if (matchesRoute(route, visitedPaths)) return false;
+  return !UNLINKED_BY_DESIGN.some(([pattern]) => pattern.test(route));
+});
+
+pass(`從 / 爬到 ${visited.size} 個頁面，磁碟上共 ${disk.length} 條路由`);
+
+if (orphans.length === 0) {
+  pass("每條路由都有畫面上的入口（或列為刻意不連並附理由）");
+} else {
+  for (const route of orphans) {
+    fail(`${route} 存在但畫面上沒有任何連結進得去`, "漏接，或該加進 UNLINKED_BY_DESIGN 並寫明理由");
+  }
+}
+
+if (brokenLinks.size === 0) {
+  pass("爬到的連結都指向存在的頁面");
+} else {
+  for (const link of brokenLinks) fail("死連結", link);
 }
 
 // ── 總結 ───────────────────────────────────────────────────────

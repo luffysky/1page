@@ -1,4 +1,16 @@
-@import "tailwindcss";
+/* 只掃 src/。
+ *
+ * Tailwind v4 預設會自動偵測來源，範圍是整個專案（扣掉 .gitignore 的部分）。
+ * 那包含 docs/——而 docs 裡寫的是**說明文字**，不是要生效的 class。
+ *
+ * 實際發生過：worklog 裡有一句「用 Tailwind 任意值 `bg-[var(--site-*)]`」，
+ * Tailwind 把那串當成真的 class 產出 `background-color: var(--site-*)`，
+ * 那不是合法的 CSS 值，整份 stylesheet 解析失敗，**每一頁在 dev 都回 500**。
+ *
+ * 寫文件不該有能力弄壞網站。class 只可能出現在 src/，就只掃 src/。 */
+@import "tailwindcss" source(none);
+@source "../";
+
 @import "../styles/tokens.css";
 
 @layer base {

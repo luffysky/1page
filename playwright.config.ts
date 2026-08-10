@@ -17,6 +17,9 @@ config({ path: [".env.local", ".env"], quiet: true });
 
 export default defineConfig({
   testDir: "./tests",
+  // 只收 *.spec.ts。預設的 testMatch 也吃 *.test.ts，
+  // 那會讓裸跑 `playwright test` 去載 vitest 的單元測試然後炸掉。
+  testMatch: "**/*.spec.ts",
   outputDir: "./test-results",
   reporter: [["list"]],
   retries: 0,
