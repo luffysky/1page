@@ -13,6 +13,11 @@ Design Token 系統（八類）、Home Goal Context（URL 驅動）、八個 Lay
 首頁依 Spec §4 IA 組裝、八斷點 RWD + a11y 基線。
 LCP 356ms / CLS 0（localhost，Phase 8 需以真實網路重測）。
 
+### Phase M — MA 會員 Profile
+`profiles` 表 + `on_auth_user_created` DB trigger + RLS。
+權限維持兩層（`admin_users` 仍是獨立員工白名單），實測**既有 20 條 policy 原封不動**。
+11 條 db 測試以真實會員 JWT 驗證。
+
 ### Phase 2 — Portfolio（2A–2F）
 Schema + RLS（對 Zeabur 實測）、`/work` 列表 + Filter、`/work/[slug]` + SEO、
 Repository 換 Supabase、後台權限 + CRUD、R2 媒體上傳。
@@ -23,11 +28,13 @@ Section Registry（9 元件）、SiteRenderer。
 
 ### 額外完成（不在原計畫）
 - `pnpm gen:slug` 密路徑產生器（多格式、熵值提示）
-- `pnpm audit:wiring` 接線稽核（七項）
+- `pnpm audit:wiring` 接線稽核（**八項**，第 8 項路由可達性見下）
 - PWA（manifest + 動態圖示，刻意不做離線快取）
 - ai_island_v3 的密路徑洩漏修正（已提交至該專案 main，`41819152`）
+- **登出**（先前完全沒有：能登入、沒有任何地方能登出）
+- **後台首次被測試真的渲染過**——先前所有後台測試都只驗「未登入時進不去」
 
-**測試總數：167 unit + 98 e2e + 45 db = 310。**
+**測試總數：174 unit + 119 e2e + 56 db = 349。**
 
 ---
 
@@ -41,12 +48,29 @@ Section Registry（9 元件）、SiteRenderer。
 那件事沒有發生。目前後果有限（兩份清單內容一致），但**沒有任何機制保證它們維持一致**：
 在後台新增分類不會出現在篩選器上。
 
-同理未接線的欄位（`audit:wiring` 第 3 項）：
-`portfolio_categories.active`、`portfolio_tags` 的 join、`admin_users.note`、`created_at`。
+同理未接線的欄位（`audit:wiring` 第 3 項，目前 7 個）：
+`portfolio_categories.active`、`portfolio_tags` 的 join、`admin_users.note`、`created_at`、
+以及 MA 新增的 `profiles.display_name` / `profiles.snowrealm_id`
+（後兩者是預期中的：MB／ME 才會有讀取端，`snowrealm_id` 要等 SSO）。
 
-### 後台頁面沒有納入 RWD 與 a11y 斷點檢查
-`/`、`/work`、`/work/[slug]` 三條公開路由各跑 8 個斷點的 axe + 橫向捲動檢查。
-後台（`/admin/*`、`/login`）沒有——後台也是人在用的。
+### 「畫面上進不去」這類問題現在有守衛了，但只覆蓋連結
+
+`audit:wiring【8】` 從 `/` 爬同源連結，跟磁碟路由對帳，
+抓得到「頁面做完了但沒有入口」。**抓不到**的還有：
+
+```text
+按鈕存在但點了沒反應（onClick 沒接）
+表單送出後沒有任何回饋
+連結存在但被 CSS 蓋住／z-index 壓住
+需要登入才看得到的入口（爬蟲是匿名的）
+```
+
+最後一項在 Phase M 會變重要：會員選單、我的詢問這些入口只有登入後才存在。
+ME 收尾時要讓可達性檢查也帶一個已登入的 session 再爬一次。
+
+### ~~後台頁面沒有納入 RWD 與 a11y 斷點檢查~~ ✅ 已補
+`/login` 與後台總覽各 8 斷點，作品列表與新增表單測最窄/最寬兩端，
+另加「登出後 session 真的失效」。見 `tests/e2e/authed-breakpoints.spec.ts`。
 
 ### 作品詳細頁的 Case Study 無法從後台編輯
 `case_study_json` / `links_json` / `ai_disclosure_json` 已在 schema 與公開頁完整支援，
@@ -59,6 +83,34 @@ Spec §8.7 列出「另可依 Project Type / Industry / Tag / Service 篩選」�
 ---
 
 ## ⏳ 被外部卡住 / 需 Luffy 操作
+
+### 🔴 MB（註冊/登入 UI）上線前必須完成，**順序不能反**
+
+1page 目前**一個 `GOTRUE_SMTP_*` 都沒有**。
+`SnowRealmSpace` 是同一套自架 GoTrue，其 `.env.local` 有可直接照抄的完整組態
+（`GOTRUE_SMTP_HOST` / `PORT` / `USER` / `PASS` / `ADMIN_EMAIL` / `SENDER_NAME`）。
+
+```text
+1. 先設好 SMTP
+2. 再把 GOTRUE_DISABLE_SIGNUP 改成 false
+3. 確認 GOTRUE_MAILER_AUTOCONFIRM 不是 true
+```
+
+**順序反了會出事**：先開註冊、後設 SMTP，中間那段時間任何人都能用
+不存在的信箱建立**已確認**的帳號。而 CR-002 開放註冊的目的正是
+「使用者能透過帳號跟我們聯繫」——信箱是假的，這件事就沒有意義。
+
+第 3 項要確認是因為 `MAILER_AUTOCONFIRM=true` 會直接跳過信箱驗證，
+那等於 SMTP 設了也沒用。
+
+在 1 與 2 完成前，MB 可以寫完並以本機測試，但不能上線。
+
+### 其他
+
+- **`.env.local` 的 `ADMIN_PASSWORD` 與實際帳號密碼不符。** 實測對 GoTrue
+  驗證回 `Invalid login credentials`。e2e 已改為自行開拋棄式帳號、不依賴這組值，
+  但 `pnpm admin:create` 之類的腳本還會讀它。
+
 
 - **ai_island_v3 密路徑 `Ak83QDhUOVqx` 必須更換。** 它曾出現在公開的 robots.txt
   與每位訪客都會載入的根版面 JS chunk 中。改完程式碼救不回來——那串已經公開過。
@@ -172,6 +224,8 @@ Demo/Concept 不得冒充客戶案例       portfolio-layout.test.ts + repositor
 presigned URL 鎖死 type/length/key r2-upload.test.ts（對真實 R2）
 後台密路徑不進瀏覽器 bundle        admin-security.spec.ts
 站內連結不得指向不存在的目標       no-dead-links.spec.ts
+每條路由都要有畫面上的入口         audit:wiring【8】（例外須寫明理由）
+Tailwind 只掃 src/，docs 弄不壞站  tailwind-source-scope.test.ts
 SiteConfig 是不可信輸入            schema.test.ts（44 條，多數在驗惡意輸入）
 未知 section 不使整頁崩潰          site-renderer.test.ts
 ```
