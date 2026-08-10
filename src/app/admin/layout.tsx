@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { isOwnerRole, toAdminUrl } from "@/config/admin";
 import { requireAdmin } from "@/features/admin/auth";
+import { signOutAction } from "@/features/admin/session-actions";
 
 /**
  * 後台版面（Spec §41）
@@ -68,6 +69,16 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <Link href="/" className="hover:text-brand-ink underline underline-offset-4">
               回到網站
             </Link>
+
+            {/* 表單而非按鈕：登出會改變狀態，不該是可被預抓（prefetch）的連結 */}
+            <form action={signOutAction}>
+              <button
+                type="submit"
+                className="border-brand-line hover:border-brand-ink rounded-pill border px-3 py-1"
+              >
+                登出
+              </button>
+            </form>
           </div>
         </div>
       </header>
