@@ -1,10 +1,19 @@
+import { resolve } from "node:path";
+
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      "@": resolve(import.meta.dirname, "./src"),
+    },
+  },
   test: {
-    // 1A 的測試皆為靜態契約檢查（讀檔比對），不需要 DOM。
-    // React Testing Library / axe 於 1C、1E 需要時才引入，避免安裝未使用的相依。
+    // 預設 node：契約測試只是讀檔比對，不需要 DOM。
+    // 需要 DOM 的檔案於檔首標註 `// @vitest-environment jsdom`，
+    // 避免所有測試都付出建立 jsdom 的成本。
     environment: "node",
-    include: ["src/**/*.test.ts", "tests/unit/**/*.test.ts"],
+    setupFiles: ["./vitest.setup.ts"],
+    include: ["src/**/*.test.{ts,tsx}", "tests/unit/**/*.test.ts"],
   },
 });

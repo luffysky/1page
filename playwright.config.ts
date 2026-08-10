@@ -9,7 +9,7 @@ import { defineConfig } from "@playwright/test";
  * 以 dev server 啟動，因為 /_dev/* 在非開發環境會回 404（見 Plan §11 C）。
  */
 export default defineConfig({
-  testDir: "./tests/visual",
+  testDir: "./tests",
   outputDir: "./test-results",
   reporter: [["list"]],
   retries: 0,

@@ -112,4 +112,109 @@ analytics             → 尚未接入，無事件可發
 
 ## 1B — Home Goal Context
 
+**日期：** 2026-08-10  
+**結果：** ✅ 全數通過
+
+### Gate 五項
+
+| # | 項目 | 指令 | 結果 |
+|---|---|---|---|
+| 1 | typecheck | `pnpm typecheck` | ✅ 0 error |
+| 2 | lint | `pnpm lint` | ✅ 0 error / 0 warning |
+| 3 | test | `pnpm test` | ✅ 33 tests / 4 files（1A 14 → 1B 33） |
+| 4 | build | `pnpm build` | ✅ 成功 |
+| 5 | visual／行為 | `pnpm e2e` + `SHOT_TAG=1b pnpm shots` | ✅ e2e 9/9、截圖 16 張 |
+
+> 1B 幾乎沒有視覺產出，Gate 第 5 項驗的是 **URL 行為**（Plan §5）。
+> 因此新增 `tests/e2e/goal-url.spec.ts`，在真實瀏覽器驗證整條鏈路，
+> 而非只靠 mock router 的單元測試。
+
+### 出口條件核對
+
+| 出口條件 | 驗證 | 結果 |
+|---|---|---|
+| Gate 五項全過 | 見上表 | ✅ |
+| `?goal=website` → context = website | e2e | ✅ |
+| 點選 goal → URL 同步更新 | e2e | ✅ |
+| `?goal=banana` → unsure，不拋錯不 404 | e2e（HTTP 200）+ unit | ✅ |
+| unsure → 不套用任何 filter | e2e + unit | ✅ |
+| 重新整理保留 goal | e2e | ✅ |
+| 上一頁可回到前一個 goal | e2e | ✅ |
+| `/?goal=ai` 可透過 debug 輸出驗證 | `GoalDebugPanel`（僅 development） | ✅ |
+
+額外驗證（非計畫要求，但屬真實情境）：
+
+```text
+切換 goal 不造成整頁重新載入   ✅（window 標記存活）
+保留網址上的其他查詢參數        ✅（?utm_source=ig 廣告進站）
+```
+
+### ⚠️ 過程中抓到的重大問題：頁面根本沒有 hydrate
+
+第一次跑 e2e：9 個測試中 6 個失敗，全部是「點擊後 URL 不變」。
+
+根因：**Next 16 將經由 `127.0.0.1` 存取的 dev 資產視為跨來源，以 403 擋下，
+HMR handshake 失敗，頁面完全沒有 hydrate。**
+
+嚴重性在於它的表現形式：
+
+```text
+SSR HTML 正常     → 截圖完全看不出異狀
+唯讀行為正常      → URL → state 的測試通過
+所有互動失效      → 按鈕是死的
+```
+
+1A 的 16 張截圖就是在這個狀態下拍的。當時頁面無互動元素，不影響結論，
+但這證明**純看畫面的驗收會漏掉「畫面對、程式死」這一整類問題**。
+
+處置：`next.config.ts` 加入 `allowedDevOrigins: ["127.0.0.1"]`（僅影響開發環境）。
+
+### 計畫修訂：`router.replace` → `router.push`
+
+計畫原文寫 `router.replace`，但同節驗收要求「上一頁可回到前一個 goal」，
+兩者矛盾（replace 不產生歷史紀錄）。改採 `push`，理由見 Plan §5 修訂說明。
+
+未動 Spec（§6.2 只規定 URL 驅動，未指定 push/replace），故不需 CR。
+
+### 另一個測試自身的 bug
+
+「上一頁」測試起初失敗並退到 `about:blank`。實測 `history.length` 後確認
+實作正常（2 → 3），是測試在 URL 寫入前就 `goBack()`——樂觀狀態更新刻意早於
+URL 寫入，測試必須等 URL 真的變更。已於測試中補上等待並註明原因。
+
+### 實作要點
+
+```text
+config/home-goals.ts        六個 goal + §6.1 對應表，唯一來源
+features/home/goal-context  Provider / useHomeGoal
+features/home/goal-debug-panel  僅 development 渲染
+```
+
+兩個刻意的設計選擇：
+
+1. **不使用 `useSearchParams()`**，改在事件處理中讀 `window.location.search`。
+   前者會讓元件與「頁面是否靜態預先產生」耦合（靜態頁需 Suspense 包裹），
+   而目前只在使用者互動時才需要當前查詢字串。
+
+2. **以「render 期間由 props 調整 state」同步上一頁／下一頁**，而非 `useEffect`。
+   少一次多餘 paint，且是 React 官方建議寫法。
+
+### 需要注意的取捨
+
+首頁因讀取 `searchParams` 而成為**動態渲染**（build 輸出 `ƒ /`）。
+Phase 1 無資料庫，成本可忽略；Phase 2 接 Supabase 後需重新評估快取策略，
+1E 的 LCP 驗收也應涵蓋此路由。
+
+### 相依調整
+
+| 套件 | 時機 | 說明 |
+|---|---|---|
+| `zod` | 1B | `?goal=` 驗證（Spec §36 指定） |
+| `@testing-library/react` 等 | 1B | 1B 首次出現 client provider 與 hook，RTL 於此才有用途 |
+| `@vitejs/plugin-react` | 已移除 | 要求 vite ^8，vitest 3 帶 vite 7；vitest 的 esbuild 依 tsconfig 已能處理 TSX |
+
+---
+
+## 1C — Layout Primitives
+
 _未開始_

@@ -37,8 +37,8 @@ Gate 未過不得跳段。詳見 Implementation Plan §9。
 ```text
 Phase 0   規格與計畫              ✅ 完成
 Phase 1A  Scaffold + Tokens       ✅ Gate 通過
-Phase 1B  Home Goal Context       ⏳ 待開始
-Phase 1C  Layout Primitives       ⏳
+Phase 1B  Home Goal Context       ✅ Gate 通過
+Phase 1C  Layout Primitives       ⏳ 待開始
 Phase 1D  Homepage Composition    ⏳
 Phase 1E  Responsive + A11y       ⏳
 ```
@@ -53,6 +53,7 @@ Gate 紀錄見 [`docs/gate-log.md`](docs/gate-log.md)。
 pnpm dev          # 開發伺服器
 pnpm gate         # typecheck → lint → test → build（Gate 前四項）
 pnpm shots        # 產生八斷點截圖至 artifacts/（Gate 第 5 項）
+pnpm e2e          # 瀏覽器行為測試（URL / 互動）
 
 pnpm typecheck    # next typegen && tsc --noEmit
 pnpm lint         # eslint + prettier --check

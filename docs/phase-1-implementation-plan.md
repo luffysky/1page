@@ -230,7 +230,7 @@ src/config/home-goals.ts   六個 goal 定義 + 對應 filter 映射
 src/features/home/goal-context.tsx
   - Server: page.tsx 讀 searchParams
   - Client: Provider 持有 optimistic state
-  - 寫回 URL：router.replace(..., { scroll: false })
+  - 寫回 URL：router.push(..., { scroll: false })  ← 見下方修訂
 Zod 驗證 ?goal= 值
 無效值 → fallback "unsure"，不 crash、不丟 404
 useHomeGoal() hook
@@ -243,8 +243,19 @@ useHomeGoal() hook
 ```text
 初始渲染      URL → state          Server 讀 searchParams，決定首次輸出
 互動當下      state → 立即渲染      client context 樂觀更新，畫面即時反應
-互動之後      state → URL          router.replace(scroll:false)，供分享與 analytics
+互動之後      state → URL          router.push(scroll:false)，供分享與 analytics
 ```
+
+**修訂（1B 實作時）：`replace` → `push`**
+
+本計畫原寫 `router.replace`，但同一節的驗收項目要求「瀏覽器上一頁可回到前一個
+goal」——`replace` 不產生歷史紀錄，兩者無法同時成立。
+
+採 `push`：goal 選擇是使用者的明確操作，上一頁應該能回到前一個 goal。
+代價是連續切換會累積歷史紀錄，屬可接受成本。
+
+此處理未動 Spec（Spec §6.2 只規定「URL 驅動」，未指定 push/replace），
+因此不需要 CR。
 
 即：**URL 是初始來源與可分享紀錄，互動期間由 client state 驅動畫面。**
 兩者在定義好的時點單向同步，不同時爭奪控制權。
