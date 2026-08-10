@@ -96,8 +96,7 @@ build 輸出的路由清單看得出來，但只看「build 成功」不會發�
 
 ## ⏳ 需 Luffy 操作（沒法純 code 修）
 
-- **ai_island_v3 的密路徑必須更換**。`Ak83QDhUOVqx` 曾出現在 robots.txt 與每位訪客的根版面 JS chunk 中，改完程式碼救不回來。可用本專案的 `pnpm gen:slug` 產生新的。
-- **ai_island_v3 的修改尚未 commit**（那是另一個專案，提交與否由 Luffy 決定）。
+- **ai_island_v3 的密路徑必須更換**（唯一還沒做的）。`Ak83QDhUOVqx` 曾出現在 robots.txt 與每位訪客的根版面 JS chunk 中，改完程式碼救不回來。可用本專案的 `pnpm gen:slug` 產生新的。
 - ai_island_v3 的安全修正**已提交至 main**（`41819152`），尚未 push。
 - R2 已綁自訂網域 `1page-r2.snowrealm.pet`，與站台同註冊網域。
   **目前不需調整**：cookie 走瀏覽器預設的 host-only，媒體網域收不到。

@@ -25,7 +25,7 @@ Section Registry（9 元件）、SiteRenderer。
 - `pnpm gen:slug` 密路徑產生器（多格式、熵值提示）
 - `pnpm audit:wiring` 接線稽核（七項）
 - PWA（manifest + 動態圖示，刻意不做離線快取）
-- ai_island_v3 的密路徑洩漏修正（**未 commit**，見下）
+- ai_island_v3 的密路徑洩漏修正（已提交至該專案 main，`41819152`）
 
 **測試總數：167 unit + 98 e2e + 45 db = 310。**
 
@@ -63,7 +63,7 @@ Spec §8.7 列出「另可依 Project Type / Industry / Tag / Service 篩選」�
 - **ai_island_v3 密路徑 `Ak83QDhUOVqx` 必須更換。** 它曾出現在公開的 robots.txt
   與每位訪客都會載入的根版面 JS chunk 中。改完程式碼救不回來——那串已經公開過。
   可用本專案的 `pnpm gen:slug` 產生新的。
-- **ai_island_v3 的修改尚未 commit。** 那是另一個專案，提交與否由 Luffy 決定。
+- **ai_island_v3 的修正已提交至該專案 main**（`41819152`）。✅
 - **後台帳號密碼已更換**（原本 9 碼）。✅
 - **Supabase 公開註冊已關閉**（`GOTRUE_DISABLE_SIGNUP=true`，實測 422）。✅
 - **R2 已綁自訂網域** `1page-r2.snowrealm.pet`。✅
