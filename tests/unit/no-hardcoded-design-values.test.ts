@@ -21,6 +21,8 @@ const ALLOWED_VALUE_FILES: Record<string, string> = {
   "src/styles/tokens.css": "設計數值的唯一歸屬地",
   "src/features/website-engine/schema.ts":
     "驗證器：必須列出 rgb()/hsl() 等函式名稱才能檢查 SiteConfig 的色彩值，本身不含任何設計數值",
+  "src/app/%5Fdev/theme/page.tsx":
+    "Theme Engine 驗證頁（dev only）：色碼是示範用的「客戶網站主題」內容，不是本站的設計數值",
 };
 
 /**
@@ -74,8 +76,12 @@ describe("設計數值只能來自 tokens.css", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("TSX 中不得使用 style={{ ... }} inline style", () => {
+  it("TSX 中不得使用 inline style", () => {
     // Spec §45.2 明列 inline style 為 Demo 不可移植的原因之一。
+    //
+    // 比對 `style={` 而非 `style={{`：後者只抓得到物件字面值，
+    // `style={someVar}` 會整個漏掉——而那正是主題注入實際的寫法。
+    // 這個漏洞是在 3B 加入 SiteScope 時才發現的。
     //
     // 例外採「具名清單」而非放寬規則：每一個例外都要寫明理由，
     // 這樣「為什麼這裡可以」不會隨時間流失，也不會有人順手再加一個。
@@ -83,13 +89,16 @@ describe("設計數值只能來自 tokens.css", () => {
       // 上傳進度條的寬度是執行期計算的百分比，無法用 Tailwind class 表達。
       // 這不是「懶得寫 class」，是 CSS 類別本質上表達不了連續變化的值。
       "src/app/admin/portfolio/media-manager.tsx": "上傳進度條寬度（執行期百分比）",
-      // Phase 3 的 SiteRenderer 需以 inline style 注入 --site-* 至
-      // [data-site-scope]，屆時在此加入，而非直接放寬規則。
+      // 全站唯一允許注入主題變數的地方（Plan §3）。
+      // 用 inline style 而非 <style> 或 class 的理由見該檔說明。
+      "src/features/website-engine/site-scope.tsx": "--site-* 主題變數注入點",
+      // 示範 Section 元件如何只使用 --site-* 變數。僅開發環境存在。
+      "src/app/%5Fdev/theme/page.tsx": "Theme Engine 視覺驗證頁（dev only）",
     };
 
     const offenders = files
       .filter((file) => file.path.endsWith(".tsx"))
-      .filter((file) => /style=\{\{/.test(file.content))
+      .filter((file) => /style=\{/.test(file.content))
       .filter((file) => !(file.path in ALLOWED_INLINE_STYLE))
       .map((file) => file.path);
 
@@ -99,10 +108,14 @@ describe("設計數值只能來自 tokens.css", () => {
   it("inline style 的例外清單不得包含已不再使用它的檔案", () => {
     // 例外清單腐爛的方向通常是「留著沒人記得為什麼」。
     // 這條讓過期的例外被主動清掉，而不是無限累積。
-    const allowed = ["src/app/admin/portfolio/media-manager.tsx"];
+    const allowed = [
+      "src/app/admin/portfolio/media-manager.tsx",
+      "src/features/website-engine/site-scope.tsx",
+      "src/app/%5Fdev/theme/page.tsx",
+    ];
     const stale = allowed.filter((path) => {
       const file = files.find((item) => item.path === path);
-      return file && !/style=\{\{/.test(file.content);
+      return file && !/style=\{/.test(file.content);
     });
 
     expect(stale).toEqual([]);

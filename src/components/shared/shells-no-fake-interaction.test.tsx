@@ -26,12 +26,14 @@ describe("TemplateExperienceShell", () => {
     }
   });
 
-  it("site scope 容器存在，Phase 3 才注入 --site-* 變數", () => {
+  it("site scope 容器永遠存在，即使尚未選擇模板", () => {
     const { container } = render(<TemplateExperienceShell />);
     expect(container.querySelector(`[${SITE_SCOPE_ATTRIBUTE}]`)).not.toBeNull();
   });
 
-  it("scope 容器上沒有任何 inline style —— Phase 1 不做主題注入", () => {
+  it("沒有 config 時不注入任何主題變數", () => {
+    // 3B 之後 SiteScope 會注入 --site-*，但那需要 config。
+    // 沒有 config 就沒有主題，容器上不該憑空出現樣式。
     const { container } = render(<TemplateExperienceShell />);
     const scope = container.querySelector(`[${SITE_SCOPE_ATTRIBUTE}]`);
     expect(scope?.getAttribute("style")).toBeNull();

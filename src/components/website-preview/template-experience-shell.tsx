@@ -1,10 +1,7 @@
 "use client";
 
-import {
-  SITE_SCOPE_ATTRIBUTE,
-  type Device,
-  type SiteConfig,
-} from "@/features/website-engine/types";
+import { SiteScope } from "@/features/website-engine/site-scope";
+import { type Device, type SiteConfig } from "@/features/website-engine/types";
 
 /**
  * Template Experience Shell（Spec §8.15）
@@ -46,20 +43,31 @@ export function TemplateExperienceShell({
 
       <div className="bg-brand-ink rounded-lg p-2.5">
         {/*
-         * Preview 的 CSS 變數作用域邊界。Phase 3 會在此以 inline style 注入
-         * ThemeConfig 對應的 --site-* 變數；官網自己的 --color-brand-* 永遠留在 :root。
-         * 現在是空殼，但容器先存在，避免 Phase 3 忘記 scope 這件事。
+         * 3B 起這裡是真正的樣式作用域：SiteScope 會把 ThemeConfig 注入
+         * --site-* 自訂屬性，官網自己的 --color-brand-* 永遠留在 :root。
+         *
+         * 尚無 config 時仍渲染一個沒有主題的容器——容器本身從 1C 就存在，
+         * 目的就是避免有人在別處另外想一套注入方式。
          */}
-        <div
-          {...{ [SITE_SCOPE_ATTRIBUTE]: "" }}
-          className="bg-brand-paper grid min-h-[19rem] place-items-center rounded-md"
-        >
-          <p className="text-body-sm text-brand-muted max-w-[28ch] text-center">
-            {config
-              ? config.brand.name
-              : "SiteRenderer 於 Phase 3 接上。此區塊目前為空殼，不做任何 DOM 樣式操作。"}
-          </p>
-        </div>
+        {config ? (
+          <SiteScope
+            theme={config.theme}
+            className="grid min-h-[19rem] place-items-center rounded-md"
+          >
+            <p className="text-body-sm max-w-[28ch] text-center">{config.brand.name}</p>
+          </SiteScope>
+        ) : (
+          // 沒有 config 時仍保留 scope 容器（1C 立下的不變量）：
+          // 容器一直存在，別人就不會在其他地方另外發明一套注入方式。
+          <div
+            data-site-scope=""
+            className="bg-brand-paper grid min-h-[19rem] place-items-center rounded-md"
+          >
+            <p className="text-body-sm text-brand-muted max-w-[28ch] text-center">
+              尚未選擇模板。Section 元件於 3C 加入，實際模板於 Phase 4。
+            </p>
+          </div>
+        )}
       </div>
 
       <fieldset disabled className="mt-4 opacity-55">
