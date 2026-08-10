@@ -12,6 +12,8 @@ AI-assisted Digital Studio / Interactive Sales Platform
 | ---------------------------------------------------------------------------- | --------------------------------------------------- |
 | [`docs/1page-v1-spec.md`](docs/1page-v1-spec.md)                             | **V1.1 · FROZEN · Source of Truth**                 |
 | [`docs/phase-1-implementation-plan.md`](docs/phase-1-implementation-plan.md) | Phase 1（1A–1E）實作計畫                            |
+| [`docs/todo/`](docs/todo/)                                                   | 待辦狀態校正（`todo_list_MMDD.md`）                 |
+| [`docs/worklog/`](docs/worklog/)                                             | 每日工作日誌（`daily_works_MMDD.md`）               |
 | [`docs/gptsay.md`](docs/gptsay.md)                                           | V1 → V1.1 的 review 討論紀錄                        |
 | [`yipage_studio_v3_polished.html`](yipage_studio_v3_polished.html)           | V3 概念 Demo（僅供參考，**不得移植**，見 Spec §45） |
 
@@ -70,6 +72,8 @@ pnpm gate         # typecheck → lint → test → build（Gate 前四項）
 pnpm shots        # 產生八斷點截圖至 artifacts/（Gate 第 5 項）
 pnpm e2e          # 瀏覽器行為測試（URL / 互動 / a11y）
 pnpm a11y         # 只跑 axe 無障礙掃描
+pnpm audit:wiring # API↔DB↔UI 接線稽核（需 dev server）
+pnpm gen:slug     # 產生後台密路徑
 
 pnpm typecheck    # next typegen && tsc --noEmit
 pnpm lint         # eslint + prettier --check

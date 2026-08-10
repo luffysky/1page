@@ -29,7 +29,8 @@
     "db:status": "node scripts/db-push.mjs --status",
     "gen:slug": "node scripts/gen-slug.mjs",
     "admin:create": "node scripts/admin-create.mjs",
-    "admin:list": "node scripts/admin-create.mjs --list"
+    "admin:list": "node scripts/admin-create.mjs --list",
+    "audit:wiring": "node scripts/audit-wiring.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1106.0",

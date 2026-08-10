@@ -21,6 +21,8 @@ const ALLOWED_VALUE_FILES: Record<string, string> = {
   "src/styles/tokens.css": "設計數值的唯一歸屬地",
   "src/features/website-engine/schema.ts":
     "驗證器：必須列出 rgb()/hsl() 等函式名稱才能檢查 SiteConfig 的色彩值，本身不含任何設計數值",
+  "src/config/brand-colors.ts":
+    "tokens.css 的鏡像。PWA manifest 與動態圖示拿不到 CSS 變數，一致性由 brand-colors.test.ts 保證",
   "src/app/%5Fdev/theme/page.tsx":
     "Theme Engine 驗證頁（dev only）：色碼是示範用的「客戶網站主題」內容，不是本站的設計數值",
 };
@@ -94,6 +96,10 @@ describe("設計數值只能來自 tokens.css", () => {
       "src/features/website-engine/site-scope.tsx": "--site-* 主題變數注入點",
       // 示範 Section 元件如何只使用 --site-* 變數。僅開發環境存在。
       "src/app/%5Fdev/theme/page.tsx": "Theme Engine 視覺驗證頁（dev only）",
+      // ImageResponse（Satori）在伺服器端算圖，完全不處理 Tailwind class，
+      // 只認 inline style。這不是選擇，是那個渲染器的唯一輸入方式。
+      "src/app/icon.tsx": "ImageResponse 只支援 inline style",
+      "src/app/icon-maskable/route.tsx": "ImageResponse 只支援 inline style",
     };
 
     const offenders = files
@@ -112,6 +118,8 @@ describe("設計數值只能來自 tokens.css", () => {
       "src/app/admin/portfolio/media-manager.tsx",
       "src/features/website-engine/site-scope.tsx",
       "src/app/%5Fdev/theme/page.tsx",
+      "src/app/icon.tsx",
+      "src/app/icon-maskable/route.tsx",
     ];
     const stale = allowed.filter((path) => {
       const file = files.find((item) => item.path === path);
