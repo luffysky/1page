@@ -50,3 +50,7 @@ yarn-error.log*
 .vscode/*
 !.vscode/extensions.json
 !.vscode/settings.json
+
+# supabase local stack
+supabase/.branches
+supabase/.temp

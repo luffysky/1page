@@ -18,9 +18,15 @@
     "shots": "playwright test tests/visual",
     "a11y": "playwright test tests/e2e/a11y.spec.ts",
     "e2e": "playwright test tests/e2e",
-    "gate": "pnpm typecheck && pnpm lint && pnpm test && pnpm build"
+    "gate": "pnpm typecheck && pnpm lint && pnpm test && pnpm build",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:reset": "supabase db reset",
+    "db:types": "supabase gen types typescript --local > src/types/database.ts",
+    "test:db": "vitest run --config vitest.db.config.ts"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.112.2",
     "next": "16.3.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
@@ -38,11 +44,13 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "axe-core": "^4.13.0",
+    "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "16.3.0",
     "eslint-config-prettier": "^10",
     "jsdom": "^30.0.1",
     "prettier": "^3",
+    "supabase": "^2.113.0",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^3"
