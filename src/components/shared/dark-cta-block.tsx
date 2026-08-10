@@ -31,7 +31,7 @@ export function DarkCtaBlock({
             <p className="text-lead mt-6 opacity-75">{lead}</p>
             <a
               href={cta.href}
-              className="bg-brand-accent text-brand-on-accent mt-10 inline-flex rounded-pill px-6 py-4 font-bold"
+              className="bg-brand-accent-strong text-brand-on-accent mt-10 inline-flex rounded-pill px-6 py-4 font-bold"
             >
               {cta.label}
             </a>

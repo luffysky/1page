@@ -47,7 +47,13 @@ const COLORS: { token: string; utility: string; swatch: string; note: string }[]
     token: "--color-brand-accent",
     utility: "bg-brand-accent",
     swatch: "bg-brand-accent",
-    note: "Rocket Red",
+    note: "Rocket Red — 裝飾用，不得承載文字",
+  },
+  {
+    token: "--color-brand-accent-strong",
+    utility: "bg-brand-accent-strong",
+    swatch: "bg-brand-accent-strong",
+    note: "承載文字用（AA 合格）",
   },
   {
     token: "--color-brand-accent-soft",
@@ -145,7 +151,7 @@ function Section({
 }) {
   return (
     <section className="border-brand-line border-t pt-8 pb-16">
-      <p className="text-kicker text-brand-accent uppercase">{index}</p>
+      <p className="text-kicker text-brand-accent-strong uppercase">{index}</p>
       <h2 className="text-heading-1 mt-2 mb-8">{title}</h2>
       {children}
     </section>
@@ -160,7 +166,7 @@ export default function TokensPage() {
   return (
     <main className="mx-auto w-full max-w-page px-gutter py-16 lg:px-gutter-lg">
       <header className="pb-12">
-        <p className="text-kicker text-brand-accent uppercase">Dev · Phase 1A</p>
+        <p className="text-kicker text-brand-accent-strong uppercase">Dev · Phase 1A</p>
         <h1 className="text-display-2 mt-3">Design Tokens</h1>
         <p className="text-lead text-brand-muted mt-5 max-w-prose">
           全站唯一設計數值來源為 <TokenName>src/styles/tokens.css</TokenName>。 此頁只呈現 token

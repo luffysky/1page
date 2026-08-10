@@ -324,4 +324,152 @@ V3 Demo 的作品區全用 CSS 漸層背景，因此完全沒有替代文字（S
 
 ## 1D — Homepage Composition
 
-_未開始_
+**日期：** 2026-08-10  
+**結果：** ✅ 全數通過
+
+### Gate 五項
+
+| # | 項目 | 結果 |
+|---|---|---|
+| 1 | typecheck | ✅ |
+| 2 | lint | ✅ |
+| 3 | test | ✅ 47 tests / 7 files |
+| 4 | build | ✅ |
+| 5 | visual + 行為 | ✅ 截圖 24 張、e2e 26/26 |
+
+### IA 順序（Spec §4，e2e 驗證，不得調換）
+
+```text
+Navbar → Hero → Goal Selector → Selected Work → Template Experience
+→ AI Website Advisor → AI Philosophy → Services → Pricing → Process
+→ Final CTA → Footer
+```
+
+### 四處同步（Plan §6.1 的核心承諾）
+
+選定 goal 後，e2e 逐項驗證四處確實反應：
+
+```text
+1. Selected Work        依 workCategories 篩選
+2. Template Experience  顯示對應模板分類
+3. Services             highlight 對應產品線（aria-current）
+4. Agent CTA            initialIntent 帶入
+＋ URL 同步
+```
+
+**Agent 與 Template 兩區原本吃 server 端的 goal，切換時不會更新——
+同步會少兩處。**改以讀 context 的 client 包裝（`AdvisorSection`、
+`TemplateExperienceSection`），Shell 本身維持純殼、不認識 Home Context。
+
+### Portfolio 資料層
+
+```text
+repository.ts            介面 + filterByGoal（server / client 共用同一支）
+in-memory-repository.ts  Phase 1 假資料，Phase 2 換實作、元件不動
+```
+
+篩選規則只有一份實作：server 與 client 共用 `filterByGoal`，避免兩邊分岔。
+
+篩選後無結果時回傳空陣列並顯示誠實說明，**不偷偷退回全部**——
+那會讓使用者以為篩選有作用，實際上沒有。
+
+### 移除 GoalDebugPanel
+
+1B 的臨時驗證裝置。真正的 Goal Selector 出現後它就是死碼，一併刪除，
+並把 `goal-url.spec.ts` 改為透過真實 UI（`aria-pressed`）驗證——
+測試應該打在使用者實際會碰到的東西上。
+
+
+---
+
+## 1E — Responsive + A11y Baseline
+
+**日期：** 2026-08-10  
+**結果：** ✅ 全數通過
+
+### Gate 五項
+
+| # | 項目 | 結果 |
+|---|---|---|
+| 1 | typecheck | ✅ |
+| 2 | lint | ✅ |
+| 3 | test | ✅ 47 tests / 7 files |
+| 4 | build | ✅ |
+| 5 | visual + 行為 | ✅ 截圖 24 張、e2e 40/40（含 a11y 14 條） |
+
+### ⚠️ axe 抓到三個對比違規——全部在 token 層
+
+這是 Design Token 系統第一次真正發揮作用：問題不在元件，改一處全站修好。
+
+```text
+違規（WCAG AA 要求 4.5:1）
+  --color-brand-muted #726d66 on bg   4.48   差 0.02
+  白字 on --color-brand-accent        3.88
+  --color-brand-accent 當文字 on bg   3.39
+```
+
+處置：
+
+| Token | 前 | 後 | 理由 |
+|---|---|---|---|
+| `--color-brand-muted` | `#726d66` | `#6a655e` | 調深至 5.0:1，色相與暖調不變 |
+| `--color-brand-accent` | `#ef3e2f` | 不變 | 保留品牌 Rocket Red，但**限裝飾用，不得承載文字** |
+| `--color-brand-accent-strong` | — | `#c42a1b` | 新增。對底 4.97:1、配白字 5.69:1 |
+
+替換規則精準鎖定「承載文字的紅」：`text-brand-accent`（全部是文字）
+與 `bg-brand-accent text-brand-on-accent`（紅底白字）。
+裝飾用的紅點、色票、間距示意條完全不動。
+
+> Rocket Red 是品牌色，但它承載不了文字。把 accent 拆成「裝飾級」與
+> 「文字級」是標準解法——品牌識別保留，可讀性不打折。
+
+### Responsive（Spec §34）
+
+八個斷點各自跑 axe 掃描 + 橫向捲動檢查，全數通過：
+
+```text
+375  390  430  768  1024  1280  1440  1920
+```
+
+### A11y 驗證項目
+
+```text
+axe critical / serious            0（首頁、已篩選、空狀態、行動選單開啟四種情境）
+八斷點 axe                        全數 0
+橫向捲動                          全數 0
+鍵盤走訪                          每個焦點元素都有 3px 可見 outline
+prefers-reduced-motion            transition-duration 實測 1e-05s
+行動選單 focus trap               焦點不逸出至背景可互動元素
+```
+
+判準取 critical / serious 為零，不把 moderate / minor 當硬性門檻——
+那層常含情境相關建議，拿來當 Gate 會讓人為了過關寫出奇怪的標記。
+
+### Performance（Spec §33，production build）
+
+```text
+LCP   356 ms    目標 < 2500   ✅
+CLS   0.0000    目標 < 0.1    ✅
+字型  382.8 KB / 9 個分片
+```
+
+> ⚠️ 這是 localhost 量測，**沒有網路延遲，數字偏樂觀**。
+> 結構面的結論才是重點：首屏無阻塞資源、零版面位移。
+> 正式部署後（Phase 8）須以真實網路環境重測。
+
+字型從 1A 的 211.1 KB / 5 分片上升到 382.8 KB / 9 分片——
+如 1A 紀錄所預告，隨頁面中文字數增加。`preload: false` + `display: swap`
+使其不阻塞首屏，LCP 356ms 證實了這點。
+
+指令：`node scripts/measure-vitals.mjs <url>`
+
+### 兩個測試自身的 bug
+
+| 問題 | 實情 |
+|---|---|
+| reduced-motion 斷言用正規式比對 `"0.0001s"` | 瀏覽器以指數記法回報極小值（`1e-05s`），改為轉數值比較 |
+| 鍵盤走訪測試在 `page.evaluate` 內引用 Node 端變數 `i` | 瀏覽器端 ReferenceError，改為在 Node 端累積 |
+
+另外 `<nextjs-portal>`（Next 開發工具浮層）也在 tab 順序中且無 focus 樣式。
+它不是產品內容、production build 不存在，故於測試中排除——
+而不是為了讓測試過關去關掉開發工具。

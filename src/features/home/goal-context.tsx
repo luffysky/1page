@@ -9,6 +9,7 @@ import {
   type HomeGoal,
   type HomeGoalDefinition,
 } from "@/config/home-goals";
+import { track } from "@/lib/analytics/track";
 
 /**
  * Home Goal Context（Spec §6 / Plan §6.2）
@@ -82,8 +83,8 @@ export function HomeGoalProvider({
       // 上一頁應該能回到前一個 goal（見 Plan §5 的驗收項目）。
       router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
 
-      // Spec §31 `goal_selected` 的發送點在此。
-      // analytics 於 1D 接入（Plan §7），屆時在這裡呼叫，不另尋位置。
+      // Spec §31 `goal_selected`
+      track("goal_selected", { goal: next });
     },
     [pathname, router],
   );

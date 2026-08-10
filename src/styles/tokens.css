@@ -31,10 +31,25 @@
   --color-brand-paper: #fffdf9; /* 卡片／浮起表面 */
   --color-brand-cream: #efe5d8; /* 次要區塊底色 */
   --color-brand-ink: #141414; /* Near Black — 主文字、深色區塊 */
-  --color-brand-muted: #726d66; /* Warm Gray — 次要文字 */
   --color-brand-line: #d8d0c7; /* 分隔線、邊框 */
-  --color-brand-accent: #ef3e2f; /* Rocket Red */
-  --color-brand-accent-soft: #ff6a57; /* Accent hover／漸層端點 */
+
+  /* Warm Gray — 次要文字。
+   * Demo 原值 #726d66 對 --color-brand-bg 只有 4.48:1，差 0.02 未達 WCAG AA
+   * 的 4.5:1（Spec §35）。此處調深至 5.0:1，色相與暖調不變。 */
+  --color-brand-muted: #6a655e;
+
+  /* ── Accent 分兩級，這不是潔癖 ──────────────────────────────
+   * Rocket Red #ef3e2f 是品牌色，但它承載不了文字：
+   *   白字放在它上面      3.88:1
+   *   它自己當文字放淺底   3.39:1
+   * 兩者都低於 AA 的 4.5:1。
+   *
+   * 因此拆成兩級：vivid 只作裝飾（不承載任何文字），
+   * strong 用於「文字本身是紅色」或「紅底上要放白字」。
+   * 品牌識別保留，可讀性不打折。 */
+  --color-brand-accent: #ef3e2f; /* 裝飾用。不得承載文字 */
+  --color-brand-accent-strong: #c42a1b; /* 承載文字用。對底 4.97:1、配白字 5.69:1 */
+  --color-brand-accent-soft: #ff6a57; /* 漸層端點、佔位色塊 */
   --color-brand-on-ink: #fffdf9; /* 深色底上的文字 */
   --color-brand-on-accent: #ffffff; /* Accent 底上的文字 */
   --color-brand-focus: #1a5fd0; /* Focus ring — 刻意與 accent 區隔以保對比 */

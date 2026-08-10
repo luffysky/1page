@@ -72,7 +72,7 @@ export function AgentWorkspaceShell({ initialIntent }: { initialIntent: HomeGoal
           />
           <button
             type="button"
-            className="bg-brand-accent text-brand-on-accent text-body-sm rounded-pill px-5 py-3 font-bold whitespace-nowrap"
+            className="bg-brand-accent-strong text-brand-on-accent text-body-sm rounded-pill px-5 py-3 font-bold whitespace-nowrap"
           >
             問 AI 顧問
           </button>

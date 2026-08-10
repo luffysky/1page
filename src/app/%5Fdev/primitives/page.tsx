@@ -75,7 +75,7 @@ function Specimen({
   return (
     <section className="border-brand-line border-t py-14">
       <div className="mx-auto w-full max-w-page px-gutter lg:px-gutter-lg">
-        <p className="text-kicker text-brand-accent uppercase">{index}</p>
+        <p className="text-kicker text-brand-accent-strong uppercase">{index}</p>
         <h2 className="text-heading-1 mt-2">{name}</h2>
         <p className="text-body-sm text-brand-muted mt-2 max-w-prose">{note}</p>
       </div>
@@ -91,7 +91,7 @@ export default function PrimitivesPage() {
 
       <main>
         <div className="mx-auto w-full max-w-page px-gutter pt-14 pb-6 lg:px-gutter-lg">
-          <p className="text-kicker text-brand-accent uppercase">Dev · Phase 1C</p>
+          <p className="text-kicker text-brand-accent-strong uppercase">Dev · Phase 1C</p>
           <h1 className="text-display-2 mt-3">Layout Primitives</h1>
           <p className="text-lead text-brand-muted mt-5 max-w-prose">
             八個版面元件，資料為 mock，尚未組裝成首頁。 兩個 Shell 的切換 UI 一律 disabled——

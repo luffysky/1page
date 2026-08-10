@@ -29,7 +29,7 @@ export function EditorialSection({
       }`}
     >
       <div className={isCentered ? "mx-auto" : ""}>
-        {kicker ? <p className="text-kicker text-brand-accent uppercase">{kicker}</p> : null}
+        {kicker ? <p className="text-kicker text-brand-accent-strong uppercase">{kicker}</p> : null}
         {/* 量測寬度用 em 而非 ch：ch 以拉丁數字「0」的字寬校準，中文字約為其兩倍寬，
             用 ch 會讓中文標題在遠早於預期的位置換行（24ch 實測只放得下 5–6 個中文字）。
             1em ≈ 1 個中文字，因此 14em ≈ 每行 14 字，是可預期的中文行長。 */}

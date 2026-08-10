@@ -25,7 +25,7 @@ function TierRow({ tier, index }: { tier: PricingTier; index: number }) {
         <div className="flex flex-wrap items-center gap-3">
           <h3 className="text-heading-1">{tier.name}</h3>
           {tier.featured ? (
-            <span className="bg-brand-accent text-brand-on-accent text-caption rounded-pill px-2.5 py-1 font-black">
+            <span className="bg-brand-accent-strong text-brand-on-accent text-caption rounded-pill px-2.5 py-1 font-black">
               POPULAR
             </span>
           ) : null}
@@ -48,7 +48,7 @@ export function PricingLadder() {
     <div className="flex flex-col gap-16">
       {PRICING_GROUPS.map((group) => (
         <section key={group.id}>
-          <p className="text-kicker text-brand-accent uppercase">{group.label}</p>
+          <p className="text-kicker text-brand-accent-strong uppercase">{group.label}</p>
           <p className="text-body-sm text-brand-muted mt-2 max-w-prose">{group.description}</p>
 
           <ul className="mt-6">

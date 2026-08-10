@@ -1,3 +1,5 @@
+import { TrackedLink } from "@/components/shared/tracked-link";
+
 export interface HeroCta {
   label: string;
   href: string;
@@ -50,18 +52,20 @@ export function Hero({
       <p className="text-lead text-brand-muted mt-8 max-w-prose">{lead}</p>
 
       <div className="mt-10 flex flex-wrap gap-3">
-        <a
+        <TrackedLink
           href={primaryCta.href}
-          className="bg-brand-accent text-brand-on-accent inline-flex rounded-pill px-6 py-4 font-bold"
+          event="hero_cta_clicked"
+          className="bg-brand-accent-strong text-brand-on-accent inline-flex rounded-pill px-6 py-4 font-bold"
         >
           {primaryCta.label}
-        </a>
-        <a
+        </TrackedLink>
+        <TrackedLink
           href={secondaryCta.href}
+          event="hero_cta_clicked"
           className="border-brand-ink text-brand-ink inline-flex rounded-pill border px-6 py-4 font-bold"
         >
           {secondaryCta.label}
-        </a>
+        </TrackedLink>
       </div>
     </section>
   );

@@ -56,7 +56,7 @@ export function Navbar({ links, cta }: { links: NavLink[]; cta: NavLink }) {
         <div className="flex items-center gap-3">
           <a
             href={cta.href}
-            className="bg-brand-accent text-brand-on-accent text-body-sm hidden rounded-pill px-5 py-3 font-bold md:inline-flex"
+            className="bg-brand-accent-strong text-brand-on-accent text-body-sm hidden rounded-pill px-5 py-3 font-bold md:inline-flex"
           >
             {cta.label}
           </a>
@@ -111,7 +111,7 @@ export function Navbar({ links, cta }: { links: NavLink[]; cta: NavLink }) {
         <a
           href={cta.href}
           onClick={close}
-          className="bg-brand-accent text-brand-on-accent mt-10 inline-flex rounded-pill px-6 py-3.5 font-bold"
+          className="bg-brand-accent-strong text-brand-on-accent mt-10 inline-flex rounded-pill px-6 py-3.5 font-bold"
         >
           {cta.label}
         </a>

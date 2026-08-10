@@ -39,8 +39,8 @@ Phase 0   規格與計畫              ✅ 完成
 Phase 1A  Scaffold + Tokens       ✅ Gate 通過
 Phase 1B  Home Goal Context       ✅ Gate 通過
 Phase 1C  Layout Primitives       ✅ Gate 通過
-Phase 1D  Homepage Composition    ⏳ 待開始
-Phase 1E  Responsive + A11y       ⏳
+Phase 1D  Homepage Composition    ✅ Gate 通過
+Phase 1E  Responsive + A11y       ✅ Gate 通過
 ```
 
 Gate 紀錄見 [`docs/gate-log.md`](docs/gate-log.md)。
@@ -53,7 +53,8 @@ Gate 紀錄見 [`docs/gate-log.md`](docs/gate-log.md)。
 pnpm dev          # 開發伺服器
 pnpm gate         # typecheck → lint → test → build（Gate 前四項）
 pnpm shots        # 產生八斷點截圖至 artifacts/（Gate 第 5 項）
-pnpm e2e          # 瀏覽器行為測試（URL / 互動）
+pnpm e2e          # 瀏覽器行為測試（URL / 互動 / a11y）
+pnpm a11y         # 只跑 axe 無障礙掃描
 
 pnpm typecheck    # next typegen && tsc --noEmit
 pnpm lint         # eslint + prettier --check

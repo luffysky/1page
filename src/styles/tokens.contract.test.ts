@@ -24,6 +24,7 @@ const REQUIRED_TOKENS: Record<string, string[]> = {
     "--color-brand-muted",
     "--color-brand-line",
     "--color-brand-accent",
+    "--color-brand-accent-strong",
     "--color-brand-accent-soft",
     "--color-brand-on-ink",
     "--color-brand-on-accent",
