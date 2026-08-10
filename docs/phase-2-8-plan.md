@@ -39,55 +39,90 @@ Phase 8  QA / Deploy        5 段   8A–8E
 
 # Phase 2 — Portfolio
 
-Spec §8、§39、§41。順序依 Spec §43：Schema → Admin → Upload → List/Detail。
+Spec §8、§39、§41。
 
-> 先把作品展示能力建立，因為這直接影響接案信用。
+## ⚠️ 2026-08-10 重排：Supabase 相關段落延後
 
-### 2A — Supabase 接線 + Schema + RLS
+Supabase 專案改由 Zeabur 自架，尚未就緒。原順序（Schema → Admin → Upload →
+List/Detail）會整個卡住，故重排為「先做不依賴資料庫的公開介面」。
+
+這不是將就。1D 立下 `PortfolioRepository` 介面就是為了讓資料源可替換；
+先由 UI 定義出 repository 真正需要提供什麼，再一次對真實資料庫實作，
+比先猜介面再回頭改更省事。
+
+```text
+2A  Schema + RLS          ✅ 已寫  ⏸ 待資料庫驗證（Gate 未通過）
+2B  /work 列表 + Filter    ← 可做（對 in-memory）
+2C  /work/[slug] + SEO     ← 可做（對 in-memory）
+2D  Repository 換 Supabase  ⏸ 待資料庫
+2E  Admin 權限 + CRUD       ⏸ 待資料庫
+2F  Media Upload            ⏸ 待 Storage
+```
+
+### 自架 Supabase 的注意事項
+
+Zeabur 上的 Supabase 是自架版，與 Supabase Cloud 有幾點不同，
+2D 開工時需留意：
+
+```text
+supabase link            針對 Supabase Cloud API，自架通常不適用
+migration 套用           改用 supabase db push --db-url <postgres-url> 或 psql
+型別產生                 supabase gen types typescript --db-url <url>
+Storage / Auth           自架版需自行確認已啟用並設定
+```
+
+---
+
+### 2A — Schema + RLS ⏸
 
 建立 `portfolio_projects` / `portfolio_media` / `portfolio_categories` /
-`portfolio_tags` 與兩張 join table（Spec §39），寫 migration 與 RLS policy。
+`portfolio_tags` 與兩張 join table（Spec §39），migration 與 RLS policy。
+
+**已完成：** migration、seed（含一筆 draft）、`tests/db/rls.test.ts`。
+
+**Gate 未通過。** RLS 未對真實資料庫執行過。
+安全邊界沒驗證過就是沒驗證過，不因為程式碼寫完就算數。
 
 **出口：** migration 可重複套用；匿名只能讀 `published`；寫入需 admin；
-型別由 schema 產生而非手抄。
+`pnpm test:db` 全綠；型別由 schema 產生而非手抄。
 
-### 2B — Repository 換實作
+### 2B — `/work` 列表 + Filter
 
-以 Supabase 實作取代 `in-memory-repository`。**元件與型別不動**——
-這是 1D 立 repository 介面的全部意義。
+分類篩選、Project Type 篩選（Spec §8.7）。
+桌機水平 filter，行動橫向 scroll chips。對 in-memory repository 開發。
 
-**出口：** 首頁改吃真實資料且畫面無變化；in-memory 版保留作測試替身。
+**出口：** 篩選狀態進 URL（沿用 Home Goal 的 URL-as-source-of-truth 模式）；
+八斷點無橫向捲動；axe 0 critical/serious；空結果有誠實說明不偷偷退回全部。
 
-### 2C — Admin 權限 + CRUD
+### 2C — `/work/[slug]` + SEO
+
+Case Study 版式（Spec §8.10）。**缺資料的區塊不顯示空 Section**。
+獨立 metadata（Spec §32）。
+
+**出口：** 每件作品有獨立 title/description/OG/canonical；
+來源類型標示明確；Related Projects 與 CTA 就位；未發布作品回 404。
+
+### 2D — Repository 換 Supabase 實作 ⏸
+
+以 Supabase 實作取代 `in-memory-repository`。**元件與型別不動**。
+
+**出口：** `/work`、`/work/[slug]` 與首頁改吃真實資料且畫面無變化；
+in-memory 版保留作測試替身。
+
+### 2E — Admin 權限 + CRUD ⏸
 
 `/admin/portfolio` route guard、建立／編輯／發布／下架／封存／排序／精選。
 
 **出口：** 非 admin 一律 404 或導離；權限在 server 端與 RLS 雙重把關，
 **不得只靠前端隱藏按鈕**（Spec §41）。
 
-### 2D — Media Upload
+### 2F — Media Upload ⏸
 
 Supabase Storage、MIME allowlist、大小限制、副檔名驗證、檔名 sanitize、
 唯一路徑、上傳進度、失敗重試、拖曳排序（Spec §8.9、§36）。
 
 **出口：** SVG 經 sanitize 或停用 inline 渲染；上傳路徑為
 `portfolio/{projectId}/{uuid}.{ext}`；非 admin 無法寫入 Storage。
-
-### 2E — `/work` 列表 + Filter
-
-分類篩選、Tag、Project Type、Industry、Service（Spec §8.7）。
-桌機水平 filter，行動橫向 chips 或 bottom sheet。
-
-**出口：** 篩選狀態進 URL（沿用 Phase 1 的 URL-as-source-of-truth 模式）；
-八斷點無橫向捲動；axe 0 critical/serious。
-
-### 2F — `/work/[slug]` + SEO
-
-Case Study 版式（Spec §8.10）。**缺資料的區塊不顯示空 Section**。
-獨立 metadata（Spec §32）。
-
-**出口：** 每件作品有獨立 title/description/OG/canonical；
-Demo/Concept 標示明確；Related Projects 與 CTA 就位。
 
 ---
 

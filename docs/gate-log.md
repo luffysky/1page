@@ -473,3 +473,82 @@ CLS   0.0000    目標 < 0.1    ✅
 另外 `<nextjs-portal>`（Next 開發工具浮層）也在 tab 順序中且無 focus 樣式。
 它不是產品內容、production build 不存在，故於測試中排除——
 而不是為了讓測試過關去關掉開發工具。
+
+---
+
+## 2A — Portfolio Schema + RLS
+
+**日期：** 2026-08-10  
+**結果：** ⏸ **Gate 未通過**（程式碼已寫，未對真實資料庫驗證）
+
+Docker Desktop daemon 未啟動，本機 Supabase stack 起不來；
+Supabase 專案改由 Zeabur 自架，尚未就緒。
+
+已完成：migration（schema + RLS）、seed（含一筆 draft）、`tests/db/rls.test.ts`。
+
+**不宣稱通過的理由：** RLS 是 Spec §41 的安全邊界。
+未對真實資料庫執行過的 policy 就是未驗證的 policy，
+不因為程式碼寫完就算數。待資料庫就緒後補跑 `pnpm test:db`。
+
+---
+
+## 2B — `/work` 列表 + Filter
+
+**日期：** 2026-08-10  
+**結果：** ✅ 全數通過
+
+### Gate 五項
+
+| # | 項目 | 結果 |
+|---|---|---|
+| 1 | typecheck | ✅ |
+| 2 | lint | ✅ 0 error / 0 warning |
+| 3 | test | ✅ 58 tests / 8 files（1E 47 → 2B 58） |
+| 4 | build | ✅ |
+| 5 | visual + 行為 | ✅ 截圖 32 張、e2e 58/58 |
+
+### 出口條件核對
+
+| 出口條件 | 結果 |
+|---|---|
+| 篩選狀態進 URL | ✅ 沿用 Home Goal 的模式，含上一頁 |
+| 八斷點無橫向捲動 | ✅ e2e 逐一驗證 |
+| axe 0 critical/serious | ✅ 八斷點全數 |
+| 空結果誠實說明不退回全部 | ✅ |
+
+### 對 in-memory repository 開發是刻意的
+
+Supabase 延後後，`/work` 仍可完整開發——這是 1D 立下
+`PortfolioRepository` 介面的回報。2D 只換實作，`src/app/work/page.tsx`
+一行都不用改。
+
+而且順序反而更好：**由 UI 定義 repository 真正需要提供什麼**
+（本段新增 `listPublished(filter)`），再一次對真實資料庫實作，
+比先猜介面再回頭改省事。
+
+### PortfolioLayout 加上 variant
+
+截圖發現列表頁版面有洞：`PortfolioLayout` 原本永遠把第一件放大成 2×2，
+那在首頁 3 件時是刻意的主視覺，但 6 件的列表頁會讓最後一列空一半。
+
+```text
+featured  首頁用。第一件放大，適合 3 件左右
+uniform   /work 用。等權重網格，md 兩欄 / xl 三欄
+```
+
+「第一件比較重要」在列表語境下本來就不成立。
+順帶把網格跨距從卡片本身移到外層 `<li>`，卡片只管高度。
+
+### 篩選器的兩個細節
+
+**結果數以 `aria-live="polite"` 播報。** 篩選後畫面變了但焦點還在 chip 上，
+螢幕閱讀器使用者沒有任何線索知道發生了什麼。
+
+**「Client Project」選項保留。** 目前沒有任何客戶案作品，
+所以這個篩選必定零結果——但它是誠實的可選條件，不是宣稱我們有客戶案例，
+且 2D 接上真實資料後就會有意義。空狀態已處理。
+
+### 測試自身的 bug
+
+「假資料中不出現 Client Project」原本掃全頁，抓到的是**篩選器選項**而非作品卡。
+改為只掃 `<article>`。

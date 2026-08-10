@@ -44,10 +44,9 @@ const TONE_CLASS: Record<NonNullable<PortfolioCard["placeholderTone"]>, string> 
 function Card({ item, featured }: { item: PortfolioCard; featured: boolean }) {
   return (
     <article
-      // featured 佔 2 欄 2 列，其餘每張佔 2 欄 1 列，
-      // 兩張剛好把 featured 右側的兩列填滿，不會留下空格。
-      className={`border-brand-line relative overflow-hidden rounded-xl border ${
-        featured ? "min-h-[26rem] md:col-span-2 md:row-span-2" : "min-h-[19rem] md:col-span-2"
+      // 網格的欄列跨距由外層 <li> 控制，卡片本身只管高度並撐滿格子。
+      className={`border-brand-line relative h-full overflow-hidden rounded-xl border ${
+        featured ? "min-h-[26rem]" : "min-h-[19rem]"
       }`}
     >
       {item.cover ? (
@@ -81,15 +80,49 @@ function Card({ item, featured }: { item: PortfolioCard; featured: boolean }) {
   );
 }
 
-export function PortfolioLayout({ items }: { items: PortfolioCard[] }) {
+/**
+ * `featured` — 首頁用。第一件放大成 2×2 作為主視覺（Spec §8.11
+ *              「一眼證明我們真的做得出來」）。適合 3 件左右。
+ *
+ * `uniform`  — `/work` 列表用。等權重網格。
+ *              列表頁沿用 featured 會讓件數非 3 的倍數時最後一列空一半，
+ *              而且「第一件比較重要」在列表語境下並不成立。
+ */
+export type PortfolioLayoutVariant = "featured" | "uniform";
+
+export function PortfolioLayout({
+  items,
+  variant = "featured",
+}: {
+  items: PortfolioCard[];
+  variant?: PortfolioLayoutVariant;
+}) {
+  if (variant === "uniform") {
+    return (
+      <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {items.map((item) => (
+          <li key={item.id}>
+            <Card item={item} featured={false} />
+          </li>
+        ))}
+      </ul>
+    );
+  }
+
   const [lead, ...rest] = items;
 
   return (
-    <div className="grid gap-4 md:grid-cols-4">
-      {lead ? <Card item={lead} featured /> : null}
+    <ul className="grid gap-4 md:grid-cols-4">
+      {lead ? (
+        <li className="md:col-span-2 md:row-span-2">
+          <Card item={lead} featured />
+        </li>
+      ) : null}
       {rest.map((item) => (
-        <Card key={item.id} item={item} featured={false} />
+        <li key={item.id} className="md:col-span-2">
+          <Card item={item} featured={false} />
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }

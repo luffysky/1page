@@ -37,7 +37,6 @@ export function track(event: AnalyticsEvent, payload?: Record<string, string | n
   if (window.location.pathname.startsWith("/_dev/")) return;
 
   if (process.env.NODE_ENV === "development") {
-    // eslint-disable-next-line no-console
     console.debug("[analytics]", event, payload ?? {});
   }
 
