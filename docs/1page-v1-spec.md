@@ -1,7 +1,7 @@
 # 一頁起家 Web Platform V1 Implementation Spec
 
 **Project:** 一頁起家  
-**Version:** V1.2  
+**Version:** V1.3  
 **Stack:** Next.js + TypeScript + Tailwind CSS + Framer Motion + Supabase  
 **定位:** AI-assisted Digital Studio / Interactive Sales Platform  
 **狀態:** 🔒 **FROZEN — Source of Truth**
@@ -14,6 +14,7 @@
 > 不接受「邊做邊改 Spec」。
 
 > V1.2 變更（CR-001）：物件儲存由 Supabase Storage 改為 Cloudflare R2，影響 §1、§8.9、§36。
+> V1.3 變更（CR-002）：開放公開註冊，新增會員帳號與帳號內聯繫功能，影響 §37、§38、§40。
 >
 > V1.1 變更：§3 視覺沿用政策、§4 IA 補回 Template Experience、§6 Goal Selector 升級為 Context Controller、新增 §8.15 Template Experience Section、§26 補上呈現形式約束、新增 §45 Demo 偏離清單。詳見 §46 Changelog。
 
@@ -1910,6 +1911,9 @@ basic model routing
 
 Qualified Lead 可以提高 Context。
 
+已登入會員（V1.3 新增）：對話與詢問綁定帳號，可回頭查看歷史紀錄與回覆。
+額度不低於匿名，但**不因為登入就無上限**——濫用防護與匿名共用同一套。
+
 ---
 
 # 38. Supabase V1 Tables
@@ -2030,6 +2034,11 @@ name
 ❌ Portfolio 公開投稿
 ❌ 讓非 Admin 任意上傳作品
 ```
+
+> V1.3 變更（CR-002）：Client Portal 移出禁令。
+> 但只解禁到**帳號 + 帳號內聯繫**為止，範圍見 §47 CR-002 的「界線」一節。
+> 進度追蹤、檔案交付、報價審批、簽核流程仍然是非目標——
+> 那些一旦開始做就會把 V1 變成專案管理系統。
 
 作品集 V1 是內部管理工具，不是 Behance。
 
@@ -2436,3 +2445,67 @@ bucket 不可公開列舉），§36 的 Upload 檢查清單同步調整。
 
 **不受影響：** §39 資料庫結構、§8.5 媒體資料模型、路徑慣例
 `portfolio/{projectId}/{uuid}.{ext}`。R2 換的是儲存後端，不是資料模型。
+
+## CR-002 — 開放公開註冊 + 帳號內聯繫
+
+| 項目 | 內容 |
+|---|---|
+| 日期 | 2026-08-11 |
+| 提出時機 | Phase 3 收尾後、Phase 4 開工前 |
+| 影響章節 | §37、§38、§40 |
+| 原規格 | 訪客全程匿名；`❌ Client Portal` 列為非目標 |
+| 變更為 | 開放公開註冊；會員可透過站內帳號與我們聯繫 |
+| 裁決 | Luffy 裁決採用 |
+| 版本 | V1.2 → V1.3 |
+
+**動機（Luffy 原話）：** 「一樣開放給使用者註冊，這樣他們有問題透過這網站帳號跟我們聯繫。」
+
+### 界線（這條 CR 解禁到哪裡為止）
+
+解禁：帳號、登入、我的詢問、與我們的訊息往返、後台收件匣。
+
+**仍是非目標**：專案進度追蹤、檔案交付區、線上報價審批、簽核流程、付款。
+
+理由是這些一旦開始，V1 就從「接案網站」變成「專案管理系統」，
+而 §40 存在的目的正是擋住這種漂移。
+
+### 主要後果一：註冊攻擊面回到開放狀態
+
+`GOTRUE_DISABLE_SIGNUP=true` 是 Phase 2 為了關掉公開註冊而設的。
+關掉它等於任何人都能建立帳號。因此下列不是「之後再補」，是同一段的一部分：
+
+- Email 驗證。沒有驗證，帳號可以用不存在的信箱大量產生，
+  而且「透過帳號聯繫我們」這件事會失去意義——我們回覆的信箱是假的。
+- 註冊與送出詢問的速率限制（參考 `ai_island_v3` 的 `src/lib/rate-limit.ts`）。
+- 錯誤訊息不得洩漏帳號是否存在。
+  （反例：`insight-engine` 的 `send-code` 對已註冊信箱回 409，等於帳號列舉。）
+
+### 主要後果二：權限模型分兩層，而且刻意不合併
+
+`admin_users` 維持為**獨立的員工白名單**，不改為 `profiles.role` 單一欄位。
+
+`ai_island_v3` 用 `profiles.role` 同時表示 member 與 admin。
+那表示「處理會員資料的程式碼」與「決定誰是管理員的程式碼」碰的是同一列。
+
+本專案已有的 RLS policy 全部引用 `admin_users`。維持分離的結果是：
+**這條 CR 不需要改動任何一條既有的 RLS policy**，
+而且 profile 相關的 bug 在結構上不可能升級成管理員權限。
+
+> 會員 = 有 `auth.users` 列、但不在 `admin_users` 裡的人。
+
+### 主要後果三：與未來 SnowRealm SSO 的關係
+
+平台規劃（`SnowRealmSpace/docs/SnowRealm-Platform-Planning.md`）要做跨子網域 SSO，
+issuer 尚未拍板。1page 現在自己發證，將來要遷移。
+
+降低遷移成本的三個決定（現在做，成本近乎為零；事後補很貴）：
+
+1. 認證相關程式碼全部收在 `src/features/auth/` 一個目錄，頁面不直接呼叫 Supabase auth。
+2. `profiles` 預留 `snowrealm_id`（可為 null）供將來對接。
+   前例：`SnowRealmSpace/supabase/migrations/0051_snowrealm_id_link.sql`。
+3. 業務資料表（詢問、訊息）外鍵指向 `profiles.id`，不指向 `auth.users.id`。
+   換 issuer 時只需要重建 `profiles` 與 `auth.users` 的對應，業務資料不動。
+
+⚠️ **SSO 會需要 `Domain=.snowrealm.pet` 的 cookie。**
+那一刻起，媒體網域 `1page-r2.snowrealm.pet` 也會收到 auth cookie。
+這在 CR-001 時只是假設，現在是已列入規劃的事。詳見待辦清單對應條目。

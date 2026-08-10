@@ -78,18 +78,84 @@ Spec §8.7 列出「另可依 Project Type / Industry / Tag / Service 篩選」�
 
 ---
 
-## 📋 接下來的 Phase（依 `docs/phase-2-8-plan.md`）
+## 📋 接下來的 Phase
 
 ```text
-Phase 4  Templates + Preview     4 段   4A–4D   ← 下一步
+Phase M  會員系統               5 段   MA–ME   ← 下一步（新增，見下方）
+Phase 4  Templates + Preview     4 段   4A–4D
 Phase 5  Agent                   5 段   5A–5E
 Phase 6  Agent Website Tools     4 段   6A–6D
 Phase 7  Workshop / Builder      3 段   7A–7C
 Phase 8  QA / Deploy             5 段   8A–8E
 ```
 
+Phase 4–8 依 `docs/phase-2-8-plan.md`，編號不變。
 Phase 4 會把 1C 立的 `TemplateExperienceShell` 從殼變成真的：
 「禁止假互動」那組測試屆時要改為驗證**真的會動**。
+
+### Phase M — 會員系統（Spec V1.3 CR-002）
+
+Luffy 裁決：開放公開註冊，使用者透過站內帳號與我們聯繫。
+詳細分段見 `docs/phase-m-member-plan.md`。
+
+插在 Phase 4 之前，因為會員身分是地基不是附加功能——
+Phase 5 的「對話綁定帳號」與 Phase 4 的「存下調過的樣板」都要外鍵指向 `profiles.id`。
+排到後面，那兩個 Phase 會先長出一套匿名資料模型再全部改一次。
+
+```text
+MA  會員身分基礎（profiles + DB trigger + RLS）
+MB  註冊 / 登入 / 登出 / 忘記密碼 + 速率限制
+MC  帳號內聯繫（會員端）
+MD  後台收件匣
+ME  導覽整合 + 後台/會員頁納入八斷點檢查
+```
+
+**權限維持兩層，刻意不合併**：`admin_users` 仍是獨立員工白名單，
+不改成 `profiles.role` 一個欄位（`ai_island_v3` 的做法）。
+結果是這整個 Phase **不需要改動任何一條既有 RLS policy**，
+而且 profile 相關的 bug 在結構上不可能升級成管理員權限。
+
+---
+
+## 🧭 SnowRealm SSO（未來，先記著別擋路）
+
+依 `SnowRealmSpace/docs/SnowRealm-Platform-Planning.md`：
+SnowRealm 要做跨子網域統一登入，**issuer 尚未拍板**
+（候選：Insight `tenant_users` / AI 島 Supabase / 新開專用）。
+現況是五個產品各自發證，沒有任何一個是跨子網域發證方。
+
+1page 現在自己做登入，將來要遷移。**現在做、成本近乎為零**的三件事：
+
+1. 認證邏輯全部收在 `src/features/auth/`，頁面不直接呼叫 Supabase auth。
+   換 issuer 時改一個目錄。
+2. `profiles` 預留 `snowrealm_id`（可為 null）。
+   前例：`SnowRealmSpace/supabase/migrations/0051_snowrealm_id_link.sql`。
+3. 業務資料表外鍵指向 `profiles.id` 而非 `auth.users.id`。
+   換 issuer 時只需重建 `profiles ↔ auth.users` 的對應，業務資料不動。
+
+### ⚠️ SSO 會踩到 R2 媒體網域——這件事現在要決定
+
+SSO 必然需要 `Domain=.snowrealm.pet` 的 cookie（不然子網域之間共用不了 session）。
+那一刻起 `1page-r2.snowrealm.pet` **也會收到 auth cookie**——
+它是同一個註冊網域下的子網域，瀏覽器不會區分「這台只是放圖片的」。
+
+httpOnly 擋得住 JS 讀取，但擋不住：從媒體網域發出的請求會自動帶上 auth cookie，
+`SameSite` 判定上它與站台同源站點，CSRF 的假設因此改變。
+而媒體網域上的內容**是使用者上傳的**。
+
+三個選項，愈往下愈該選：
+
+```text
+A. 什麼都不做，靠 SVG 不進白名單 + Content-Type 鎖死
+   → 防線變成「上傳白名單永遠不能鬆綁」，那是把安全性押在一個未來的決定上
+B. SSO cookie 改用更窄的 Domain（例如 auth.snowrealm.pet + 明確的 allow list）
+   → 可行但 GoTrue 這側要客製，且每加一個產品都要改
+C. 媒體換到 SSO cookie 範圍外的網域
+   → 一次解決。趁媒體記錄還很少的現在做，成本最低
+```
+
+Phase M 不處理這件事（SSO 還沒開始），但 **SSO 動工前必須先決定**。
+拖到有幾千筆媒體記錄之後，選項 C 就不再是「換個網域」而是資料遷移。
 
 ---
 
