@@ -1,0 +1,15 @@
+.next/
+out/
+build/
+node_modules/
+artifacts/
+playwright-report/
+test-results/
+pnpm-lock.yaml
+next-env.d.ts
+
+# 概念 Demo，保持原樣不格式化（Spec §45：不得移植）
+yipage_studio_v3_polished.html
+
+# 文件為人工排版，含刻意的對齊表格
+docs/

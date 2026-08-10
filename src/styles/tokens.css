@@ -1,0 +1,135 @@
+/* ============================================================================
+ * 一頁起家 — Design Tokens
+ * ----------------------------------------------------------------------------
+ * Spec §3 Design Direction / §43 Phase 1
+ * Implementation Plan §3、§4
+ *
+ * 這是全站唯一的設計數值來源。元件中不得出現 hard-coded 色碼、字級或間距。
+ * （由 src/styles/tokens.contract.test.ts 強制檢查）
+ * ========================================================================== */
+
+/* ----------------------------------------------------------------------------
+ * ⚠️ 兩套 Token 系統的邊界（Plan §3）
+ * ----------------------------------------------------------------------------
+ * 系統 A  --color-brand-* / --font-* / --text-* ...
+ *         一頁起家「官網自己」的品牌 token。Build-time，掛在 :root，全域生效。
+ *         就是本檔案。
+ *
+ * 系統 B  --site-*
+ *         被預覽的「客戶網站」主題（Spec §14 ThemeConfig）。Runtime，per-config。
+ *         【本檔案永遠不得出現 --site-*】
+ *         必須由 SiteRenderer 以 inline style 注入到 [data-site-scope] 容器上，
+ *         絕不可寫進 :root——否則 Preview 會污染官網，或反向繼承官網品牌色。
+ *
+ * 命名層級即隔離。看到 --site-* 出現在這裡，就是架構已經破了。
+ * -------------------------------------------------------------------------- */
+
+@theme {
+  /* == 1. Color ============================================================ */
+  /* 取自 V3 Demo，Spec §3.0 允許沿用品牌層 */
+  --color-brand-bg: #f4efe7; /* Warm Off-white — 頁面底色 */
+  --color-brand-paper: #fffdf9; /* 卡片／浮起表面 */
+  --color-brand-cream: #efe5d8; /* 次要區塊底色 */
+  --color-brand-ink: #141414; /* Near Black — 主文字、深色區塊 */
+  --color-brand-muted: #726d66; /* Warm Gray — 次要文字 */
+  --color-brand-line: #d8d0c7; /* 分隔線、邊框 */
+  --color-brand-accent: #ef3e2f; /* Rocket Red */
+  --color-brand-accent-soft: #ff6a57; /* Accent hover／漸層端點 */
+  --color-brand-on-ink: #fffdf9; /* 深色底上的文字 */
+  --color-brand-on-accent: #ffffff; /* Accent 底上的文字 */
+  --color-brand-focus: #1a5fd0; /* Focus ring — 刻意與 accent 區隔以保對比 */
+
+  /* == 2. Typography ======================================================= */
+  /* 字族。實際檔案載入見 src/styles/fonts.ts */
+  --font-sans:
+    var(--font-brand-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC",
+    "Microsoft JhengHei", "Noto Sans TC", sans-serif;
+  --font-display:
+    var(--font-brand-serif), "Songti TC", "Source Han Serif TC", "Noto Serif CJK TC", "MingLiU",
+    serif;
+
+  /* 字級階梯
+   * display-1 對應 Spec §3：Desktop 72–112px / Mobile 44–64px
+   *   clamp 下限 2.75rem = 44px，上限 7rem = 112px
+   *   @1024px → 73.7px  @1440px → 103.7px  @768px → 55.3px  ✅ 落在規格內
+   * Demo 的 clamp(52px, 8vw, 96px) 不符規格，不沿用（Spec §45.2） */
+  --text-display-1: clamp(2.75rem, 7.2vw, 7rem);
+  --text-display-1--line-height: 0.95;
+  --text-display-1--letter-spacing: -0.06em;
+  --text-display-1--font-weight: 700;
+
+  --text-display-2: clamp(2.25rem, 4.6vw, 3.75rem);
+  --text-display-2--line-height: 1.05;
+  --text-display-2--letter-spacing: -0.045em;
+  --text-display-2--font-weight: 700;
+
+  --text-heading-1: clamp(1.5rem, 2.2vw, 1.875rem);
+  --text-heading-1--line-height: 1.2;
+  --text-heading-1--letter-spacing: -0.03em;
+  --text-heading-1--font-weight: 700;
+
+  --text-heading-2: 1.375rem;
+  --text-heading-2--line-height: 1.35;
+  --text-heading-2--letter-spacing: -0.02em;
+  --text-heading-2--font-weight: 700;
+
+  --text-lead: 1.3125rem;
+  --text-lead--line-height: 1.75;
+  --text-lead--letter-spacing: 0em;
+
+  --text-body: 1rem;
+  --text-body--line-height: 1.7;
+
+  --text-body-sm: 0.875rem;
+  --text-body-sm--line-height: 1.65;
+
+  --text-caption: 0.8125rem;
+  --text-caption--line-height: 1.6;
+
+  --text-kicker: 0.8125rem;
+  --text-kicker--line-height: 1;
+  --text-kicker--letter-spacing: 0.12em;
+  --text-kicker--font-weight: 800;
+
+  /* == 3. Spacing ========================================================== */
+  /* 基礎階為 Tailwind 預設 0.25rem 級距；此處只加語意級距 */
+  --spacing-gutter: 1.25rem; /* 行動版左右留白 */
+  --spacing-gutter-lg: 1.5rem; /* 桌機版左右留白 */
+  --spacing-section: 4.5rem; /* Section 垂直節奏 — 行動 */
+  --spacing-section-lg: 7rem; /* Section 垂直節奏 — 桌機 */
+
+  /* == 4. Radius =========================================================== */
+  --radius-sm: 0.75rem; /* 12px — 輸入框、小標籤 */
+  --radius-md: 1.125rem; /* 18px — 按鈕群、次要容器 */
+  --radius-lg: 1.5rem; /* 24px — 卡片 */
+  --radius-xl: 1.875rem; /* 30px — 大型區塊 */
+  --radius-2xl: 2.375rem; /* 38px — Hero 容器 */
+  --radius-pill: 999px;
+
+  /* == 5. Shadow =========================================================== */
+  --shadow-soft: 0 10px 30px rgba(24, 18, 12, 0.07);
+  --shadow-lifted: 0 24px 70px rgba(24, 18, 12, 0.1);
+
+  /* == 6. Container ======================================================== */
+  --container-page: 76.25rem; /* 1220px — 全站主要內容最大寬 */
+  --container-prose: 42rem; /* 672px — 長文閱讀寬 */
+
+  /* == 7. Breakpoint ======================================================= */
+  /* Spec §34 要求驗證 375 / 390 / 430 / 768 / 1024 / 1280 / 1440 / 1920
+   * 其中 375 與 390 低於最小斷點，落在 base 樣式，不另設斷點。
+   * 驗證寬度清單見 tests/visual/viewports.ts */
+  --breakpoint-sm: 26.875rem; /* 430  大尺寸手機 */
+  --breakpoint-md: 48rem; /* 768  平板 */
+  --breakpoint-lg: 64rem; /* 1024 小筆電 */
+  --breakpoint-xl: 80rem; /* 1280 桌機 */
+  --breakpoint-2xl: 90rem; /* 1440 大桌機 */
+  --breakpoint-3xl: 120rem; /* 1920 寬螢幕 */
+
+  /* == 8. Motion =========================================================== */
+  /* Spec §35 要求 prefers-reduced-motion；全域覆寫見 globals.css */
+  --ease-brand: cubic-bezier(0.2, 0.6, 0.2, 1);
+  --ease-brand-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 150ms;
+  --duration-base: 220ms;
+  --duration-slow: 420ms;
+}
