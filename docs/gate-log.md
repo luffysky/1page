@@ -478,17 +478,78 @@ CLS   0.0000    目標 < 0.1    ✅
 
 ## 2A — Portfolio Schema + RLS
 
-**日期：** 2026-08-10  
-**結果：** ⏸ **Gate 未通過**（程式碼已寫，未對真實資料庫驗證）
+**日期：** 2026-08-10（初版）／2026-08-10（對 Zeabur 資料庫驗證完成）  
+**結果：** ✅ **全數通過**
 
-Docker Desktop daemon 未啟動，本機 Supabase stack 起不來；
-Supabase 專案改由 Zeabur 自架，尚未就緒。
+一度標記為未通過：當時 Docker daemon 未啟動、Zeabur Supabase 尚未就緒，
+RLS policy 寫完但沒對任何真實資料庫執行過。現已補齊。
 
-已完成：migration（schema + RLS）、seed（含一筆 draft）、`tests/db/rls.test.ts`。
+### Gate
 
-**不宣稱通過的理由：** RLS 是 Spec §41 的安全邊界。
-未對真實資料庫執行過的 policy 就是未驗證的 policy，
-不因為程式碼寫完就算數。待資料庫就緒後補跑 `pnpm test:db`。
+| # | 項目 | 結果 |
+|---|---|---|
+| 1–4 | typecheck / lint / test / build | ✅ 73 tests / 10 files |
+| 5 | `pnpm test:db` | ✅ 10/10（對 Zeabur 實例） |
+
+### 出口條件核對
+
+| 出口條件 | 驗證方式 | 結果 |
+|---|---|---|
+| migration 可重複套用 | 第二次執行全部跳過 | ✅ |
+| 匿名只能讀 published | `pnpm test:db` + 獨立 curl | ✅ |
+| 寫入需 admin | 匿名 POST → HTTP 401 | ✅ |
+| 型別由 schema 產生 | `pnpm db:types` introspect | ✅ |
+
+### 自架 Supabase 的實際情況
+
+Zeabur 版沒有對外開放的 Postgres 連線埠，`supabase link` 也只對 Supabase Cloud
+有效，因此 CLI 的 `db push` 與 `gen types` 都用不了。可用的是 Kong 後方的
+pg-meta：`POST {SUPABASE_URL}/pg/query`（需同時帶 `apikey` 與 `Bearer`，
+兩者皆為 service role key）。
+
+據此自建兩支工具：
+
+```text
+scripts/db-push.mjs    套用 migration，已套用者記錄於 public._migrations
+                       → 「migration 可重複套用」的實作
+scripts/db-types.mjs   introspect information_schema 產生 src/types/database.ts
+```
+
+### ⚠️ 對 `/pg/query` 端點做了授權探測
+
+這個端點可執行任意 SQL 且公開可達，因此先確認它的授權姿態：
+
+```text
+無驗證           → 401
+anon key         → 403   ✅ 一般使用者拿不到
+偽造 Bearer      → 401
+service role key → 200   （且必須同時帶 apikey 標頭）
+```
+
+姿態正確。但這也再次確認：**service role key 等同資料庫管理員**，
+絕不可出現在瀏覽器端、不可加 `NEXT_PUBLIC_` 前綴。
+`.env.local` 已確認被 `.gitignore` 忽略且未被 git 追蹤。
+
+### 獨立驗證（不經過我們的任何程式碼）
+
+`pnpm test:db` 用的是 supabase-js。另以 curl 直接打 REST API 再驗一次，
+模擬「有人拿到 anon key 自己打 API」：
+
+```text
+列出全部作品     → 只回 3 筆 published，草稿不在其中
+指名查詢草稿     → []（RLS 以「查得到零筆」表現，不洩漏該筆存在）
+嘗試 POST 新增   → HTTP 401
+讀取 admin 名單  → []
+```
+
+### 新增：資料庫 enum 與應用層型別的一致性守衛
+
+`src/features/portfolio/type-parity.test.ts`
+
+資料庫的 `portfolio_project_type` 與應用層手寫的 `PortfolioProjectType`
+若分歧，症狀很難查：資料庫多了一個類型，程式端不會有編譯錯誤，
+只會在 UI 顯示 undefined 標籤，或該類型的作品被靜默略過。
+現在分歧會直接讓測試失敗。
 
 ---
 

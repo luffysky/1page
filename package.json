@@ -22,8 +22,11 @@
     "db:start": "supabase start",
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
-    "db:types": "supabase gen types typescript --local > src/types/database.ts",
-    "test:db": "vitest run --config vitest.db.config.ts"
+    "db:types": "node scripts/db-types.mjs",
+    "test:db": "vitest run --config vitest.db.config.ts",
+    "db:push": "node scripts/db-push.mjs",
+    "db:seed": "node scripts/db-push.mjs --seed",
+    "db:status": "node scripts/db-push.mjs --status"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.2",

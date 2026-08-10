@@ -42,7 +42,7 @@ Phase 1C  Layout Primitives       ✅ Gate 通過
 Phase 1D  Homepage Composition    ✅ Gate 通過
 Phase 1E  Responsive + A11y       ✅ Gate 通過
 
-Phase 2A  Schema + RLS            ⏸ 待資料庫驗證
+Phase 2A  Schema + RLS            ✅ Gate 通過（Zeabur）
 Phase 2B  /work 列表 + Filter      ✅ Gate 通過
 Phase 2C  /work/[slug] + SEO       ✅ Gate 通過
 Phase 2D  Repository 換 Supabase   ⏸ 待資料庫
