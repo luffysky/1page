@@ -106,9 +106,11 @@ describe("getBySlug", () => {
     });
   });
 
-  it("媒體帶回替代文字", async () => {
+  it("媒體一律帶有替代文字（Spec §35）", async () => {
+    // 種子不含媒體（見 supabase/seed.sql 的說明），此處驗證的是
+    // 「若有媒體，一定有替代文字」這條不變量。
+    // 完整的上傳→呈現鏈路由 tests/db/media-pipeline.test.ts 端到端驗證。
     const project = await repo.getBySlug("interior-studio");
-    expect(project?.media.length).toBeGreaterThan(0);
     for (const media of project?.media ?? []) {
       expect(media.alt.length).toBeGreaterThan(0);
     }

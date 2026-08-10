@@ -89,3 +89,26 @@ export async function getProjectCounts() {
     featured: featured.count ?? 0,
   };
 }
+
+export interface AdminMediaRow {
+  id: string;
+  type: "image" | "video" | "pdf" | "embed" | "external";
+  url: string;
+  alt: string | null;
+  role: string;
+  sort_order: number;
+}
+
+export async function listProjectMedia(projectId: string): Promise<AdminMediaRow[]> {
+  const supabase = await createSupabaseServerClient();
+
+  const { data, error } = await supabase
+    .from("portfolio_media")
+    .select("id, type, url, alt, role, sort_order")
+    .eq("project_id", projectId)
+    .order("sort_order", { ascending: true })
+    .returns<AdminMediaRow[]>();
+
+  if (error) throw new Error(`媒體讀取失敗：${error.message}`);
+  return data ?? [];
+}

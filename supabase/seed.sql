@@ -123,15 +123,15 @@ values
 -- ---------------------------------------------------------------------------
 -- 媒體
 --
--- 草稿也放一筆：驗證「作品未發布時，其媒體也讀不到」。
+-- ⚠️ 種子刻意不放任何媒體。
+--
+-- 早期版本放了兩筆指向 example.invalid 的假網址，用途是驗證
+-- 「作品未發布時其媒體也讀不到」。但 2F 把封面接上畫面之後，
+-- 那些網址被送進 next/image，未設定的主機名會直接拋錯 —— 整個作品頁 500。
+--
+-- 真實媒體現在由後台上傳到 R2。RLS 對媒體的隔離改由
+-- tests/db/rls.test.ts 以實際上傳的物件驗證，不需要假資料。
 -- ---------------------------------------------------------------------------
-insert into portfolio_media (project_id, type, url, alt, role, sort_order)
-select p.id, 'image', v.url, v.alt, 'cover'::portfolio_media_role, 0
-from (values
-  ('interior-studio',   'https://example.invalid/interior-cover.webp', '山序設計網站首頁的桌機版畫面'),
-  ('unpublished-draft', 'https://example.invalid/draft-cover.webp',    '草稿作品的封面，匿名不得讀到')
-) as v (slug, url, alt)
-join portfolio_projects p on p.slug = v.slug;
 
 -- ---------------------------------------------------------------------------
 -- 分類

@@ -47,7 +47,9 @@ Phase 2B  /work 列表 + Filter      ✅ Gate 通過
 Phase 2C  /work/[slug] + SEO       ✅ Gate 通過
 Phase 2D  Repository 換 Supabase   ✅ Gate 通過
 Phase 2E  Admin 權限 + CRUD        ✅ Gate 通過
-Phase 2F  Media Upload（R2）       ⏳ 待開始
+Phase 2F  Media Upload（R2）       ✅ Gate 通過
+
+Phase 2 完成。下一步：Phase 3 Website Engine
 ```
 
 Gate 紀錄見 [`docs/gate-log.md`](docs/gate-log.md)。

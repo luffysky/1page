@@ -1,5 +1,6 @@
 import type { HomeGoal } from "@/config/home-goals";
 import { ALL_CATEGORIES, ALL_PROJECT_TYPES } from "@/config/portfolio-categories";
+import { keyFromPublicUrl } from "@/lib/storage/r2";
 import { getSupabasePublicClient } from "@/lib/supabase/client";
 import type { Json, PortfolioProjectsRow } from "@/types/database";
 
@@ -24,7 +25,8 @@ import {
 /** PostgREST 的巢狀選取：一次把分類與標籤帶回來，避免 N+1 */
 const LIST_SELECT = `
   id, slug, title, kicker, summary, project_type, featured, sort_order,
-  portfolio_project_categories ( portfolio_categories ( slug ) )
+  portfolio_project_categories ( portfolio_categories ( slug ) ),
+  portfolio_media ( url, alt, role )
 `;
 
 const DETAIL_SELECT = `
@@ -43,6 +45,7 @@ interface ListRow extends Pick<
   "id" | "slug" | "title" | "kicker" | "summary" | "project_type" | "featured" | "sort_order"
 > {
   portfolio_project_categories: CategoryJoin;
+  portfolio_media: { url: string; alt: string | null; role: string }[] | null;
 }
 
 function categoriesOf(join: CategoryJoin): string[] {
@@ -67,10 +70,23 @@ function toneOf(slug: string): (typeof TONES)[number] {
 }
 
 function toListItem(row: ListRow): PortfolioListItem {
+  // 封面來自 role = cover 的媒體。沒有封面時退回佔位色塊——
+  // 寧可顯示色塊，也不要在頁面上放一張破圖。
+  //
+  // alt 為空的封面一律當作沒有封面：Spec §35 要求圖片必須有替代文字，
+  // 而 PortfolioCard.cover 的型別也讓「有圖沒 alt」不可能成立。
+  // 只接受指向自家 R2 的網址。
+  //
+  // 這不只是潔癖：next/image 遇到未設定的主機名會直接拋錯，
+  // 一筆殘留的舊網址就能讓整個作品頁 500。降級成佔位色塊是正確的失敗方式——
+  // 少一張圖，而不是整頁掛掉。
+  const cover = (row.portfolio_media ?? []).find(
+    (media) =>
+      media.role === "cover" && media.alt && media.alt.trim() && keyFromPublicUrl(media.url),
+  );
+
   return {
-    // 刻意不映射 cover：資料庫裡的封面目前指向尚未存在的檔案，
-    // 真實媒體要等 2F 接上 R2。在那之前一律用佔位色塊，
-    // 寧可顯示色塊，也不要在頁面上放一張破圖。
+    cover: cover ? { url: cover.url, alt: cover.alt! } : undefined,
     id: row.slug,
     title: row.title,
     kicker: row.kicker ?? "",
@@ -145,7 +161,8 @@ export const supabasePortfolioRepository: PortfolioRepository = {
     if (error) throw new Error(`getBySlug 失敗：${error.message}`);
     if (!data) return null; // 不存在與未發布走同一條路徑，不從差異洩漏草稿存在
 
-    const row = data as unknown as ListRow & {
+    // 詳細查詢帶回更多媒體欄位，因此排除 ListRow 較窄的 portfolio_media 定義
+    const row = data as unknown as Omit<ListRow, "portfolio_media"> & {
       industry: string | null;
       year: number | null;
       services: string[] | null;
@@ -207,7 +224,8 @@ export const supabasePortfolioRepository: PortfolioRepository = {
         .sort((a, b) => a.sort_order - b.sort_order)
         // 資料庫的 image_requires_alt 已保證圖片有 alt；
         // 其他型別若缺 alt 則跳過，寧可不顯示也不產生無替代文字的內容（Spec §35）
-        .filter((media) => Boolean(media.alt))
+        // 同上：非自家儲存的網址一律不顯示，避免整頁因單一壞連結而崩潰
+        .filter((media) => Boolean(media.alt) && Boolean(keyFromPublicUrl(media.url)))
         .map((media) => ({
           id: media.id,
           type: media.type,

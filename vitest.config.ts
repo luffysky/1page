@@ -6,6 +6,12 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": resolve(import.meta.dirname, "./src"),
+      /*
+       * server-only 的預設入口在非 react-server 環境會主動拋錯。
+       * 它保護的是 app 的建置（client component 誤引用伺服器模組時編譯失敗），
+       * 測試執行環境不需要，故別名成空模組。這不是繞過保護。
+       */
+      "server-only": resolve(import.meta.dirname, "./tests/stubs/server-only.ts"),
     },
   },
   test: {

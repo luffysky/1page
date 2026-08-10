@@ -870,3 +870,117 @@ Playwright 行程沒有載入 `.env.local`，所以 `ADMIN_SEGMENT` 是 undefine
 **角色只有 owner / admin 兩種。** 參考專案有 support / marketing /
 finance / content 等 scoped 角色，那是在多部門進後台之後才需要的。
 目前只有一位使用者，先做四個角色只會產生四份沒人走過的權限路徑。
+
+---
+
+## 2F — Media Upload（Cloudflare R2）
+
+**日期：** 2026-08-11  
+**結果：** ✅ 全數通過 — **Phase 2 完成**
+
+### Gate
+
+| # | 項目 | 結果 |
+|---|---|---|
+| 1–4 | typecheck / lint / test / build | ✅ 110 unit tests（2E 95 → 2F 110） |
+| 5 | e2e | ✅ 92/92 |
+| ＋ | `pnpm test:db` | ✅ 43/43（RLS 10 + repository 19 + R2 10 + 端到端 4） |
+
+### ⚠️ 測試抓到一個真的安全漏洞：簽名網址沒有鎖住 Content-Type
+
+寫完 `createUploadUrl` 後，程式碼看起來完全正確：
+`PutObjectCommand` 帶了 `ContentType` 與 `ContentLength`，註解也寫了
+「R2 會驗證標頭與簽章一致」。
+
+實測結果不是這樣：
+
+```text
+拿一張簽給 image/png 的網址，改用 Content-Type: text/html 上傳
+→ R2 回 200，接受了
+```
+
+原因：`@aws-sdk/s3-request-presigner` **預設只簽 `host`**，
+其餘標頭會被提升成查詢參數而不納入簽章。也就是說
+`ContentType` 在那個情境下形同註解——MIME 白名單完全被繞過。
+
+修正：明確指定 `signableHeaders: new Set(["content-type", "content-length"])`。
+
+> 這條測試的價值就在這裡。程式碼、註解、型別全部正確，
+> 唯一能發現問題的方式是真的送一個不符的請求出去。
+
+### 上傳鏈路的三個鎖
+
+```text
+Key          伺服器產生的 uuid，呼叫端無法指定路徑
+             （否則可覆寫他人檔案或寫到 bucket 任意位置）
+ContentType  簽入簽章，改了就被拒
+ContentLength 同上，10 bytes 的簽章傳 5000 bytes 會被拒
+expiresIn    300 秒。簽名網址等同一次性寫入權限，不該長期有效
+```
+
+四項都由 `tests/db/r2-upload.test.ts` 對真實 R2 驗證，不是靠閱讀程式碼。
+
+### R2 沒有 RLS —— 這是 CR-001 的核心後果
+
+Supabase Storage 的權限與資料表共用同一套 RLS，可被 `pnpm test:db` 驗證。
+R2 沒有這個機制，**上傳授權只剩自家 server action 在把關**。
+
+因此：
+
+```text
+createMediaUploadUrl  先驗證身分，再驗證 MIME / 副檔名 / 大小，最後才簽發
+lib/storage/r2.ts     匯入 server-only —— client 誤引用直接編譯失敗
+前端                   永遠不持有 access key
+```
+
+順序是重點：**先驗證身分再簽發**。一個不檢查身分的 presign endpoint
+等於開放公開寫入。
+
+### 驗證採「MIME × 副檔名」雙重比對
+
+只驗 MIME 不夠（瀏覽器提供的值可偽造），只驗副檔名也不夠（可隨便改）。
+兩者都驗且必須互相對應，才擋得住「把 .html 改名成 .png」這類手法。
+
+已知取捨：presigned 上傳不經過我們的伺服器，因此無法檢查檔案內容的
+magic bytes。換來的是不必讓 100MB 影片流經 Node 行程。記在 `config/media.ts`。
+
+### SVG 刻意不在白名單內
+
+Spec §8.3 列了 SVG（註明「需安全處理」），§36 允許
+「sanitize 或停用 raw inline rendering」——此處採後者的最徹底版本：
+在有伺服器端 sanitizer 之前不接受上傳。
+
+目前公開網域是 `r2.dev`，與 `snowrealm.pet` 不同註冊網域、cookie 不共用，
+直接開啟 SVG 的風險有限。但那是「目前的部署剛好安全」，不是
+「這個功能本身安全」——若哪天換成 `media.snowrealm.pet` 之類的自訂網域，
+同註冊網域的風險會立刻回來，而那時不會有人記得這件事。
+
+### 一筆壞網址不該讓整頁 500
+
+把封面接上畫面後，種子裡的 `example.invalid` 假網址被送進 `next/image`，
+未設定的主機名直接拋錯——**整個作品頁 500**。
+
+兩處修正：
+
+1. repository 只接受指向自家 R2 的媒體網址，其餘忽略並降級為佔位色塊。
+   正確的失敗方式是少一張圖，不是整頁掛掉。
+2. 種子不再放任何媒體。真實媒體由後台上傳，
+   端到端鏈路由 `tests/db/media-pipeline.test.ts` 驗證。
+
+`next.config.ts` 的 `remotePatterns` 只允許 R2 網域，且從環境變數推導——
+開放任意來源等於讓別人透過我們的圖片最佳化服務代載外部圖片。
+
+### inline style 的例外採具名清單
+
+上傳進度條的寬度是執行期計算的百分比，CSS 類別本質上表達不了連續值。
+`no-hardcoded-design-values.test.ts` 因此加入具名例外並寫明理由，
+**而不是放寬規則**；另加一條測試確保例外清單不會留下已失效的項目。
+
+### 待辦（不影響 2F 通過）
+
+```text
+密碼只有 9 碼          建議改為 16 碼以上
+Supabase 公開註冊開著   建議關閉，此站不需要一般使用者註冊
+r2.dev 公開網域         有速率限制，正式上線建議綁自訂網域
+                        （屆時 SVG 的網域隔離前提會改變）
+```

@@ -2,8 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { toAdminUrl } from "@/config/admin";
-import { getProjectById } from "@/features/admin/portfolio-repository";
+import { getProjectById, listProjectMedia } from "@/features/admin/portfolio-repository";
 
+import { MediaManager } from "../media-manager";
 import { ProjectForm } from "../project-form";
 
 export default async function EditProjectPage({ params }: PageProps<"/admin/portfolio/[id]">) {
@@ -11,6 +12,8 @@ export default async function EditProjectPage({ params }: PageProps<"/admin/port
   const project = await getProjectById(id);
 
   if (!project) notFound();
+
+  const media = await listProjectMedia(project.id);
 
   return (
     <>
@@ -45,6 +48,8 @@ export default async function EditProjectPage({ params }: PageProps<"/admin/port
           sort_order: project.sort_order,
         }}
       />
+
+      <MediaManager projectId={project.id} media={media} />
     </>
   );
 }
