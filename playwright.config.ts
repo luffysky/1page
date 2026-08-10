@@ -1,4 +1,9 @@
 import { defineConfig } from "@playwright/test";
+import { config } from "dotenv";
+
+// 測試行程本身也要讀 .env.local。
+// 少了這行，需要 ADMIN_SEGMENT 的後台安全測試會「靜默跳過」——
+// 測試報告全綠，但那幾條根本沒跑過。
 
 /**
  * Gate 第 5 項「visual review」的載體。
@@ -8,6 +13,8 @@ import { defineConfig } from "@playwright/test";
  *
  * 以 dev server 啟動，因為 /_dev/* 在非開發環境會回 404（見 Plan §11 C）。
  */
+config({ path: [".env.local", ".env"], quiet: true });
+
 export default defineConfig({
   testDir: "./tests",
   outputDir: "./test-results",

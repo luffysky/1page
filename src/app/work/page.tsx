@@ -5,6 +5,7 @@ import { PortfolioFilter } from "@/components/portfolio/portfolio-filter";
 import { PortfolioLayout } from "@/components/portfolio/portfolio-layout";
 import { DarkCtaBlock } from "@/components/shared/dark-cta-block";
 import { Navbar, type NavLink } from "@/components/shared/navbar";
+import { getAdminEntry } from "@/features/admin/auth";
 import { SiteFooter } from "@/components/shared/site-footer";
 import { FINAL_CTA_COPY } from "@/config/home-copy";
 import {
@@ -46,6 +47,9 @@ export default async function WorkPage({ searchParams }: PageProps<"/work">) {
   const projectType = parseProjectTypeFilter(params.type);
 
   const items = await getPortfolioRepository().listPublished({ category, projectType });
+  // 後台入口只渲染給已驗證的後台人員；其他人拿到 null，
+  // 密路徑因此完全不會出現在送給瀏覽器的 HTML 裡。
+  const adminEntry = await getAdminEntry();
 
   const isFiltered = category !== ALL_CATEGORIES || projectType !== ALL_PROJECT_TYPES;
   const activeLabels = [
@@ -55,7 +59,11 @@ export default async function WorkPage({ searchParams }: PageProps<"/work">) {
 
   return (
     <>
-      <Navbar links={NAV_LINKS} cta={{ label: "開始一個專案 ↗", href: "/#contact" }} />
+      <Navbar
+        adminEntry={adminEntry}
+        links={NAV_LINKS}
+        cta={{ label: "開始一個專案 ↗", href: "/#contact" }}
+      />
 
       <main>
         <section className="mx-auto w-full max-w-page px-gutter pt-section pb-10 lg:px-gutter-lg lg:pt-section-lg">

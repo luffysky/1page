@@ -21,7 +21,22 @@ export interface NavLink {
  * 所有站內連結一律用 next/link：`<a>` 會觸發整頁重新載入，
  * 在有多個頁面之後那是實際可感知的退步，不只是 lint 規則。
  */
-export function Navbar({ links, cta }: { links: NavLink[]; cta: NavLink }) {
+export function Navbar({
+  links,
+  cta,
+  adminEntry = null,
+}: {
+  links: NavLink[];
+  cta: NavLink;
+  /**
+   * 後台入口。只有已驗證的後台人員會拿到值，其他人一律 null。
+   *
+   * ⚠️ 這個 prop 為 null 時，後台路徑完全不會出現在送給瀏覽器的 HTML 裡。
+   * 這是密路徑保密的關鍵：入口只渲染給真的有權限的人，
+   * 而不是渲染給所有人再用 CSS 藏起來。
+   */
+  adminEntry?: { href: string; role: string } | null;
+}) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [open, setOpen] = useState(false);
 
@@ -63,6 +78,16 @@ export function Navbar({ links, cta }: { links: NavLink[]; cta: NavLink }) {
         </nav>
 
         <div className="flex items-center gap-3">
+          {adminEntry ? (
+            <Link
+              href={adminEntry.href}
+              className="border-brand-ink text-caption hidden rounded-pill border px-4 py-2 font-bold md:inline-flex"
+            >
+              後台
+              <span className="text-brand-muted ml-1.5 font-normal">{adminEntry.role}</span>
+            </Link>
+          ) : null}
+
           <Link
             href={cta.href}
             className="bg-brand-accent-strong text-brand-on-accent text-body-sm hidden rounded-pill px-5 py-3 font-bold md:inline-flex"
@@ -117,13 +142,25 @@ export function Navbar({ links, cta }: { links: NavLink[]; cta: NavLink }) {
           ))}
         </nav>
 
-        <Link
-          href={cta.href}
-          onClick={close}
-          className="bg-brand-accent-strong text-brand-on-accent mt-10 inline-flex rounded-pill px-6 py-3.5 font-bold"
-        >
-          {cta.label}
-        </Link>
+        <div className="mt-10 flex flex-wrap items-center gap-3">
+          <Link
+            href={cta.href}
+            onClick={close}
+            className="bg-brand-accent-strong text-brand-on-accent inline-flex rounded-pill px-6 py-3.5 font-bold"
+          >
+            {cta.label}
+          </Link>
+
+          {adminEntry ? (
+            <Link
+              href={adminEntry.href}
+              onClick={close}
+              className="border-brand-ink text-body-sm inline-flex rounded-pill border px-5 py-3 font-bold"
+            >
+              後台
+            </Link>
+          ) : null}
+        </div>
       </dialog>
     </header>
   );

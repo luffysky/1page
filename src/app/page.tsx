@@ -9,6 +9,7 @@ import { ServicesBand } from "@/components/services/services-band";
 import { DarkCtaBlock } from "@/components/shared/dark-cta-block";
 import { EditorialSection } from "@/components/shared/editorial-section";
 import { Navbar, type NavLink } from "@/components/shared/navbar";
+import { getAdminEntry } from "@/features/admin/auth";
 import { SiteFooter } from "@/components/shared/site-footer";
 import { FINAL_CTA_COPY, HERO_COPY, SECTION_COPY } from "@/config/home-copy";
 import { parseHomeGoal } from "@/config/home-goals";
@@ -43,10 +44,17 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   const params = await searchParams;
   const goal = parseHomeGoal(params.goal);
   const featured = await getPortfolioRepository().listFeatured();
+  // 後台入口只渲染給已驗證的後台人員；其他人拿到 null，
+  // 密路徑因此完全不會出現在送給瀏覽器的 HTML 裡。
+  const adminEntry = await getAdminEntry();
 
   return (
     <HomeGoalProvider initialGoal={goal}>
-      <Navbar links={NAV_LINKS} cta={{ label: "開始一個專案 ↗", href: "#contact" }} />
+      <Navbar
+        adminEntry={adminEntry}
+        links={NAV_LINKS}
+        cta={{ label: "開始一個專案 ↗", href: "#contact" }}
+      />
 
       <main id="top">
         <Hero {...HERO_COPY} />

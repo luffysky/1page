@@ -774,3 +774,99 @@ production   直接拋錯
 
 佔位色調改由 slug 雜湊決定（原本手挑），因此分布不如手挑均勻。
 這是 2F 之前的過渡呈現，不值得為此增加 schema 欄位。
+
+---
+
+## 2E — Admin 權限 + CRUD
+
+**日期：** 2026-08-11  
+**結果：** ✅ 全數通過
+
+### Gate
+
+| # | 項目 | 結果 |
+|---|---|---|
+| 1–4 | typecheck / lint / test / build | ✅ 95 unit tests（2D 73 → 2E 95） |
+| 5 | e2e | ✅ 92/92（含 13 條後台安全測試） |
+| ＋ | `pnpm test:db` | ✅ 29/29 |
+
+### 三層防線，密路徑是最外層也是最弱的一層
+
+參考 `ai_island_v3`、`SnowRealmSpace` 的模式，取其中最嚴謹的版本。
+
+```text
+1. 密路徑     /<ADMIN_SEGMENT>/admin，裸 /admin 一律 404    ← 只防掃描
+2. 身分驗證   requireAdmin()：getUser() + admin_users 名單
+3. RLS        繞過前兩層直接打 API 也拿不到                  ← 真正的邊界
+```
+
+**`ADMIN_SEGMENT` 沒有 `NEXT_PUBLIC_` 前綴**，且 `src/config/admin.ts`
+匯入 `server-only`——client component 誤引用會直接編譯失敗，而不是安靜地
+把密路徑打包進瀏覽器。
+
+`ai_island_v3` 原本有 `NEXT_PUBLIC_ADMIN_SLUG` 的 fallback 與硬編預設值，
+實測導致密路徑出現在每位訪客都會載入的根版面 chunk，以及公開的 robots.txt。
+此處從一開始就排除這條路。
+
+### 選單入口只渲染給有權限的人
+
+`getAdminEntry()` 回傳 null 時，後台路徑**完全不會出現在送給瀏覽器的 HTML**。
+
+不是「渲染給所有人再用 CSS 藏起來」——那樣密路徑等於公開。
+e2e 直接比對整份 HTML 不含 `ADMIN_SEGMENT` 來驗證這件事。
+
+### Server Action 各自驗證身分
+
+Server Action 會被編譯成可從瀏覽器直接呼叫的端點。
+「這個按鈕只有 admin 看得到」完全不構成保護——任何人都能自己組出請求。
+
+因此 `features/admin/actions.ts` 的每一支都獨立呼叫 `requireStaff()`，
+而不是倚賴頁面層的 `requireAdmin()`。
+
+後台一律使用**帶 cookie 的 anon client，不是 service role**：
+能讀草稿、能寫入是因為登入者在 `admin_users` 名單上、RLS 放行，
+不是因為換了一把繞過所有規則的鑰匙。即使這裡程式碼有漏洞，
+非後台人員也拿不到草稿。
+
+### 新增：密路徑產生器
+
+```bash
+pnpm gen:slug                      # 16 碼 base58，約 93 bits
+pnpm gen:slug --format hex --length 32
+pnpm gen:slug --format words --length 4
+pnpm gen:slug --count 5
+```
+
+用 `crypto.randomInt` 而非 `Math.random`（後者可預測），
+也不用 `% alphabet.length`（模數偏差會讓前面的字元較常出現）。
+輸出會標示熵值，低於 64 bits 直接警告。
+預設 base58 排除 `0 O I l`，因為這串路徑遲早要有人用眼睛核對。
+
+### 兩個測試自身的問題，其中一個很危險
+
+**靜默跳過的安全測試。** 第一次跑時有 2 條後台測試被 skip——
+Playwright 行程沒有載入 `.env.local`，所以 `ADMIN_SEGMENT` 是 undefined。
+報告全綠，但那兩條根本沒跑。已在 `playwright.config.ts` 加上 dotenv。
+
+> 這正是我在 2A 拒絕把 RLS 測試併進 `pnpm test` 的同一個理由：
+> 安全測試被靜默跳過，比沒有測試更危險。
+
+**跳脫錯誤導致的假失敗。** open redirect 測試中 `"/\evil.example.com"`
+在 TypeScript 裡 `\e` 不是有效跳脫，實際字串是 `/evil.example.com`——
+一個合法站內路徑。函式回傳它是正確的，錯的是測試。
+
+順帶把淨化邏輯抽成 `safe-redirect.ts` 並寫了 16 條單元測試，
+涵蓋 `//evil.com`、`/\evil.com`、`javascript:`、控制字元等變形寫法——
+那些才是實務上真的被利用的形式。
+
+### 刻意不做的事
+
+**列表沒有刪除按鈕。** Spec §8.8 列了 Delete，但作品是累積型資產
+（Spec §44 的飛輪），誤刪的代價遠高於封存。刪除需進編輯頁並二次確認。
+
+**新增作品的來源類型預設為 Demo 而非 Client。** 若不小心略過這一欄，
+錯誤方向應該是「低估自己」，而不是宣稱有客戶案例（Spec §29）。
+
+**角色只有 owner / admin 兩種。** 參考專案有 support / marketing /
+finance / content 等 scoped 角色，那是在多部門進後台之後才需要的。
+目前只有一位使用者，先做四個角色只會產生四份沒人走過的權限路徑。

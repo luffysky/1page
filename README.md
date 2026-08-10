@@ -45,7 +45,9 @@ Phase 1E  Responsive + A11y       ✅ Gate 通過
 Phase 2A  Schema + RLS            ✅ Gate 通過（Zeabur）
 Phase 2B  /work 列表 + Filter      ✅ Gate 通過
 Phase 2C  /work/[slug] + SEO       ✅ Gate 通過
-Phase 2D  Repository 換 Supabase   ⏸ 待資料庫
+Phase 2D  Repository 換 Supabase   ✅ Gate 通過
+Phase 2E  Admin 權限 + CRUD        ✅ Gate 通過
+Phase 2F  Media Upload（R2）       ⏳ 待開始
 ```
 
 Gate 紀錄見 [`docs/gate-log.md`](docs/gate-log.md)。

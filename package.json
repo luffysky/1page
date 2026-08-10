@@ -26,9 +26,13 @@
     "test:db": "vitest run --config vitest.db.config.ts",
     "db:push": "node scripts/db-push.mjs",
     "db:seed": "node scripts/db-push.mjs --seed",
-    "db:status": "node scripts/db-push.mjs --status"
+    "db:status": "node scripts/db-push.mjs --status",
+    "gen:slug": "node scripts/gen-slug.mjs",
+    "admin:create": "node scripts/admin-create.mjs",
+    "admin:list": "node scripts/admin-create.mjs --list"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.112.2",
     "next": "16.3.0",
     "react": "19.2.8",

@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { PortfolioLayout } from "@/components/portfolio/portfolio-layout";
 import { DarkCtaBlock } from "@/components/shared/dark-cta-block";
 import { Navbar, type NavLink } from "@/components/shared/navbar";
+import { getAdminEntry } from "@/features/admin/auth";
 import { SiteFooter } from "@/components/shared/site-footer";
 import { FINAL_CTA_COPY } from "@/config/home-copy";
 import { getCategoryName } from "@/config/portfolio-categories";
@@ -72,6 +73,9 @@ export default async function WorkDetailPage({ params }: PageProps<"/work/[slug]
   if (!project) notFound();
 
   const related = await getPortfolioRepository().listRelated(slug, 3);
+  // 後台入口只渲染給已驗證的後台人員；其他人拿到 null，
+  // 密路徑因此完全不會出現在送給瀏覽器的 HTML 裡。
+  const adminEntry = await getAdminEntry();
   const caseStudySections = presentCaseStudySections(project.caseStudy);
   const services = SERVICE_LINES.filter((line) => project.services.includes(line.id));
   const links = Object.entries(project.links).filter(([, href]) => Boolean(href));
@@ -82,7 +86,11 @@ export default async function WorkDetailPage({ params }: PageProps<"/work/[slug]
 
   return (
     <>
-      <Navbar links={NAV_LINKS} cta={{ label: "開始一個專案 ↗", href: "/#contact" }} />
+      <Navbar
+        adminEntry={adminEntry}
+        links={NAV_LINKS}
+        cta={{ label: "開始一個專案 ↗", href: "/#contact" }}
+      />
 
       <main>
         {/* Hero */}
