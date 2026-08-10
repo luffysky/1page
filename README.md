@@ -52,7 +52,10 @@ Phase 2F  Media Upload（R2）       ✅ Gate 通過
 Phase 2  Portfolio                ✅ 完成
 Phase 3A SiteConfig Schema        ✅ Gate 通過
 Phase 3B Theme Engine             ✅ Gate 通過
-Phase 3C Section Registry         ⏳ 待開始
+Phase 3C Section Registry         ✅ Gate 通過
+Phase 3D SiteRenderer             ✅ Gate 通過
+
+Phase 3 完成。
 ```
 
 Gate 紀錄見 [`docs/gate-log.md`](docs/gate-log.md)。

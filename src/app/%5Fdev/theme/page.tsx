@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { validateSiteConfig } from "@/features/website-engine/schema";
 import { SiteScope } from "@/features/website-engine/site-scope";
+import { SiteRenderer } from "@/features/website-engine/site-renderer";
 import { SITE_VARS } from "@/features/website-engine/theme";
 
 export const metadata: Metadata = {
@@ -108,8 +109,46 @@ function ThemedCard({ title }: { title: string }) {
   );
 }
 
+/**
+ * 走完整條 SiteRenderer 鏈路的示範設定。
+ * 最後一個 section 的 type 刻意是尚未實作的 pricing——
+ * 用來確認降級行為在真實渲染中也成立，而不只在單元測試裡。
+ */
+const DEMO = validateSiteConfig({
+  ...BASE,
+  theme: WARM.ok ? WARM.config.theme : undefined,
+  sections: [
+    {
+      id: "hero",
+      type: "hero",
+      variant: "editorial",
+      content: {
+        eyebrow: "甜點品牌",
+        title: "把今天的甜，留久一點。",
+        subtitle: "手作甜點、季節風味與一點剛好的儀式感。",
+        actions: [{ label: "看看今日甜點", href: "#menu" }],
+      },
+    },
+    {
+      id: "services",
+      type: "services",
+      variant: "list",
+      content: {
+        title: "我們提供",
+        items: [
+          { label: "季節限定", text: "依當季水果調整的甜點組合。" },
+          { label: "訂製蛋糕", text: "生日與節慶的訂製設計。" },
+          { label: "外燴甜點", text: "活動與婚禮的甜點桌。" },
+        ],
+      },
+    },
+    { id: "cta", type: "cta", variant: "banner", content: { title: "今天想吃點什麼甜的？" } },
+    { id: "pricing", type: "pricing", variant: "table", content: { title: "方案" } },
+  ],
+});
+
 export default function ThemePage() {
-  if (!WARM.ok || !LUXURY.ok) {
+  if (!WARM.ok || !LUXURY.ok || !DEMO.ok) {
     return <p>示範主題未通過 schema 驗證：這本身就是錯誤，請檢查 schema。</p>;
   }
 
@@ -149,6 +188,17 @@ export default function ThemePage() {
               </SiteScope>
             </div>
           </SiteScope>
+        </div>
+      </section>
+
+      <section className="mt-16">
+        <h2 className="text-heading-1">SiteRenderer（3D）</h2>
+        <p className="text-body-sm text-brand-muted mt-2 max-w-prose">
+          同一份 SiteConfig 走完整條鏈路：驗證 → 主題 → Section 解析 → 元件。
+          最後一個區塊是刻意寫錯的 type，應顯示佔位而非讓整頁崩潰。
+        </p>
+        <div className="border-brand-line mt-6 overflow-hidden rounded-lg border">
+          <SiteRenderer config={DEMO.config} />
         </div>
       </section>
 

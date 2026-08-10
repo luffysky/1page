@@ -1201,3 +1201,70 @@ SSR 會把 inline style 序列化成 `style="--site-accent: red"` 屬性；
 ```
 
 第 3 項是這頁真正的目的：若主題滲漏到 `:root`，那排品牌色票會跟著變。
+
+---
+
+## 3C + 3D — Section Registry + SiteRenderer
+
+**日期：** 2026-08-11  
+**結果：** ✅ 全數通過 — **Phase 3 完成**
+
+### Gate
+
+| # | 項目 | 結果 |
+|---|---|---|
+| 1–4 | typecheck / lint / test / build | ✅ 167 unit tests（3B 153 → 3D 167） |
+| 5 | e2e + 截圖 | ✅ 48 張，`/_dev/theme` 含完整 SiteRenderer 鏈路 |
+
+### 降級行為是這兩段真正的產出
+
+Spec §11 的流程（驗證 → 主題 → Section 解析 → 元件）不難寫，
+難的是「其中一步失敗時會發生什麼」。Phase 6 的 Agent 會直接產生
+section type 與 variant，LLM 生出不存在的名稱是遲早的事。
+
+```text
+未知 variant   退回該 type 的預設 variant
+               排版錯了還能看，內容不見了就沒得救
+未知 type      顯示可辨識的佔位，其餘 section 照常渲染
+               靜默略過會讓人以為「Agent 沒做事」，
+               實際上是「這個 type 還沒有元件」——兩者要分得出來
+無效 config    渲染錯誤說明而非拋例外
+               拋例外會讓 error boundary 吃掉整棵樹，使用者看到整片白
+```
+
+`/_dev/theme` 的示範設定刻意放了一個尚未實作的 `pricing` type，
+讓降級行為在真實渲染中也看得見，而不只存在於單元測試裡。
+
+### SiteRenderer 再驗一次 schema，即使型別已是 SiteConfig
+
+TypeScript 的型別只在編譯期存在。設定會經過 JSON 序列化
+（Server → Client、資料庫、Agent 的 tool call 回傳），
+那些邊界都可能讓一個「型別上是 SiteConfig」的值實際上不是。
+
+渲染是最後一站，這裡漏掉就直接進到使用者的瀏覽器。
+
+### Section 元件用 Tailwind 任意值，不用 inline style
+
+`bg-[var(--site-color-background)]` 是**類別**而非 inline style。
+因此九個 Section 元件完全不需要 `style={}`，
+`no-hardcoded-design-values` 的例外清單維持三項，沒有因為 3C 而膨脹。
+
+例外清單短，才有人願意在加新例外時停下來想一下。
+
+### 判準寫錯：`=== "development"` vs `!== "production"`
+
+佔位與錯誤說明的技術細節原本只在 `NODE_ENV === "development"` 顯示，
+測試環境（`"test"`）因此看不到，測試直接失敗。
+
+要防的是**對正式環境的訪客洩漏內部結構**，而不是「只有開發時才需要細節」。
+判準改為 `!== "production"`。
+
+### Registry 的兩個附帶產出
+
+```text
+implementedSectionTypes()   Phase 4 的模板知道能用哪些 type
+variantsFor(type)           Phase 6 的 Agent 工具知道能填哪些 variant
+```
+
+這兩支不是現在需要，是為了讓 Phase 4/6 不必自己再維護一份清單——
+兩份清單必然分歧，而分歧的表現是 Agent 產生了合法但渲染不出來的設定。
