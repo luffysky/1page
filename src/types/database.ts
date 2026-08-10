@@ -70,6 +70,8 @@ export interface PortfolioProjectsRow {
   created_at: string;
   updated_at: string;
   published_at: string | null;
+  kicker: string | null;
+  services: string[];
 }
 
 export interface PortfolioTagsRow {

@@ -104,7 +104,9 @@ if (wantSeed) {
   process.stdout.write("\n  → 套用 seed.sql ... ");
   // 種子可重複執行：先清空作品相關資料。
   // 只清 portfolio_*，不動 admin_users 與 auth schema。
-  await sql("truncate table public.portfolio_projects restart identity cascade;");
+  await sql(
+    "truncate table public.portfolio_projects, public.portfolio_tags restart identity cascade;",
+  );
   await sql(readFileSync(join(process.cwd(), "supabase/seed.sql"), "utf8"));
   console.log("完成");
 }

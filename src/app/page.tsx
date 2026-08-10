@@ -13,7 +13,7 @@ import { SiteFooter } from "@/components/shared/site-footer";
 import { FINAL_CTA_COPY, HERO_COPY, SECTION_COPY } from "@/config/home-copy";
 import { parseHomeGoal } from "@/config/home-goals";
 import { HomeGoalProvider } from "@/features/home/goal-context";
-import { inMemoryPortfolioRepository } from "@/features/portfolio/in-memory-repository";
+import { getPortfolioRepository } from "@/features/portfolio";
 
 /**
  * 首頁組裝（Spec §4 IA）
@@ -42,7 +42,7 @@ const NAV_LINKS: NavLink[] = [
 export default async function Home({ searchParams }: PageProps<"/">) {
   const params = await searchParams;
   const goal = parseHomeGoal(params.goal);
-  const featured = await inMemoryPortfolioRepository.listFeatured();
+  const featured = await getPortfolioRepository().listFeatured();
 
   return (
     <HomeGoalProvider initialGoal={goal}>

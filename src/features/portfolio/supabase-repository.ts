@@ -1,0 +1,250 @@
+import type { HomeGoal } from "@/config/home-goals";
+import { ALL_CATEGORIES, ALL_PROJECT_TYPES } from "@/config/portfolio-categories";
+import { getSupabasePublicClient } from "@/lib/supabase/client";
+import type { Json, PortfolioProjectsRow } from "@/types/database";
+
+import type { PortfolioCaseStudy, PortfolioDetail, PortfolioLinks, PortfolioMedia } from "./detail";
+import {
+  filterByGoal,
+  type PortfolioListFilter,
+  type PortfolioListItem,
+  type PortfolioRepository,
+} from "./repository";
+
+/**
+ * Supabase 實作（2D）。
+ *
+ * 介面與型別完全沿用 1D 立下的 `PortfolioRepository`——
+ * `/work`、`/work/[slug]` 與首頁一行都不用改，這就是當初立介面的用意。
+ *
+ * ⚠️ 一律使用 anon client。未發布作品讀不到不是因為查詢加了 `status = published`，
+ * 而是因為 RLS 不給（Spec §41）。因此即使這裡的查詢寫錯，草稿也不會外流。
+ */
+
+/** PostgREST 的巢狀選取：一次把分類與標籤帶回來，避免 N+1 */
+const LIST_SELECT = `
+  id, slug, title, kicker, summary, project_type, featured, sort_order,
+  portfolio_project_categories ( portfolio_categories ( slug ) )
+`;
+
+const DETAIL_SELECT = `
+  id, slug, title, kicker, summary, project_type, industry, year, services,
+  case_study_json, links_json, ai_disclosure_json,
+  portfolio_project_categories ( portfolio_categories ( slug ) ),
+  portfolio_project_tags ( portfolio_tags ( name ) ),
+  portfolio_media ( id, type, url, thumbnail_url, alt, caption, role, sort_order )
+`;
+
+type CategoryJoin = { portfolio_categories: { slug: string } | null }[] | null;
+type TagJoin = { portfolio_tags: { name: string } | null }[] | null;
+
+interface ListRow extends Pick<
+  PortfolioProjectsRow,
+  "id" | "slug" | "title" | "kicker" | "summary" | "project_type" | "featured" | "sort_order"
+> {
+  portfolio_project_categories: CategoryJoin;
+}
+
+function categoriesOf(join: CategoryJoin): string[] {
+  return (join ?? [])
+    .map((row) => row.portfolio_categories?.slug)
+    .filter((slug): slug is string => Boolean(slug));
+}
+
+/**
+ * 沒有封面圖時的佔位色調。
+ *
+ * 由 slug 決定而非存成欄位：這是「還沒有真實封面」才需要的過渡呈現，
+ * 2F 接上 R2 之後就不再用到。存成欄位等於為暫時狀態增加 schema 負擔。
+ * 用 slug 雜湊而非隨機，是為了同一件作品每次都得到同樣的顏色。
+ */
+const TONES = ["cream", "accent", "ink"] as const;
+
+function toneOf(slug: string): (typeof TONES)[number] {
+  let hash = 0;
+  for (const char of slug) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  return TONES[hash % TONES.length]!;
+}
+
+function toListItem(row: ListRow): PortfolioListItem {
+  return {
+    // 刻意不映射 cover：資料庫裡的封面目前指向尚未存在的檔案，
+    // 真實媒體要等 2F 接上 R2。在那之前一律用佔位色塊，
+    // 寧可顯示色塊，也不要在頁面上放一張破圖。
+    id: row.slug,
+    title: row.title,
+    kicker: row.kicker ?? "",
+    projectType: row.project_type,
+    href: `/work/${row.slug}`,
+    placeholderTone: toneOf(row.slug),
+    categories: categoriesOf(row.portfolio_project_categories),
+  };
+}
+
+/** jsonb 欄位在型別上是 Json，取用前先確認它真的是物件 */
+function asRecord(value: Json | null): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function pickString(source: Record<string, unknown>, key: string): string | undefined {
+  const value = source[key];
+  return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+export const supabasePortfolioRepository: PortfolioRepository = {
+  async listFeatured() {
+    const { data, error } = await getSupabasePublicClient()
+      .from("portfolio_projects")
+      .select(LIST_SELECT)
+      .eq("featured", true)
+      .order("sort_order", { ascending: true })
+      .returns<ListRow[]>();
+
+    if (error) throw new Error(`listFeatured 失敗：${error.message}`);
+    return (data ?? []).map(toListItem);
+  },
+
+  async listByGoal(goal: HomeGoal) {
+    // 精選作品數量很少，取回後在記憶體篩選即可；
+    // 且與 client 端使用同一支 filterByGoal，規則不會分岔。
+    const featured = await supabasePortfolioRepository.listFeatured();
+    return filterByGoal(featured, goal);
+  },
+
+  async listPublished(filter: PortfolioListFilter) {
+    let query = getSupabasePublicClient()
+      .from("portfolio_projects")
+      .select(LIST_SELECT)
+      .order("sort_order", { ascending: true });
+
+    if (filter.projectType !== ALL_PROJECT_TYPES) {
+      query = query.eq("project_type", filter.projectType);
+    }
+
+    const { data, error } = await query.returns<ListRow[]>();
+    if (error) throw new Error(`listPublished 失敗：${error.message}`);
+
+    const items = (data ?? []).map(toListItem);
+
+    // 分類篩選在記憶體完成：PostgREST 對「巢狀關聯的條件」需要 inner join 語法，
+    // 而那會連帶影響回傳的關聯資料（只剩符合條件的分類），
+    // 導致卡片上顯示的分類不完整。作品數量在此規模下不值得為此犧牲正確性。
+    if (filter.category === ALL_CATEGORIES) return items;
+    return items.filter((item) => item.categories.includes(filter.category));
+  },
+
+  async getBySlug(slug: string) {
+    const { data, error } = await getSupabasePublicClient()
+      .from("portfolio_projects")
+      .select(DETAIL_SELECT)
+      .eq("slug", slug)
+      .maybeSingle();
+
+    if (error) throw new Error(`getBySlug 失敗：${error.message}`);
+    if (!data) return null; // 不存在與未發布走同一條路徑，不從差異洩漏草稿存在
+
+    const row = data as unknown as ListRow & {
+      industry: string | null;
+      year: number | null;
+      services: string[] | null;
+      case_study_json: Json | null;
+      links_json: Json | null;
+      ai_disclosure_json: Json | null;
+      portfolio_project_tags: TagJoin;
+      portfolio_media: {
+        id: string;
+        type: PortfolioMedia["type"];
+        url: string;
+        thumbnail_url: string | null;
+        alt: string | null;
+        caption: string | null;
+        role: PortfolioMedia["role"];
+        sort_order: number;
+      }[];
+    };
+
+    const caseStudyJson = asRecord(row.case_study_json);
+    const caseStudy: PortfolioCaseStudy = {
+      problem: pickString(caseStudyJson, "problem"),
+      goal: pickString(caseStudyJson, "goal"),
+      thinking: pickString(caseStudyJson, "thinking"),
+      solution: pickString(caseStudyJson, "solution"),
+      result: pickString(caseStudyJson, "result"),
+    };
+
+    const linksJson = asRecord(row.links_json);
+    const links: PortfolioLinks = {
+      live: pickString(linksJson, "live"),
+      demo: pickString(linksJson, "demo"),
+      figma: pickString(linksJson, "figma"),
+      github: pickString(linksJson, "github"),
+    };
+
+    const aiJson = asRecord(row.ai_disclosure_json);
+    const aiUsed = aiJson.used === true;
+
+    const detail: PortfolioDetail = {
+      id: row.slug,
+      slug: row.slug,
+      title: row.title,
+      kicker: row.kicker ?? "",
+      summary: row.summary ?? undefined,
+      projectType: row.project_type,
+      categories: categoriesOf(row.portfolio_project_categories),
+      tags: (row.portfolio_project_tags ?? [])
+        .map((entry) => entry.portfolio_tags?.name)
+        .filter((name): name is string => Boolean(name)),
+      services: row.services ?? [],
+      industry: row.industry ?? undefined,
+      year: row.year ?? undefined,
+      caseStudy,
+      links,
+      placeholderTone: toneOf(row.slug),
+      media: (row.portfolio_media ?? [])
+        .slice()
+        .sort((a, b) => a.sort_order - b.sort_order)
+        // 資料庫的 image_requires_alt 已保證圖片有 alt；
+        // 其他型別若缺 alt 則跳過，寧可不顯示也不產生無替代文字的內容（Spec §35）
+        .filter((media) => Boolean(media.alt))
+        .map((media) => ({
+          id: media.id,
+          type: media.type,
+          url: media.url,
+          thumbnailUrl: media.thumbnail_url ?? undefined,
+          alt: media.alt!,
+          caption: media.caption ?? undefined,
+          role: media.role,
+        })),
+      aiDisclosure: aiUsed
+        ? { used: true, description: pickString(aiJson, "description") }
+        : undefined,
+    };
+
+    return detail;
+  },
+
+  async listRelated(slug: string, limit: number) {
+    const current = await supabasePortfolioRepository.getBySlug(slug);
+    if (!current) return [];
+
+    const all = await supabasePortfolioRepository.listPublished({
+      category: ALL_CATEGORIES,
+      projectType: ALL_PROJECT_TYPES,
+    });
+
+    const categories = new Set(current.categories);
+    const others = all.filter((item) => item.id !== current.slug);
+
+    // 同分類優先，不足時以其餘作品補滿，避免相關作品區時有時無
+    const sameCategory = others.filter((item) =>
+      item.categories.some((category) => categories.has(category)),
+    );
+    const rest = others.filter(
+      (item) => !item.categories.some((category) => categories.has(category)),
+    );
+
+    return [...sameCategory, ...rest].slice(0, limit);
+  },
+};

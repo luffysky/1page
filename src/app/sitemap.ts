@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 
 import { absoluteUrl } from "@/config/site";
-import { inMemoryPortfolioRepository } from "@/features/portfolio/in-memory-repository";
+import { getPortfolioRepository } from "@/features/portfolio";
 
 /**
  * Sitemap（Spec §32）
@@ -13,7 +13,7 @@ import { inMemoryPortfolioRepository } from "@/features/portfolio/in-memory-repo
  * 且只會列出已發布作品（`listPublished` 的語意）。
  */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const projects = await inMemoryPortfolioRepository.listPublished({
+  const projects = await getPortfolioRepository().listPublished({
     category: "all",
     projectType: "all",
   });

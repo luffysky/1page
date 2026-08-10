@@ -11,7 +11,7 @@ import { getCategoryName } from "@/config/portfolio-categories";
 import { SERVICE_LINES } from "@/config/services";
 import { absoluteUrl, SITE_NAME } from "@/config/site";
 import { presentCaseStudySections } from "@/features/portfolio/detail";
-import { inMemoryPortfolioRepository } from "@/features/portfolio/in-memory-repository";
+import { getPortfolioRepository } from "@/features/portfolio";
 import { PROJECT_TYPE_LABELS } from "@/features/portfolio/project-type";
 
 /**
@@ -34,7 +34,7 @@ const NAV_LINKS: NavLink[] = [
 
 export async function generateMetadata({ params }: PageProps<"/work/[slug]">): Promise<Metadata> {
   const { slug } = await params;
-  const project = await inMemoryPortfolioRepository.getBySlug(slug);
+  const project = await getPortfolioRepository().getBySlug(slug);
 
   if (!project) return { title: `找不到作品｜${SITE_NAME}` };
 
@@ -66,15 +66,19 @@ function MetaRow({ label, value }: { label: string; value: string }) {
 
 export default async function WorkDetailPage({ params }: PageProps<"/work/[slug]">) {
   const { slug } = await params;
-  const project = await inMemoryPortfolioRepository.getBySlug(slug);
+  const project = await getPortfolioRepository().getBySlug(slug);
 
   // 找不到與未發布都走同一條路徑：不從回應差異洩漏草稿的存在
   if (!project) notFound();
 
-  const related = await inMemoryPortfolioRepository.listRelated(slug, 3);
+  const related = await getPortfolioRepository().listRelated(slug, 3);
   const caseStudySections = presentCaseStudySections(project.caseStudy);
   const services = SERVICE_LINES.filter((line) => project.services.includes(line.id));
   const links = Object.entries(project.links).filter(([, href]) => Boolean(href));
+
+  // Gallery 排除 cover：封面是列表卡片用的，重複出現在圖廊裡只是同一張圖看兩次。
+  // 這也讓「只有封面、沒有其他媒體」的作品正確地不顯示 Gallery。
+  const gallery = project.media.filter((media) => media.role !== "cover");
 
   return (
     <>
@@ -159,11 +163,11 @@ export default async function WorkDetailPage({ params }: PageProps<"/work/[slug]
         ) : null}
 
         {/* Media Gallery —— 無媒體時整段不出現，而非顯示空相簿 */}
-        {project.media.length > 0 ? (
+        {gallery.length > 0 ? (
           <section className="mx-auto w-full max-w-page px-gutter pb-16 lg:px-gutter-lg">
             <h2 className="text-heading-1 mb-6">Gallery</h2>
             <ul className="grid gap-4 md:grid-cols-2">
-              {project.media.map((media) => (
+              {gallery.map((media) => (
                 <li key={media.id} className="border-brand-line overflow-hidden rounded-lg border">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={media.url} alt={media.alt} className="w-full" />

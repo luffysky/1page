@@ -693,3 +693,84 @@ Navbar 品牌 logo → #top      同樣只存在於首頁
 作品詳細頁由 repository 供應而非手抄，2D 換 Supabase 後自動反映真實資料，
 且只列出已發布作品。採白名單（明列要收錄的）而非黑名單（排除 `/_dev`）——
 白名單不容易漏。
+
+---
+
+## 2D — Repository 換 Supabase 實作
+
+**日期：** 2026-08-11  
+**結果：** ✅ 全數通過
+
+### Gate
+
+| # | 項目 | 結果 |
+|---|---|---|
+| 1–4 | typecheck / lint / test / build | ✅ 73 unit tests |
+| 5 | e2e + 截圖 | ✅ 79/79、40 張 |
+| ＋ | `pnpm test:db` | ✅ 29/29（RLS 10 + repository 整合 19） |
+
+### 出口條件：畫面無變化
+
+**首頁、`/work`、`/work/[slug]` 三個頁面一行都沒改**，只換了 `getPortfolioRepository()`
+回傳的實作。原本針對 in-memory 資料寫的 79 條 e2e 全數通過，
+而 e2e 跑的是連著真實資料庫的 dev server。
+
+這是 1D 立下 `PortfolioRepository` 介面的完整回報。
+
+### schema 缺口在接線時才浮現
+
+2B/2C 把 UI 做出來後才發現 2A 的 schema 少了兩個欄位：
+
+```text
+kicker    標題上方小標。summary 是段落敘述，兩者用途不同不能互相取代
+services  Spec §8.4 明列，§8.13 的「Service Detail 自動顯示 Related Work」靠它
+```
+
+補了 migration 0003。這正是「先由 UI 定義 repository 需要什麼，
+再對真實資料庫實作」這個順序的用處——缺口在接線時浮現，
+而不是等 Admin 介面做完才發現存不了。
+
+`services` 用 `text[]` 而非 join table：服務是 config 中的固定四條產品線，
+不是使用者可新增的實體，Spec §39 的表列也沒有這張 join table。
+
+### 產生式型別當場擋下不一致
+
+migration 0003 之後沒重新產生型別，`tsc` 立刻報
+「`kicker` 不在 `PortfolioProjectsRow` 上」。`pnpm db:types` 一跑就修好。
+
+若型別是手抄的，這個不一致會安靜地存在到執行期。
+
+### 三個刻意的實作選擇
+
+**一律使用 anon client。** 未發布作品讀不到不是因為查詢加了
+`status = published`，而是因為 RLS 不給。因此即使查詢寫錯，草稿也不會外流。
+公開路徑絕不改用 service role key——那會讓 RLS 完全失效，而症狀是靜默的。
+
+**分類篩選在記憶體完成。** PostgREST 對巢狀關聯下條件需要 inner join 語法，
+而那會讓回傳的關聯只剩符合條件的分類，卡片上就會少顯示分類。
+此規模下不值得為了少一次過濾而犧牲顯示正確性。
+
+**缺少設定時分環境處理。**
+
+```text
+development  退回 in-memory 並在主控台警告（沒憑證的人 clone 下來仍能看畫面）
+production   直接拋錯
+```
+
+在 production 靜默退回種子資料是最糟的失敗模式：網站看起來完全正常，
+只是展示的全是不存在的作品。寧可整頁掛掉，也不要對訪客說謊。
+
+### Gallery 排除封面
+
+資料庫種子給 interior-studio 加了一張 cover 之後，詳細頁的 Gallery 冒出來了——
+但那只是把列表卡片的同一張圖再看一次。改為 Gallery 排除 `role = 'cover'`，
+語意才正確：封面給卡片用，圖廊放其他媒體。
+
+### 尚未接上的部分
+
+`PortfolioCard.cover` 刻意不映射。資料庫裡的封面目前指向尚未存在的檔案，
+真實媒體要等 2F 接上 R2。在那之前一律用佔位色塊——寧可顯示色塊，
+也不要在頁面上放一張破圖。
+
+佔位色調改由 slug 雜湊決定（原本手挑），因此分布不如手挑均勻。
+這是 2F 之前的過渡呈現，不值得為此增加 schema 欄位。

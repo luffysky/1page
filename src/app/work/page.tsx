@@ -14,7 +14,7 @@ import {
   parseCategoryFilter,
   parseProjectTypeFilter,
 } from "@/config/portfolio-categories";
-import { inMemoryPortfolioRepository } from "@/features/portfolio/in-memory-repository";
+import { getPortfolioRepository } from "@/features/portfolio";
 import { PROJECT_TYPE_LABELS } from "@/features/portfolio/project-type";
 
 export const metadata: Metadata = {
@@ -45,7 +45,7 @@ export default async function WorkPage({ searchParams }: PageProps<"/work">) {
   const category = parseCategoryFilter(params.category);
   const projectType = parseProjectTypeFilter(params.type);
 
-  const items = await inMemoryPortfolioRepository.listPublished({ category, projectType });
+  const items = await getPortfolioRepository().listPublished({ category, projectType });
 
   const isFiltered = category !== ALL_CATEGORIES || projectType !== ALL_PROJECT_TYPES;
   const activeLabels = [
