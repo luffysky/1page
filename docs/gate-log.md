@@ -217,4 +217,111 @@ Phase 1 無資料庫，成本可忽略；Phase 2 接 Supabase 後需重新評估
 
 ## 1C — Layout Primitives
 
+**日期：** 2026-08-10  
+**結果：** ✅ 全數通過
+
+### Gate 五項
+
+| # | 項目 | 結果 |
+|---|---|---|
+| 1 | typecheck | ✅ |
+| 2 | lint | ✅ 0 error / 0 warning |
+| 3 | test | ✅ 47 tests / 7 files（1B 33 → 1C 47） |
+| 4 | build | ✅ |
+| 5 | visual + 行為 | ✅ 截圖 24 張、e2e 18/18 |
+
+### 八個 Primitive
+
+```text
+Navbar（含 Mobile Nav）      components/shared/navbar.tsx        client
+Hero                         components/landing/hero.tsx         server
+EditorialSection             components/shared/editorial-section server
+PortfolioLayout              components/portfolio/               server
+TemplateExperienceShell      components/website-preview/         client
+AgentWorkspaceShell          components/agent/                   client
+PricingLadder                components/pricing/                 server
+DarkCtaBlock                 components/shared/                  server
+```
+
+### 出口條件核對
+
+| 出口條件 | 結果 |
+|---|---|
+| `/_dev/primitives` 可逐一檢視八個 primitive | ✅ |
+| 兩個 Shell 的 TS 介面已定，site scope container 已存在 | ✅ |
+| Mobile Nav 可實際開闔並支援鍵盤操作 | ✅ |
+
+### Mobile Nav 以原生 `<dialog>` 實作
+
+V3 Demo 在 900px 以下直接 `display:none` 且無替代（Spec §45.1）。
+此處選原生 `<dialog>` + `showModal()`，而非自行拼裝面板：
+focus trap、Escape 關閉、背景 inert 全是瀏覽器原生行為。
+手刻這三件事很容易做得半殘，而無障礙半殘等同沒做。
+
+e2e 實測：開闔、`aria-expanded` 同步、Escape 關閉、鍵盤開啟、焦點不逸出背景。
+
+### 「禁止假互動」已成為會 fail 的測試
+
+```text
+TemplateExperienceShell  所有切換控制項 disabled
+                         site scope 容器存在且無 inline style
+                         e2e：force click 後 [data-site-scope] 的 style 仍為 null
+AgentWorkspaceShell      輸入框與送出按鈕 disabled
+                         等待 400ms 後訊息數量不變（不用 setTimeout 假裝 AI 回覆）
+```
+
+### ⚠️ 截圖抓到的中文排版問題
+
+單元測試與 e2e 全綠，但截圖顯示標題斷行是壞的：
+
+```text
+修正前   從第一頁，開 / 始你的生意。        ← 拆開「開始」
+        你不需要先知道怎 / 麼做。          ← 拆開「怎麼」
+        會用 / AI，跟能 / 用 AI 做 / 出產品，/ 是兩回 / 事。
+```
+
+三個獨立原因：
+
+1. **`ch` 單位不適用於中文。** `ch` 以拉丁數字「0」的字寬校準，中文字約為其兩倍寬。
+   `max-w-[24ch]` 實測只放得下 5–6 個中文字。改用 `em`（1em ≈ 1 個中文字）。
+
+2. **`text-wrap: balance` 會主動製造壞斷點。** 它為了讓各行等長而挑斷點，
+   而瀏覽器不知道中文詞界，結果是把詞硬拆。改用 `pretty`。
+
+3. **`word-break: auto-phrase` 對中文沒有實際效果。** Chromium 的詞組斷行
+   分詞資料以日文為主。保留（無害、對日文有效）但不能倚賴它。
+
+處置：Hero 與 Final CTA 這兩句最關鍵的大字改以 `titleLines` 逐行指定，
+不把全站最重要的一行交給瀏覽器猜。
+
+> 這一輪修正中我第一次只改了 Hero 的 `ch`，卻把 EditorialSection 的
+> `max-w-[24ch]` 留著——同一個 bug 修一半，第二輪截圖才發現。
+
+### PortfolioLayout 網格空洞
+
+featured 佔 2 欄 2 列、其餘各佔 1 欄，導致第二列右半永遠是空的。
+改為其餘各佔 2 欄，兩張剛好填滿 featured 右側。
+
+### 刻意的型別設計
+
+`PortfolioCard.cover` 為 `{ url: string; alt: string }`，**alt 必填**。
+V3 Demo 的作品區全用 CSS 漸層背景，因此完全沒有替代文字（Spec §45.1）。
+這樣「有圖但沒有 alt」在編譯期就不可能成立。
+
+未提供 cover 時渲染純色佔位塊（`aria-hidden`），不會產生無替代文字的圖片。
+
+### 依「相對位置」補上的 config
+
+| 檔案 | 為何在 1C |
+|---|---|
+| `config/pricing.ts` | PricingLadder 是第一個消費者 |
+| `config/home-copy.ts` | Hero / DarkCtaBlock 需要 Spec §5、§30 的指定文案 |
+| `features/website-engine/types.ts` | TemplateExperienceShell 的 props 需要 SiteConfig 型別 |
+
+`features/website-engine` 只有型別，**沒有任何 Engine 實作**——那是 Phase 3。
+
+---
+
+## 1D — Homepage Composition
+
 _未開始_

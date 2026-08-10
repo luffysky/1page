@@ -38,8 +38,8 @@ Gate 未過不得跳段。詳見 Implementation Plan §9。
 Phase 0   規格與計畫              ✅ 完成
 Phase 1A  Scaffold + Tokens       ✅ Gate 通過
 Phase 1B  Home Goal Context       ✅ Gate 通過
-Phase 1C  Layout Primitives       ⏳ 待開始
-Phase 1D  Homepage Composition    ⏳
+Phase 1C  Layout Primitives       ✅ Gate 通過
+Phase 1D  Homepage Composition    ⏳ 待開始
 Phase 1E  Responsive + A11y       ⏳
 ```
 

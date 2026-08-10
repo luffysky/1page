@@ -1,0 +1,121 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+
+export interface NavLink {
+  label: string;
+  href: string;
+}
+
+/**
+ * Navbar（含 Mobile Nav）
+ *
+ * V3 Demo 在 900px 以下直接 `display:none` 隱藏導覽列且無任何替代，
+ * 手機完全無法瀏覽分頁（Spec §45.1）。此處以原生 <dialog> 實作。
+ *
+ * 選用原生 <dialog> 而非自行拼裝面板的理由：
+ * focus trap、Escape 關閉、背景 inert 都是瀏覽器原生行為，
+ * 手刻這三件事很容易做得半殘，而無障礙半殘等同沒做（Spec §35）。
+ */
+export function Navbar({ links, cta }: { links: NavLink[]; cta: NavLink }) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const [open, setOpen] = useState(false);
+
+  const close = useCallback(() => {
+    dialogRef.current?.close();
+  }, []);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    // Escape 由瀏覽器處理，但要把 state 同步回來
+    const handleClose = () => setOpen(false);
+    dialog.addEventListener("close", handleClose);
+    return () => dialog.removeEventListener("close", handleClose);
+  }, []);
+
+  return (
+    <header className="border-brand-line bg-brand-bg/85 sticky top-0 z-20 border-b backdrop-blur-md">
+      <div className="mx-auto flex h-[4.5rem] w-full max-w-page items-center justify-between gap-5 px-gutter lg:px-gutter-lg">
+        <a href="#top" className="flex items-center gap-3">
+          <span className="bg-brand-ink text-brand-on-ink grid h-10 w-10 place-items-center rounded-md text-xl font-black">
+            1
+          </span>
+          <span className="text-heading-2">一頁起家</span>
+        </a>
+
+        <nav aria-label="主要導覽" className="text-body-sm hidden gap-7 md:flex">
+          {links.map((link) => (
+            <a key={link.href} href={link.href} className="text-brand-muted hover:text-brand-ink">
+              {link.label}
+            </a>
+          ))}
+        </nav>
+
+        <div className="flex items-center gap-3">
+          <a
+            href={cta.href}
+            className="bg-brand-accent text-brand-on-accent text-body-sm hidden rounded-pill px-5 py-3 font-bold md:inline-flex"
+          >
+            {cta.label}
+          </a>
+
+          <button
+            type="button"
+            aria-expanded={open}
+            aria-controls="mobile-nav"
+            aria-label="開啟選單"
+            onClick={() => {
+              dialogRef.current?.showModal();
+              setOpen(true);
+            }}
+            className="border-brand-line text-body-sm rounded-pill border px-4 py-2.5 md:hidden"
+          >
+            選單
+          </button>
+        </div>
+      </div>
+
+      <dialog
+        id="mobile-nav"
+        ref={dialogRef}
+        aria-label="行動版選單"
+        className="bg-brand-paper text-brand-ink m-0 h-full max-h-none w-full max-w-none p-gutter backdrop:bg-brand-ink/40"
+      >
+        <div className="flex items-center justify-between">
+          <span className="text-heading-2">一頁起家</span>
+          <button
+            type="button"
+            onClick={close}
+            aria-label="關閉選單"
+            className="border-brand-line rounded-pill border px-4 py-2.5"
+          >
+            關閉
+          </button>
+        </div>
+
+        <nav aria-label="行動版導覽" className="mt-10 flex flex-col gap-2">
+          {links.map((link) => (
+            <a
+              key={link.href}
+              href={link.href}
+              onClick={close}
+              className="text-heading-1 border-brand-line border-b py-4"
+            >
+              {link.label}
+            </a>
+          ))}
+        </nav>
+
+        <a
+          href={cta.href}
+          onClick={close}
+          className="bg-brand-accent text-brand-on-accent mt-10 inline-flex rounded-pill px-6 py-3.5 font-bold"
+        >
+          {cta.label}
+        </a>
+      </dialog>
+    </header>
+  );
+}

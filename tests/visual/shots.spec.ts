@@ -13,6 +13,7 @@ const TAG = process.env.SHOT_TAG ?? "latest";
 const ROUTES = [
   { name: "home", path: "/" },
   { name: "dev-tokens", path: "/_dev/tokens" },
+  { name: "dev-primitives", path: "/_dev/primitives" },
 ];
 
 for (const route of ROUTES) {

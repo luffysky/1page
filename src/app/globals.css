@@ -20,7 +20,17 @@
   h3,
   h4 {
     font-family: var(--font-display);
-    text-wrap: balance;
+
+    /* 刻意不用 text-wrap: balance。
+     * balance 為了讓各行等長會主動挑斷點，而瀏覽器不知道中文詞界，
+     * 結果是把「開始」「知道」這種詞硬拆到兩行。
+     * pretty 只處理末行孤字，不會為了對齊而亂斷。 */
+    text-wrap: pretty;
+
+    /* Chromium 的詞組斷行。實測對中文沒有明顯效果（其分詞資料以日文為主），
+     * 保留是因為無害且對日文有效，但它不能取代明確的斷行控制——
+     * Hero 與 Final CTA 這類關鍵大字仍以 titleLines 逐行指定。 */
+    word-break: auto-phrase;
   }
 
   /* Spec §35：focus 必須可見，且不得是預設藍框以外無對比的樣式 */
