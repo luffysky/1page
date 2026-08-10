@@ -40,10 +40,20 @@ export const ALLOWED_MEDIA: MediaKind[] = [
  * 在有伺服器端 sanitizer（如 DOMPurify）之前不接受上傳。
  *
  * 理由：SVG 是可執行的 XML，可內嵌 <script>、外部參照與事件屬性。
- * 目前公開網域是 r2.dev，與站台網域不同註冊網域，cookie 不共用，
- * 直接開啟 SVG 的風險有限——但那是「目前的部署剛好安全」，
- * 不是「這個功能本身安全」。若哪天換成 media.snowrealm.pet 之類的自訂網域，
- * 同註冊網域下的風險會立刻回來，而那時不會有人記得這件事。
+ *
+ * ⚠️ 2026-08-11 更新：媒體網域已改為 1page-r2.snowrealm.pet，
+ * 與站台 1page.snowrealm.pet **同註冊網域**。
+ *
+ * 這正是先前預告會發生的事——當時的說明寫著「目前 r2.dev 與站台不同註冊網域，
+ * 風險有限，但那是『部署剛好安全』而非『功能本身安全』；換成自訂網域後
+ * 風險會立刻回來，而那時不會有人記得這件事」。現在它回來了。
+ *
+ * 同註冊網域下，若有任何 cookie 設定在 .snowrealm.pet 範圍，
+ * 一個惡意 SVG 被直接開啟時就能讀到它。目前 Supabase 的 auth cookie
+ * 是 host-only（只綁 1page.snowrealm.pet），因此尚未實際暴露——
+ * 但這又是一個「剛好安全」，不是設計上的保證。
+ *
+ * 結論不變且更堅定：在有伺服器端 sanitizer 之前，SVG 不進白名單。
  *
  * 要開放時：加入 sanitizer → 加進白名單 → 補上針對惡意 SVG 的測試。
  */

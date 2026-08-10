@@ -163,6 +163,28 @@ describe("簽名網址鎖死上傳內容", () => {
   });
 });
 
+describe("網域搬遷", () => {
+  it("新上傳使用自訂網域（若已設定）", () => {
+    const custom = process.env.NEXT_PUBLIC_R2_PUBLIC_DOMAIN_URL;
+    if (!custom) return;
+
+    const host = new URL(publicUrlFor(buildObjectKey(PROJECT_ID, "png"))).hostname;
+    const normalized = custom.startsWith("http") ? custom : `https://${custom}`;
+    expect(host).toBe(new URL(normalized).hostname);
+  });
+
+  it("舊網域的既有網址仍可辨識", () => {
+    // 只認新網域會讓所有既有媒體記錄被當成外部網址而整批消失。
+    // 網域搬遷必須是加法，不是替換。
+    const legacy = process.env.NEXT_PUBLIC_R2_PUBLIC_URL;
+    if (!legacy) return;
+
+    const base = legacy.endsWith("/") ? legacy.slice(0, -1) : legacy;
+    const key = buildObjectKey(PROJECT_ID, "png");
+    expect(keyFromPublicUrl(`${base}/${key}`)).toBe(key);
+  });
+});
+
 describe("bucket 不可公開列舉", () => {
   it("公開網域不提供物件清單", async () => {
     const base = process.env.NEXT_PUBLIC_R2_PUBLIC_URL!.replace(/\/$/, "");
