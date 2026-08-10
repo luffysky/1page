@@ -13,8 +13,30 @@ import { describe, expect, it } from "vitest";
 const ROOT = process.cwd();
 const SCAN_DIR = join(ROOT, "src");
 
-/** tokens.css 是數值的合法歸屬地，其餘檔案都不是 */
-const ALLOWED_VALUE_FILES = new Set(["src/styles/tokens.css"]);
+/**
+ * 具名例外。每一項都要寫明理由——
+ * 「為什麼這裡可以」不該隨時間流失，也不該有人順手再加一個。
+ */
+const ALLOWED_VALUE_FILES: Record<string, string> = {
+  "src/styles/tokens.css": "設計數值的唯一歸屬地",
+  "src/features/website-engine/schema.ts":
+    "驗證器：必須列出 rgb()/hsl() 等函式名稱才能檢查 SiteConfig 的色彩值，本身不含任何設計數值",
+};
+
+/**
+ * 測試檔不在此規則範圍內。
+ *
+ * 規則的原文是「元件與樣式中不得出現硬編色碼」——測試檔兩者皆非。
+ * 而且驗證色彩相關邏輯（例如 SiteConfig 的 CSS 注入防護）本來就必須
+ * 寫出各種色彩字面值，包含刻意惡意的那些。
+ */
+function isTestFile(path: string): boolean {
+  return /\.test\.tsx?$/.test(path);
+}
+
+function isExempt(path: string): boolean {
+  return path in ALLOWED_VALUE_FILES || isTestFile(path);
+}
 
 function collectFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((entry) => {
@@ -32,7 +54,7 @@ const files = collectFiles(SCAN_DIR).map((file) => ({
 describe("設計數值只能來自 tokens.css", () => {
   it("元件與樣式中不得出現 hard-coded hex 色碼", () => {
     const offenders = files
-      .filter((file) => !ALLOWED_VALUE_FILES.has(file.path))
+      .filter((file) => !isExempt(file.path))
       .flatMap((file) => {
         const matches = file.content.match(/#[0-9a-fA-F]{3,8}\b/g) ?? [];
         return matches.map((match) => `${file.path}: ${match}`);
@@ -43,7 +65,7 @@ describe("設計數值只能來自 tokens.css", () => {
 
   it("不得出現 rgb() / rgba() / hsl() 字面值", () => {
     const offenders = files
-      .filter((file) => !ALLOWED_VALUE_FILES.has(file.path))
+      .filter((file) => !isExempt(file.path))
       .flatMap((file) => {
         const matches = file.content.match(/\b(rgba?|hsla?)\(/g) ?? [];
         return matches.map((match) => `${file.path}: ${match}`);

@@ -984,3 +984,92 @@ Supabase 公開註冊開著   建議關閉，此站不需要一般使用者註�
 r2.dev 公開網域         有速率限制，正式上線建議綁自訂網域
                         （屆時 SVG 的網域隔離前提會改變）
 ```
+
+---
+
+## 3A — SiteConfig Schema + 驗證
+
+**日期：** 2026-08-11  
+**結果：** ✅ 全數通過
+
+### Gate
+
+| # | 項目 | 結果 |
+|---|---|---|
+| 1–4 | typecheck / lint / test / build | ✅ 140 unit tests（2F 110 → 3A 140） |
+
+### SiteConfig 是不可信輸入
+
+Spec §44 的核心架構決策是「Agent 生成與修改 SiteConfig」。
+換句話說，SiteConfig 的來源包含 LLM 輸出與訪客操作，兩者都不能假設善意。
+
+整條鏈路（Agent → tool call → SiteConfig → SiteRenderer → 畫面）
+唯一的把關點就是這份 schema。Spec §36 對 Preview 的五條要求
+（禁 arbitrary HTML／禁 arbitrary JS／禁 script injection／URL 驗證／
+image source 驗證）全部在此落實，而不是留到渲染時逐一檢查——
+渲染點會越來越多，檢查遲早漏掉一處。
+
+### 最重要的一條：色彩值的 CSS 注入
+
+3B 會把 ThemeConfig 的色彩注入 `--site-*` CSS 自訂屬性。
+自訂屬性的值幾乎不受限制，若原樣採用：
+
+```text
+accent: "red; background-image: url(//evil/x)"
+accent: "#fff; --site-text: black"
+accent: "#fff}/*"
+```
+
+都能跳出屬性值、插入額外宣告。因此 schema 只接受明確列舉的形式
+（hex / rgb() / hsl() / 具名顏色），不接受「任何看起來像顏色的東西」。
+字型名稱同理，不接受引號、分號與括號。
+
+這是在 3B 寫出注入程式碼**之前**先把邊界立好——
+等到注入寫完再回頭想「值安不安全」，通常就是漏掉的時候。
+
+### 其他刻意的限制
+
+```text
+URL          只接受 https 與 mailto
+             排除 javascript: / data: / http: / 協定相對網址
+文字欄位      拒絕 HTML 標籤形狀（React 本來就會逸出，
+             但在驗證階段就看見問題，好過畫面上出現一串 <script> 字樣）
+content      限制為一層扁平結構
+             Spec §10 定義為 Record<string, unknown>，但 unknown 不等於
+             什麼都能塞。允許任意巢狀會讓每個 Section 元件都得自行防禦，
+             漏掉的那個就是渲染時的例外
+sections     上限 30 個
+             失控的 tool call 不該讓渲染端耗盡資源
+```
+
+錯誤以清單回傳而非拋例外：呼叫端是 Agent 的 tool call，
+它需要知道「哪裡不對」才能修正重試，拋例外只會讓對話中斷（Spec §36）。
+
+### 型別收斂到 schema
+
+1C 的 `types.ts` 是手寫介面（當時還沒有驗證層）。3A 之後兩份定義並存
+就會慢慢分歧，而分歧方向永遠是「程式以為某欄位可以是任意字串，
+驗證器其實不允許」這類最難查的。
+
+現在型別一律由 `z.infer` 推導。這是 2D 在資料庫型別上學到的同一個教訓。
+
+### 測試的重點不是「合法設定能過」
+
+44 條測試中，絕大多數在驗證**惡意或畸形的設定過不了**：
+六種 CSS 跳脫寫法、六種不安全的 URL 協定、HTML 標籤注入、
+任意巢狀 content、超量 sections、原型污染。
+
+同時也驗證「不能因為防注入就讓正常文案過不了」——
+`5 < 10 且 a > b，這是正常文案！` 必須通過。
+
+### 守衛的兩處具名例外
+
+`no-hardcoded-design-values` 開始誤判：
+
+```text
+測試檔        驗證色彩邏輯本來就必須寫出色彩字面值（含刻意惡意的）
+schema.ts     驗證器必須列出 rgb()/hsl() 函式名稱才能檢查它們
+```
+
+兩者都加入**具名例外並寫明理由**，而不是放寬規則。
+規則原文是「元件與樣式中不得出現硬編色碼」，這兩類檔案兩者皆非。
