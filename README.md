@@ -73,3 +73,37 @@ pnpm test         # vitest
 node scripts/measure-fonts.mjs <url>   # 首屏字型傳輸量
 node scripts/verify-fonts.mjs  <url>   # 實際套用的字型（CDP）
 ```
+
+---
+
+## 部署（Zeabur）
+
+### 環境變數
+
+在 Zeabur 的服務環境變數中設定 `.env.example` 列出的項目。
+
+```text
+NEXT_PUBLIC_SUPABASE_URL        必要
+NEXT_PUBLIC_SUPABASE_ANON_KEY   必要
+NEXT_PUBLIC_SITE_URL            建議（canonical 與 OG 需要絕對網址）
+SUPABASE_SERVICE_ROLE_KEY       非網站執行所需，僅本機做 migration 與型別產生時用
+```
+
+**建置期不需要這些變數。** 所有呈現作品的路由都是動態渲染，
+資料在請求時才取得。實測確認：不帶任何環境變數也能 `pnpm build` 成功，
+執行期再提供變數即可正常運作。
+
+### 資料庫
+
+Zeabur 自架的 Supabase 沒有對外 Postgres 埠，`supabase link` 也不適用。
+Migration 與型別產生透過 pg-meta 進行，在本機執行：
+
+```bash
+pnpm db:status   # 檢視哪些 migration 尚未套用
+pnpm db:push     # 套用未執行的 migration（可重複執行）
+pnpm db:seed     # 重置並灌入示範資料
+pnpm db:types    # 由 schema 產生 src/types/database.ts
+```
+
+`pnpm db:*` 需要 `SUPABASE_SERVICE_ROLE_KEY`，該金鑰等同資料庫管理員，
+只放在本機的 `.env.local`，不要放進部署環境。
