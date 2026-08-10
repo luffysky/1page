@@ -67,7 +67,14 @@ Spec §8.7 列出「另可依 Project Type / Industry / Tag / Service 篩選」�
 - **後台帳號密碼已更換**（原本 9 碼）。✅
 - **Supabase 公開註冊已關閉**（`GOTRUE_DISABLE_SIGNUP=true`，實測 422）。✅
 - **R2 已綁自訂網域** `1page-r2.snowrealm.pet`。✅
-  ⚠️ 與站台同註冊網域，之後若要設 cookie 不要設在 `.snowrealm.pet` 範圍。
+  ⚠️ 與站台同註冊網域。**目前無須任何調整**——瀏覽器預設發出的是 host-only
+  cookie（不帶 `Domain` 屬性），只有 `1page.snowrealm.pet` 收得到，
+  媒體網域看不見。已確認 `src/lib/supabase/` 與 `middleware.ts` 都沒有設 `domain`。
+
+  真正要留意的是未來某一天：**若需要跨子網域共用登入狀態**
+  （例如再開一個 `app.snowrealm.pet` 要共用 session），那時會有人加上
+  `Domain=.snowrealm.pet`——那一加，R2 網域就同時收得到 auth cookie，
+  SVG 不進白名單的決定必須重新評估，而且會變得更不能鬆綁。
 
 ---
 
