@@ -9,6 +9,7 @@
 
 export type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
 
+export type AdminRole = "owner" | "admin";
 export type PortfolioMediaRole =
   "cover" | "gallery" | "mobile" | "desktop" | "before" | "after" | "document";
 export type PortfolioMediaType = "image" | "video" | "pdf" | "embed" | "external";
@@ -19,6 +20,7 @@ export interface AdminUsersRow {
   user_id: string;
   note: string | null;
   created_at: string;
+  role: AdminRole;
 }
 
 export interface PortfolioCategoriesRow {
@@ -78,4 +80,13 @@ export interface PortfolioTagsRow {
   id: string;
   slug: string;
   name: string;
+}
+
+export interface ProfilesRow {
+  id: string;
+  email: string | null;
+  display_name: string | null;
+  snowrealm_id: string | null;
+  created_at: string;
+  updated_at: string;
 }

@@ -1,6 +1,7 @@
 import { writeFileSync } from "node:fs";
 
 import { config } from "dotenv";
+import { format, resolveConfig } from "prettier";
 
 /**
  * 由資料庫 schema 產生 TypeScript 型別。
@@ -133,7 +134,18 @@ for (const [table, cols] of [...byTable.entries()].sort()) {
   out += "}\n\n";
 }
 
-writeFileSync("src/types/database.ts", out, "utf8");
-console.log(`已產生 src/types/database.ts`);
+// 產生完就格式化。少了這步，`db:types` 之後的第一次 gate 一定卡在
+// prettier --check，而那是個純噪音的失敗：它不代表任何東西壞掉。
+//
+// 用 Node API 而非開子行程跑 CLI：prettier 本來就是相依套件，
+// 而在 Windows 上從 .mjs 的 top-level await 生 pnpm.cmd 會讓 node 直接 abort。
+const target = "src/types/database.ts";
+const formatted = await format(out, {
+  ...(await resolveConfig(target)),
+  filepath: target,
+});
+writeFileSync(target, formatted, "utf8");
+
+console.log(`已產生 ${target}`);
 console.log(`  enum ${enums.length} 個：${enums.map((e) => e.name).join(", ")}`);
 console.log(`  資料表 ${byTable.size} 個：${[...byTable.keys()].sort().join(", ")}`);
