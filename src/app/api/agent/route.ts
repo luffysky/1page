@@ -8,6 +8,7 @@ import {
   type AgentErrorCode,
 } from "@/features/agent/config";
 import { classifyAgentError } from "@/features/agent/errors";
+import { checkRateLimit, requestIdentifier } from "@/features/agent/rate-limit";
 import { agentRequestSchema, encodeStreamEvent } from "@/features/agent/schema";
 import { AGENT_SYSTEM_PROMPT, initialIntentHint } from "@/features/agent/system-prompt";
 import { AGENT_TOOLS, executeAgentTool } from "@/features/agent/tools";
@@ -29,13 +30,17 @@ import { getAnthropicClient } from "@/lib/ai/anthropic";
 // 串流回應不可被快取，也不該被靜態化。
 export const dynamic = "force-dynamic";
 
-function errorResponse(code: AgentErrorCode, status: number): Response {
+function errorResponse(
+  code: AgentErrorCode,
+  status: number,
+  extraHeaders: Record<string, string> = {},
+): Response {
   return Response.json(
     { code, message: AGENT_ERROR_MESSAGES[code] },
     // 錯誤回應也不可被快取。這條路徑的內容因請求而異
     // （「太長」是針對這一次的輸入說的），被中間層存起來之後，
     // 下一個人會拿到與自己無關的那句話。
-    { status, headers: { "Cache-Control": "no-store" } },
+    { status, headers: { "Cache-Control": "no-store", ...extraHeaders } },
   );
 }
 
@@ -45,6 +50,20 @@ export async function POST(request: Request): Promise<Response> {
     // 「還沒接上」與「壞掉了」是兩件事，回不同的碼。
     // 503 而非 500：這不是程式出錯，是這個環境還沒設定金鑰。
     return errorResponse("not_configured", 503);
+  }
+
+  /*
+   * 速率限制放在**驗證之前**（Spec §36）。
+   *
+   * 直覺上會想先驗格式再限流，但那是錯的：一支狂送格式錯誤請求的腳本
+   * 一樣佔用連線與 CPU，而且完全不受限——限流只在「請求合法」時才生效的話，
+   * 攻擊者只要故意送壞的就能繞過。
+   */
+  const limit = checkRateLimit(requestIdentifier(request));
+  if (!limit.allowed) {
+    return errorResponse("rate_limited", 429, {
+      "Retry-After": String(limit.retryAfterSeconds),
+    });
   }
 
   let body: unknown;

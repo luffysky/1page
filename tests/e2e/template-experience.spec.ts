@@ -152,8 +152,10 @@ test.describe("設定的傳遞", () => {
     await expect(advisor.getByText("南方麵包店")).toBeVisible();
     await expect(advisor.getByText("烘焙坊")).toBeVisible();
 
-    // Spec §8.15 的 initialIntent 是 "template"，不是 goal
-    await expect(advisor.getByText(/initialIntent: template/)).toBeVisible();
+    // Spec §8.15：交接過來的對話從 template 情境開場，不是 Goal Selector 選的那個。
+    // 5E 之前這裡讀的是殼上的 `initialIntent: template` 徽章；那是鷹架，已經拆了。
+    // 判準改為人看得到的那一句——而「帶入的設定」本身在上面幾行已經逐項驗過。
+    await expect(advisor).toContainText("已帶入你剛才在上面調好的設定");
   });
 
   test("交接之後再改預覽，Agent 手上的那份不跟著變", async ({ page }) => {

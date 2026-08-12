@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { AgentWorkspaceShell } from "@/components/agent/agent-workspace-shell";
+import { AgentChat } from "@/components/agent/agent-chat";
 import { Hero } from "@/components/landing/hero";
 import { PortfolioLayout, type PortfolioCard } from "@/components/portfolio/portfolio-layout";
 import { PricingLadder } from "@/components/pricing/pricing-ladder";
@@ -150,11 +150,11 @@ export default function PrimitivesPage() {
 
         <Specimen
           index="06"
-          name="AgentWorkspaceShell"
-          note="殼。靜態範例訊息，輸入框 disabled，不用 setTimeout 假裝 AI 在回覆。"
+          name="AgentChat"
+          note="5E 起是真的：輸入會送到 /api/agent 並串流回來。停止鈕會中止上游請求，不只是不再顯示。"
         >
           <div className="mx-auto w-full max-w-page px-gutter lg:px-gutter-lg">
-            <AgentWorkspaceShell initialIntent="website" />
+            <AgentChat initialIntent="website" />
           </div>
         </Specimen>
 

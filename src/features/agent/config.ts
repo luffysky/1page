@@ -77,6 +77,21 @@ export const AGENT_LIMITS = {
 } as const;
 
 /**
+ * 速率限制的兩層視窗（Spec §36 / §37）。
+ *
+ * 短視窗擋「連按送出」與腳本狂打；長視窗擋「一整個下午慢慢刷」。
+ * 只有短視窗的話，每分鐘打滿也能一天打幾千次；
+ * 只有長視窗的話，前三十秒就能把一小時的額度用光。
+ *
+ * 放在 config 而不是 rate-limit.ts：那個檔案是 server-only，
+ * 而測試與畫面都需要知道這些數字。
+ */
+export const AGENT_RATE_LIMITS = [
+  { windowMs: 60_000, max: 8 },
+  { windowMs: 60 * 60_000, max: 60 },
+] as const;
+
+/**
  * 錯誤碼。
  *
  * 5A 的出口條件是「逾時、中斷、超額都有明確行為，不是無聲失敗」。

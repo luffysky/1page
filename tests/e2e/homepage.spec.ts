@@ -62,8 +62,12 @@ test("選 goal 後四處同步反應（Plan §6.1）", async ({ page }) => {
     page.locator("li[aria-current='true']").filter({ hasText: "AI & Automation" }),
   ).toBeVisible();
 
-  // 4. Agent CTA → initialIntent 帶入
-  await expect(page.getByText(/initialIntent：/)).toContainText("ai");
+  // 4. Agent → 開場情境跟著換
+  //
+  // 5E 之前這裡讀的是殼上一個顯示 `initialIntent：ai` 的除錯徽章。
+  // 那是鷹架，接上真的對話之後就拆了——同步這件事現在用人話講出來，
+  // 而測試也應該讀人看得到的那一句，不是讀鷹架。
+  await expect(page.locator("#advisor")).toContainText("「我要導入 AI」的情境開場");
 
   // URL 同步
   await expect(page).toHaveURL(/\?goal=ai$/);

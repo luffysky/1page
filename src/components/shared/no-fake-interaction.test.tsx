@@ -3,7 +3,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
-import { AgentWorkspaceShell } from "@/components/agent/agent-workspace-shell";
+import { AgentChat } from "@/components/agent/agent-chat";
 import { TemplatePicker } from "@/components/website-preview/template-picker";
 import { SitePreview } from "@/components/website-preview/site-preview";
 import { SitePreviewProvider } from "@/features/website-engine/preview-context";
@@ -96,17 +96,49 @@ describe("Template Experience", () => {
   });
 });
 
-describe("AgentWorkspaceShell", () => {
-  it("輸入框與送出按鈕 disabled", () => {
-    render(<AgentWorkspaceShell initialIntent="website" />);
-    expect(screen.getByRole("textbox")).toBeDisabled();
+describe("AgentChat", () => {
+  it("輸入框與送出按鈕可以用，不是 disabled 的裝飾", () => {
+    // 5E 之前這裡驗的是相反的事：「輸入框與送出按鈕 disabled」。
+    // 那時 Agent 是殼，寧可不能按也不要假裝會動。
+    // 現在它真的會送到 /api/agent，判準因此反過來。
+    render(<AgentChat initialIntent="website" />);
+
+    expect(screen.getByRole("textbox")).toBeEnabled();
+    // 送出鈕在沒打字時是 disabled——那不是假互動，是正確的表單狀態。
     expect(screen.getByRole("button", { name: "問 AI 顧問" })).toBeDisabled();
   });
 
-  it("聊天內容為靜態範例，不隨時間新增訊息", async () => {
-    render(<AgentWorkspaceShell initialIntent="website" />);
+  it("打了字之後送出鈕才能按", async () => {
+    const user = userEvent.setup();
+    render(<AgentChat initialIntent="website" />);
+
+    await user.type(screen.getByRole("textbox"), "我想做網站");
+
+    expect(screen.getByRole("button", { name: "問 AI 顧問" })).toBeEnabled();
+  });
+
+  it("沒有訊息時不會憑空長出對話", async () => {
+    // V3 Demo 用 setTimeout 假裝 AI 在回覆（Spec §45.1）。
+    // 這條守的是同一件事：沒有人送出的話，畫面上不會自己冒出訊息。
+    render(<AgentChat initialIntent="website" />);
     const initial = screen.getAllByRole("listitem").length;
+
     await new Promise((resolve) => setTimeout(resolve, 400));
+
     expect(screen.getAllByRole("listitem")).toHaveLength(initial);
+  });
+
+  it("對話區對輔助技術可讀（Spec §35）", () => {
+    render(<AgentChat initialIntent="website" />);
+
+    const log = screen.getByRole("log");
+    expect(log).toHaveAttribute("aria-live", "polite");
+    expect(log).toHaveAccessibleName("與 AI 顧問的對話");
+  });
+
+  it("使用黑體，不是宋體（Spec §3）", () => {
+    // 對話框用宋體會像在朗誦民國文學選集。
+    const { container } = render(<AgentChat initialIntent="website" />);
+    expect(container.firstElementChild?.className).toContain("font-sans");
   });
 });

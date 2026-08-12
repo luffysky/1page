@@ -77,25 +77,20 @@ test.describe("Mobile Nav", () => {
   });
 });
 
-test.describe("Shell 禁止假互動", () => {
-  /*
-   * 4B 之前這裡有一條「Template Experience 的切換控制項點下去毫無反應」。
-   * 那條測的是殼——控制項一律 disabled，寧可不能按也不要假裝會動。
-   *
-   * 4B 把它接上真的 SiteConfig 之後，那個判準就過期了：
-   * 現在它**應該**有反應。對應的驗證搬到兩個地方，
-   * 分別驗單元與瀏覽器兩層：
-   *   src/components/shared/no-fake-interaction.test.tsx
-   *   tests/e2e/template-experience.spec.ts
-   *
-   * 這一頁只留 Agent 那一半——它到 Phase 5 之前仍然是殼。
-   */
-  test("Agent 輸入框無法輸入", async ({ page }) => {
-    const input = page.getByRole("textbox");
-    await expect(input).toBeDisabled();
-    await expect(page.getByRole("button", { name: "問 AI 顧問" })).toBeDisabled();
-  });
-});
+/*
+ * 這裡曾經有一組「Shell 禁止假互動」，兩條都已經退場：
+ *
+ *   4B  Template Experience 接上真的 SiteConfig
+ *   5E  Agent 接上真的 /api/agent
+ *
+ * 那組測試的判準是「控制項一律 disabled」——寧可不能按，也不要假裝會動。
+ * 兩個殼都變成真的之後，那個判準就過期了：現在它們**應該**有反應。
+ *
+ * 對應的驗證搬到各自的地方，而且都驗到「真的會動」：
+ *   tests/e2e/template-experience.spec.ts
+ *   tests/e2e/agent-ui.spec.ts
+ *   src/components/shared/no-fake-interaction.test.tsx
+ */
 
 test("八個 primitive 全數呈現", async ({ page }) => {
   for (const name of [
@@ -104,7 +99,7 @@ test("八個 primitive 全數呈現", async ({ page }) => {
     "EditorialSection",
     "PortfolioLayout",
     "SitePreview",
-    "AgentWorkspaceShell",
+    "AgentChat",
     "PricingLadder",
     "DarkCtaBlock",
   ]) {
