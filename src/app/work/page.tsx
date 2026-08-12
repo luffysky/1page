@@ -37,6 +37,7 @@ export const metadata: Metadata = {
 
 const NAV_LINKS: NavLink[] = [
   { label: "作品", href: "/work" },
+  { label: "自己排版", href: "/edit" },
   { label: "AI 顧問", href: "/#advisor" },
   { label: "服務", href: "/#services" },
   { label: "價格", href: "/#pricing" },

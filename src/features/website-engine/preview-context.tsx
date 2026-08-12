@@ -15,6 +15,8 @@ import {
   type ThemeId,
   type WebsiteTemplate,
 } from "./templates";
+import { removeSection, reorderSections } from "./section-ops";
+import { siteSectionSchema, type SiteSection } from "./schema";
 import type { Device, SiteConfig } from "./types";
 
 /**
@@ -47,6 +49,23 @@ interface PreviewState {
    * 名字就變回「晴日咖啡」——那是他剛剛才輸入的東西。
    */
   edited: { brandName: boolean; industry: boolean };
+  /**
+   * 被編輯過的區塊（CR-003-4）。`null` 代表「還是模板原本那組」。
+   *
+   * ── 為什麼這個不能像 theme 一樣從 draft 算出來 ────────────────
+   *
+   * 上面那段說「狀態是 draft 不是 config」，理由是 config 算得出來，
+   * 存 config 會存到一份可能與程式碼分歧的快照。那個理由對主題成立，
+   * 對這裡**不成立**：使用者把「常見問題」搬到「團隊」前面之後，
+   * 沒有任何一組純量算得出那個順序。它是輸入，不是衍生物。
+   *
+   * 所以規則其實一直是同一條——**存輸入，不存衍生物**。
+   * 主題是衍生物（存 draft），排好的區塊是輸入（存這裡）。
+   *
+   * null 而不是一開始就複製一份模板區塊：這樣「還沒動過」與
+   * 「動過但剛好長得一樣」分得出來，換模板時才知道該不該覆蓋。
+   */
+  sections: SiteSection[] | null;
 }
 
 type PreviewAction =
@@ -57,7 +76,10 @@ type PreviewAction =
   | { type: "set-brand-name"; value: string }
   | { type: "set-industry"; value: string }
   | { type: "set-device"; device: Device }
-  | { type: "apply-patch"; patch: Record<string, unknown> };
+  | { type: "apply-patch"; patch: Record<string, unknown> }
+  | { type: "move-section"; id: string; direction: "up" | "down" }
+  | { type: "remove-section"; id: string }
+  | { type: "reset-sections" };
 
 function reducer(state: PreviewState, action: PreviewAction): PreviewState {
   switch (action.type) {
@@ -80,6 +102,14 @@ function reducer(state: PreviewState, action: PreviewAction): PreviewState {
           brandName: state.edited.brandName ? state.draft.brandName : defaults.brandName,
           industry: state.edited.industry ? state.draft.industry : defaults.industry,
         },
+        /*
+         * 換模板一定清掉區塊覆寫。
+         *
+         * 這與品牌名的處理**刻意相反**：名字是使用者自己打的一個字串，
+         * 換版型時該留著。區塊順序則是綁在特定一套模板上的——
+         * 保留舊模板的區塊等於換了版型卻沒換內容，那不是換模板。
+         */
+        sections: null,
       };
     }
 
@@ -116,6 +146,38 @@ function reducer(state: PreviewState, action: PreviewAction): PreviewState {
      * 內容當作不可信輸入：來源是模型的 tool call，經過 server 驗過一次，
      * 但這裡是狀態的擁有者，該自己再確認一次。
      */
+    /*
+     * 區塊操作（CR-003-4）。
+     *
+     * 一律走 section-ops 的純函式，不在這裡自己動陣列。
+     * 那些函式失敗時回 { ok: false } 且**不會動到傳進去的 config**，
+     * 所以「移動失敗」的表現是畫面沒變，而不是半毀的順序。
+     */
+    case "move-section": {
+      const current = sectionsOf(state);
+      const index = current.findIndex((section) => section.id === action.id);
+      if (index === -1) return state;
+
+      const target = action.direction === "up" ? index - 1 : index + 1;
+      // 已經在頭或尾就是沒事發生。不要繞回另一端——
+      // 那會讓「一直按下移」把區塊從最底下跳到最上面。
+      if (target < 0 || target >= current.length) return state;
+
+      const order = current.map((section) => section.id);
+      [order[index], order[target]] = [order[target]!, order[index]!];
+
+      const result = reorderSections(configOf(state), order);
+      return result.ok ? { ...state, sections: result.config.sections } : state;
+    }
+
+    case "remove-section": {
+      const result = removeSection(configOf(state), action.id);
+      return result.ok ? { ...state, sections: result.config.sections } : state;
+    }
+
+    case "reset-sections":
+      return { ...state, sections: null };
+
     case "apply-patch": {
       const { patch } = action;
 
@@ -128,6 +190,7 @@ function reducer(state: PreviewState, action: PreviewAction): PreviewState {
               ...state,
               draft: draftFromTemplate(template),
               edited: { brandName: false, industry: false },
+              sections: null,
             }
           : state;
       }
@@ -167,6 +230,33 @@ function reducer(state: PreviewState, action: PreviewAction): PreviewState {
 const isThemeId = (value: unknown): value is ThemeId =>
   typeof value === "string" && (THEME_IDS as readonly string[]).includes(value);
 
+/* ------------------------------------------------------------------ */
+/* draft + 區塊覆寫 → SiteConfig                                       */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 目前該顯示的區塊。
+ *
+ * 沒被編輯過（`sections === null`）就用模板算出來的那一組，
+ * 所以模板文案改版之後，沒動過區塊的訪客會拿到新版——
+ * 這正是「不存衍生物」想保住的性質。動過的人才拿自己那一份。
+ */
+function sectionsOf(state: PreviewState) {
+  return state.sections ?? buildSiteConfig(state.draft).sections;
+}
+
+/**
+ * 完整的 SiteConfig。
+ *
+ * ⚠️ 主題、品牌、字型仍然一律由 draft 算，**只有 sections 會被覆寫**。
+ * 這樣「換主題」依然不可能只改一半——那個保證是 draft 換來的，
+ * 加了區塊編輯之後也不能弄丟。
+ */
+function configOf(state: PreviewState): SiteConfig {
+  const base = buildSiteConfig(state.draft);
+  return state.sections ? { ...base, sections: state.sections } : base;
+}
+
 const isAccentId = (value: unknown): value is AccentId =>
   typeof value === "string" && (ACCENT_IDS as readonly string[]).includes(value);
 
@@ -193,6 +283,17 @@ const storedStateSchema = z.object({
   brandName: z.string().max(200),
   industry: z.string().max(200),
   edited: z.object({ brandName: z.boolean(), industry: z.boolean() }),
+  /*
+   * 排好的區塊要存。
+   *
+   * 上面說「存 draft 不存 config」，但那條規則真正的內容是
+   * **存輸入、不存衍生物**。使用者搬過的區塊順序沒有任何純量算得出來，
+   * 它是輸入。不存的話，Spec §8.15 的「訪客累積的設定不會在跳轉時消失」
+   * 對整個編輯器都不成立——他排了十分鐘，點一下作品頁就全沒了。
+   *
+   * 一樣過 schema：sessionStorage 是使用者改得動的不可信輸入。
+   */
+  sections: z.array(siteSectionSchema).max(30).nullable().default(null),
 });
 
 function readStoredState(): PreviewState | null {
@@ -221,15 +322,22 @@ function readStoredState(): PreviewState | null {
   // 模板可能在這次瀏覽之後被移除。指向不存在的模板就當作沒存過。
   if (!getTemplate(result.data.templateId)) return null;
 
-  const { edited, ...draft } = result.data;
-  return { draft, edited, device: "desktop" };
+  /*
+   * ⚠️ 明確一個一個取，不要用 `const { edited, ...draft } = result.data`。
+   *
+   * 那種寫法在 schema 只有 draft 欄位時是對的，但每加一個非 draft 欄位
+   * （這次是 sections）就會被 rest 掃進 draft 裡，變成 draft 上一個
+   * 不該存在的欄位。它不會報錯，只會讓 buildSiteConfig 收到多餘的東西。
+   */
+  const { edited, sections, ...draft } = result.data;
+  return { draft, edited, sections, device: "desktop" };
 }
 
 function writeStoredState(state: PreviewState): void {
   try {
     window.sessionStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ ...state.draft, edited: state.edited }),
+      JSON.stringify({ ...state.draft, edited: state.edited, sections: state.sections }),
     );
   } catch {
     // 同上：存不進去就算了，不影響當下的操作。
@@ -248,6 +356,12 @@ export interface SitePreviewValue extends PreviewState {
   setDevice: (device: Device) => void;
   /** Agent 送過來的變更（Spec §21）。走與訪客操作同一個 reducer */
   applyPatch: (patch: Record<string, unknown>) => void;
+  /* 區塊編輯（CR-003-4）。拖曳與鍵盤按鈕呼叫的是同一組函式 */
+  moveSection: (id: string, direction: "up" | "down") => void;
+  removeSection: (id: string) => void;
+  resetSections: () => void;
+  /** 有沒有動過區塊結構。用來決定要不要顯示「回到模板原樣」 */
+  sectionsEdited: boolean;
 }
 
 const SitePreviewContext = createContext<SitePreviewValue | null>(null);
@@ -267,6 +381,7 @@ export function SitePreviewProvider({
     draft: draftFromTemplate(getTemplate(id ?? "") ?? TEMPLATES[0]!),
     device: "desktop" as Device,
     edited: { brandName: false, industry: false },
+    sections: null,
   }));
 
   /*
@@ -302,7 +417,7 @@ export function SitePreviewProvider({
   const value = useMemo<SitePreviewValue>(
     () => ({
       ...state,
-      config: buildSiteConfig(state.draft),
+      config: configOf(state),
       template: getTemplate(state.draft.templateId) ?? TEMPLATES[0]!,
       selectTemplate: (templateId) => dispatch({ type: "select-template", templateId }),
       setTheme: (themeId) => dispatch({ type: "set-theme", themeId }),
@@ -311,6 +426,10 @@ export function SitePreviewProvider({
       setIndustry: (value) => dispatch({ type: "set-industry", value }),
       setDevice: (device) => dispatch({ type: "set-device", device }),
       applyPatch: (patch) => dispatch({ type: "apply-patch", patch }),
+      moveSection: (id, direction) => dispatch({ type: "move-section", id, direction }),
+      removeSection: (id) => dispatch({ type: "remove-section", id }),
+      resetSections: () => dispatch({ type: "reset-sections" }),
+      sectionsEdited: state.sections !== null,
     }),
     [state],
   );

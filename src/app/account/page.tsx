@@ -28,6 +28,7 @@ export const metadata: Metadata = {
 
 const NAV_LINKS: NavLink[] = [
   { label: "作品", href: "/work" },
+  { label: "自己排版", href: "/edit" },
   { label: "開始一個專案", href: "/start" },
 ];
 

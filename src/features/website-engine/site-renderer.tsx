@@ -1,5 +1,7 @@
+import { Fragment } from "react";
+
 import { resolveSection, UnknownSection } from "./registry";
-import { type SiteConfig, validateSiteConfig } from "./schema";
+import { type SiteConfig, type SiteSection, validateSiteConfig } from "./schema";
 import { SiteScope } from "./site-scope";
 
 /**
@@ -31,6 +33,13 @@ export interface SiteRendererProps {
    */
   config: SiteConfig;
   className?: string;
+  /**
+   * 在每一塊外面包一層（CR-003-4 的編輯器用）。
+   *
+   * 不給就照常渲染，所以首頁與 Agent 預覽完全不受影響——
+   * 它們與編輯器共用的仍然是同一條渲染路徑（Spec §11）。
+   */
+  wrapSection?: (section: SiteSection, index: number, rendered: React.ReactNode) => React.ReactNode;
 }
 
 /**
@@ -43,7 +52,7 @@ export interface SiteRendererProps {
  * 而那些邊界都可能讓一個「型別上是 SiteConfig」的值實際上不是。
  * 渲染是最後一站，這裡漏掉就直接進到使用者的瀏覽器。
  */
-export function SiteRenderer({ config, className }: SiteRendererProps) {
+export function SiteRenderer({ config, className, wrapSection }: SiteRendererProps) {
   const validated = validateSiteConfig(config);
 
   if (!validated.ok) {
@@ -57,14 +66,30 @@ export function SiteRenderer({ config, className }: SiteRendererProps) {
       {site.sections.length === 0 ? (
         <EmptySite />
       ) : (
-        site.sections.map((section) => {
+        site.sections.map((section, index) => {
           const resolved = resolveSection(section);
 
           // 未知的 type：顯示可辨識的佔位，不中斷其餘區塊的渲染
-          if (!resolved) return <UnknownSection key={section.id} section={section} />;
+          const rendered = resolved ? (
+            <resolved.component section={section} />
+          ) : (
+            <UnknownSection section={section} />
+          );
 
-          const Component = resolved.component;
-          return <Component key={section.id} section={section} />;
+          /*
+           * 編輯器用 wrapSection 在每一塊外面包一層 widget 外框（CR-003-4）。
+           *
+           * 為什麼是加一個 prop，而不是讓編輯器自己 map 一次 sections：
+           * Spec §11 規定 SiteRenderer 是唯一的正式渲染入口。編輯器自己 map
+           * 就會複製一份 validate + resolve + 降級的邏輯，
+           * 而那份複製品遲早與這裡分歧——分歧的表現是「編輯器裡好好的，
+           * 存出去卻不一樣」，那是最難查的一種。
+           */
+          return (
+            <Fragment key={section.id}>
+              {wrapSection ? wrapSection(section, index, rendered) : rendered}
+            </Fragment>
+          );
         })
       )}
     </SiteScope>
