@@ -31,6 +31,8 @@ export interface AgentChatState {
 export function useAgentChat(
   options: {
     initialIntent?: string;
+    /** advisor（預設）或 demo（模板內的客服體驗，CR-003） */
+    mode?: "advisor" | "demo";
     /** 目前的預覽狀態。Agent 需要知道現在長什麼樣子才改得動（Spec §21） */
     draft?: Record<string, unknown>;
     /** Agent 改了預覽時呼叫。套用的動作由呼叫端做——狀態的擁有者是 preview context */
@@ -39,7 +41,7 @@ export function useAgentChat(
     onLeadContext?: (lead: Record<string, unknown>) => void;
   } = {},
 ): AgentChatState {
-  const { initialIntent, draft, onPreviewPatch, onLeadContext } = options;
+  const { initialIntent, draft, mode, onPreviewPatch, onLeadContext } = options;
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [error, setError] = useState<AgentChatState["error"]>(null);
   const [isStreaming, setStreaming] = useState(false);
@@ -80,6 +82,7 @@ export function useAgentChat(
             messages: outgoing.map(({ role, content: value }) => ({ role, content: value })),
             ...(initialIntent ? { initialIntent } : {}),
             ...(draft ? { draft } : {}),
+            ...(mode ? { mode } : {}),
           }),
           signal: controller.signal,
         });
@@ -151,7 +154,7 @@ export function useAgentChat(
         );
       }
     },
-    [draft, initialIntent, messages, onLeadContext, onPreviewPatch],
+    [draft, initialIntent, messages, mode, onLeadContext, onPreviewPatch],
   );
 
   return {

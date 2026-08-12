@@ -95,7 +95,29 @@ check(
 
 check(
   "Rate limit 在請求驗證之前生效",
-  haystack.includes("checkRateLimit(requestIdentifier(request))"),
+  (() => {
+    /*
+     * 這一條原本比對的是 `checkRateLimit(requestIdentifier(request))` 這串字。
+     *
+     * 它從來沒有在驗順序：就算把限流搬到 safeParse 後面，只要那串字還在，
+     * 它照樣是綠的。反過來，CR-003 只是給那個呼叫多加一個參數
+     * （demo 用另一份額度），順序完全沒動，它就紅了。
+     *
+     * 兩個方向都錯，是同一個原因——比對寫法，而不是比對它宣稱的那件事。
+     * 改成真的去比位置。
+     *
+     * 為什麼順序重要：一支狂送格式錯誤請求的腳本一樣佔用連線與 CPU，
+     * 限流只在「請求合法」時才生效的話，攻擊者只要故意送壞的就能繞過。
+     */
+    const route = code.find((file) => file.path.endsWith("api/agent/route.ts"));
+    if (!route) return false;
+
+    const body = stripComments(route.content);
+    const limitAt = body.indexOf("checkRateLimit(");
+    const validateAt = body.indexOf("agentRequestSchema.safeParse(");
+
+    return limitAt !== -1 && validateAt !== -1 && limitAt < validateAt;
+  })(),
 );
 
 check(

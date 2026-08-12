@@ -43,6 +43,15 @@ export const site = {
   radius: "rounded-[var(--site-radius)]",
 
   /*
+   * 邊框色。
+   *
+   * 4A 曾經因為沒有任何地方用到而刪掉，CR-003 的客服泡泡需要分隔線才加回來。
+   * 這正是 Guardrail 2 想要的循環：用到了才留著，沒用到就拿掉，
+   * 而不是先擺著「以後可能會用」。
+   */
+  border: "border-[var(--site-color-muted)]",
+
+  /*
    * 版面節奏由 ThemeConfig 的 spacingScale 推導。
    *
    * 原本 Section 直接寫 `py-20`、`p-6` 這類固定值，

@@ -40,6 +40,17 @@ export const agentRequestSchema = z
     initialIntent: z.string().max(40).optional(),
 
     /**
+     * 誰在講話（CR-003）。
+     *
+     *   advisor  一頁起家的顧問——有工具、有 scope policy
+     *   demo     被預覽那間店的客服體驗——**零工具**，只知道預覽裡的內容
+     *
+     * 走同一個端點而不是另外開一條：限流、驗證、串流、錯誤碼、中止
+     * 全部共用。多一個公開端點就多一個要保護、要限流、要出現在稽核【9】裡的東西。
+     */
+    mode: z.enum(["advisor", "demo"]).default("advisor"),
+
+    /**
      * 訪客目前的預覽狀態（Spec §21）。
      *
      * 由 client 隨請求送上來，server 不存——預覽的唯一狀態在瀏覽器裡。

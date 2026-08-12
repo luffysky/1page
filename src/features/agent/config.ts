@@ -74,6 +74,14 @@ export const AGENT_LIMITS = {
    * 四輪足夠讓它查完手上四個工具還有餘裕。
    */
   maxToolRounds: 4,
+
+  /**
+   * 客服體驗的輸出上限（CR-003）。
+   *
+   * 比顧問小得多：它回答的是「今天有什麼甜點」這種問題，
+   * 兩三句話就夠。設大只會讓它把預覽裡的內容整段唸出來。
+   */
+  demoMaxOutputTokens: 1_500,
 } as const;
 
 /**
@@ -86,6 +94,18 @@ export const AGENT_LIMITS = {
  * 放在 config 而不是 rate-limit.ts：那個檔案是 server-only，
  * 而測試與畫面都需要知道這些數字。
  */
+/**
+ * 客服體驗的額度（CR-003）。
+ *
+ * 與顧問**分開計算**，而且更緊。理由不是它比較不重要，
+ * 是玩預覽的人會一直打——那是它存在的目的——
+ * 而那些額度不該吃掉真正想問服務的人的份。
+ */
+export const DEMO_RATE_LIMITS = [
+  { windowMs: 60_000, max: 6 },
+  { windowMs: 60 * 60_000, max: 30 },
+] as const;
+
 export const AGENT_RATE_LIMITS = [
   { windowMs: 60_000, max: 8 },
   { windowMs: 60 * 60_000, max: 60 },

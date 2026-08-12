@@ -1,5 +1,6 @@
 "use client";
 
+import { PreviewAssistant } from "@/components/website-preview/preview-assistant";
 import { useSitePreview } from "@/features/website-engine/preview-context";
 import { SiteRenderer } from "@/features/website-engine/site-renderer";
 import type { Device } from "@/features/website-engine/types";
@@ -48,7 +49,7 @@ export function SitePreview() {
         </span>
       </div>
 
-      <div className={`bg-brand-ink mx-auto rounded-lg p-2.5 ${DEVICE_WIDTH[device]}`}>
+      <div className={`bg-brand-ink relative mx-auto rounded-lg p-2.5 ${DEVICE_WIDTH[device]}`}>
         {/*
          * 可捲動區域必須能用鍵盤操作。
          *
@@ -64,6 +65,13 @@ export function SitePreview() {
         >
           <SiteRenderer config={config} />
         </div>
+
+        {/*
+         * 模板內的 AI 客服體驗（CR-003）。
+         * 放在捲動容器外面、定位容器裡面——真實網站的客服泡泡
+         * 是固定在視窗角落的，不是跟著內容捲走。
+         */}
+        <PreviewAssistant />
       </div>
     </div>
   );

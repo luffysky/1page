@@ -5,12 +5,15 @@ import {
   AGENT_ERROR_MESSAGES,
   AGENT_LIMITS,
   AGENT_MODEL,
+  DEMO_RATE_LIMITS,
   type AgentErrorCode,
 } from "@/features/agent/config";
 import { classifyAgentError } from "@/features/agent/errors";
 import { checkRateLimit, requestIdentifier } from "@/features/agent/rate-limit";
 import { agentRequestSchema, encodeStreamEvent } from "@/features/agent/schema";
+import { buildDemoSystemPrompt } from "@/features/agent/demo-prompt";
 import { AGENT_SYSTEM_PROMPT, initialIntentHint } from "@/features/agent/system-prompt";
+import { buildSiteConfig } from "@/features/website-engine/templates";
 import { AGENT_TOOLS } from "@/features/agent/tools";
 import { getAnthropicClient } from "@/lib/ai/anthropic";
 
@@ -55,25 +58,36 @@ export async function POST(request: Request): Promise<Response> {
     return errorResponse("not_configured", 503);
   }
 
-  /*
-   * 速率限制放在**驗證之前**（Spec §36）。
-   *
-   * 直覺上會想先驗格式再限流，但那是錯的：一支狂送格式錯誤請求的腳本
-   * 一樣佔用連線與 CPU，而且完全不受限——限流只在「請求合法」時才生效的話，
-   * 攻擊者只要故意送壞的就能繞過。
-   */
-  const limit = checkRateLimit(requestIdentifier(request));
-  if (!limit.allowed) {
-    return errorResponse("rate_limited", 429, {
-      "Retry-After": String(limit.retryAfterSeconds),
-    });
-  }
-
   let body: unknown;
   try {
     body = await request.json();
   } catch {
     return errorResponse("invalid_request", 400);
+  }
+
+  /*
+   * 速率限制放在 schema **驗證之前**（Spec §36）。
+   *
+   * 直覺上會想先驗格式再限流，但那是錯的：一支狂送格式錯誤請求的腳本
+   * 一樣佔用連線與 CPU，而且完全不受限——限流只在「請求合法」時才生效的話，
+   * 攻擊者只要故意送壞的就能繞過。
+   *
+   * 只在它前面做 JSON 解析，因為要知道用哪一份額度。那一步很便宜，
+   * 而且解不開的就在上面直接擋掉了。
+   */
+  const rawMode = (body as { mode?: unknown } | null)?.mode;
+  const isDemo = rawMode === "demo";
+
+  // 客服體驗與顧問的額度分開計算（CR-003）。玩預覽的人會一直打——
+  // 那是它存在的目的——而那些額度不該吃掉真正想問服務的人的份。
+  const limit = checkRateLimit(
+    isDemo ? `${requestIdentifier(request)}:demo` : requestIdentifier(request),
+    isDemo ? DEMO_RATE_LIMITS : undefined,
+  );
+  if (!limit.allowed) {
+    return errorResponse("rate_limited", 429, {
+      "Retry-After": String(limit.retryAfterSeconds),
+    });
   }
 
   const parsed = agentRequestSchema.safeParse(body);
@@ -92,8 +106,30 @@ export async function POST(request: Request): Promise<Response> {
     return errorResponse(code, 400);
   }
 
-  const { messages, initialIntent, draft } = parsed.data;
-  const hint = initialIntentHint(initialIntent);
+  const { messages, initialIntent, draft, mode } = parsed.data;
+  const hint = mode === "demo" ? null : initialIntentHint(initialIntent);
+
+  /*
+   * 客服體驗（CR-003）。
+   *
+   * 它扮演被預覽的那間店，所以系統提示由那份 SiteConfig 產生，
+   * 而且**零工具**——不是提示詞裡叮嚀它別用，是根本沒給。
+   * 一個扮演別人的角色，不該碰得到我們的作品集、價格或 Lead。
+   *
+   * 沒有 draft 就沒有店可以扮演，那是請求本身不完整。
+   */
+  const demoConfig =
+    mode === "demo" && draft?.templateId
+      ? buildSiteConfig({
+          templateId: draft.templateId,
+          themeId: draft.themeId ?? "minimal",
+          accentId: draft.accentId ?? "ink",
+          brandName: draft.brandName ?? "",
+          industry: draft.industry ?? "",
+        })
+      : null;
+
+  if (mode === "demo" && !demoConfig) return errorResponse("invalid_request", 400);
 
   const encoder = new TextEncoder();
 
@@ -138,7 +174,9 @@ export async function POST(request: Request): Promise<Response> {
           const upstream = client.beta.messages.stream(
             {
               model: AGENT_MODEL,
-              max_tokens: AGENT_LIMITS.maxOutputTokens,
+              max_tokens: demoConfig
+                ? AGENT_LIMITS.demoMaxOutputTokens
+                : AGENT_LIMITS.maxOutputTokens,
               output_config: { effort: AGENT_EFFORT },
               /*
                * 安全分類器擋下請求時，改由另一個模型回答，而不是把拒絕丟給訪客。
@@ -149,11 +187,12 @@ export async function POST(request: Request): Promise<Response> {
               fallbacks: "default",
               // 免費階段只拿得到 free 分級的工具（Spec §23）。
               // 分級由 registry 過濾，不靠這裡記得篩。
-              tools: AGENT_TOOLS.specs("free"),
+              // 客服體驗零工具（CR-003 的硬性要求之一）。
+              tools: demoConfig ? [] : AGENT_TOOLS.specs("free"),
               system: [
                 {
                   type: "text",
-                  text: AGENT_SYSTEM_PROMPT,
+                  text: demoConfig ? buildDemoSystemPrompt(demoConfig) : AGENT_SYSTEM_PROMPT,
                   // 系統提示每一次請求都一樣，快取它。
                   // 讀取只要約一成的價格，而這段會出現在每一則訊息上。
                   cache_control: { type: "ephemeral" },
