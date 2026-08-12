@@ -142,6 +142,12 @@ export const SITE_SECTION_TYPES = [
   "pricing",
   "testimonials",
   "faq",
+  // CR-003-2 補的一批。加在這裡還不夠——沒有進 SECTION_REGISTRY 的 type
+  // 只會渲染成 UnknownSection，registry.test 會抓到。
+  "process",
+  "stats",
+  "team",
+  "form",
   "cta",
   "contact",
   "map",

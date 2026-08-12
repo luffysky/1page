@@ -1,7 +1,9 @@
 import type { SiteSection, SiteSectionType } from "./schema";
 import { CtaBanner, ContactSimple, FooterSimple } from "./sections/action";
 import { AboutSimple, GalleryGrid, ServicesList } from "./sections/content";
+import { FaqList, FormSimple, PricingTiers, ProcessSteps } from "./sections/detail";
 import { HeroCentered, HeroEditorial, HeroMinimal } from "./sections/hero";
+import { StatsRow, TeamGrid, TestimonialsQuotes } from "./sections/proof";
 import type { SectionProps } from "./sections/shared";
 import { site } from "./site-classes";
 
@@ -37,6 +39,13 @@ export const SECTION_REGISTRY: Partial<Record<SiteSectionType, Record<string, Se
     features: { list: ServicesList },
     gallery: { grid: GalleryGrid },
     portfolio: { grid: GalleryGrid },
+    pricing: { tiers: PricingTiers },
+    testimonials: { quotes: TestimonialsQuotes },
+    faq: { list: FaqList },
+    process: { steps: ProcessSteps },
+    stats: { row: StatsRow },
+    team: { grid: TeamGrid },
+    form: { simple: FormSimple },
     cta: { banner: CtaBanner },
     contact: { simple: ContactSimple },
     footer: { simple: FooterSimple },

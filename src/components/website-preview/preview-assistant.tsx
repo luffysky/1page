@@ -47,7 +47,7 @@ export function PreviewAssistant() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={`${site.accentBg} ${site.onAccent} ${site.radius} ${site.body} absolute right-4 bottom-4 px-4 py-2.5 text-sm font-bold shadow-lg`}
+        className={`${site.accentBg} ${site.onAccent} ${site.radius} ${site.body} px-4 py-2.5 text-sm font-bold shadow-lg`}
       >
         跟{config.brand.name}的客服聊聊
       </button>
@@ -56,7 +56,7 @@ export function PreviewAssistant() {
 
   return (
     <div
-      className={`${site.surface} ${site.text} ${site.radius} ${site.body} absolute right-4 bottom-4 flex w-[min(22rem,calc(100%-2rem))] flex-col shadow-xl`}
+      className={`${site.surface} ${site.text} ${site.radius} ${site.body} flex w-full flex-col shadow-xl`}
     >
       <div className={`${site.border} flex items-start justify-between gap-3 border-b p-3.5`}>
         <div>
@@ -122,7 +122,7 @@ export function PreviewAssistant() {
         <button
           type="submit"
           disabled={!input.trim() || isStreaming}
-          className={`${site.accentBg} ${site.onAccent} ${site.radius} px-3 py-1.5 text-sm font-bold disabled:opacity-50`}
+          className={`${site.accentBg} ${site.onAccent} ${site.radius} px-3 py-1.5 text-sm font-bold whitespace-nowrap disabled:opacity-50`}
         >
           送出
         </button>

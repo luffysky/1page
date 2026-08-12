@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { implementedSectionTypes } from "@/features/website-engine/registry";
 import { siteSectionSchema } from "@/features/website-engine/schema";
 import {
   addSection,
@@ -158,6 +159,21 @@ const addSectionTool = defineTool({
   run({ section, position }, context) {
     const missing = requireConfig(context);
     if (missing) return missing;
+
+    /*
+     * type 的合法值來自 siteSectionSchema 的 enum，而 enum 裡有東西
+     * 還沒有元件（目前是 map，等 CR-003-3）。模型看到的 JSON Schema
+     * 就是那份 enum，所以它一定會挑到——不是它亂猜，是我們給的清單裡有。
+     *
+     * 讓它加下去的話，使用者會得到一塊「這個區塊還在準備中」，
+     * 而且是他親口要求之後出現的——看起來就像功能壞了。
+     * 在這裡擋掉，模型還能改用別的區塊或解釋一句。
+     */
+    if (!implementedSectionTypes().includes(section.type)) {
+      return toolError(
+        `「${section.type}」這種區塊還沒做好，現在能用的有：${implementedSectionTypes().join("、")}。`,
+      );
+    }
 
     const result = addSection(context.config!, section, position);
     return result.ok

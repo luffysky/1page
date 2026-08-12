@@ -2,8 +2,14 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { implementedSectionTypes, resolveSection, variantsFor } from "./registry";
-import type { SiteConfig, SiteSection } from "./schema";
+import {
+  implementedSectionTypes,
+  resolveSection,
+  SECTION_REGISTRY,
+  UnknownSection,
+  variantsFor,
+} from "./registry";
+import { SITE_SECTION_TYPES, type SiteConfig, type SiteSection } from "./schema";
 import { SiteRenderer } from "./site-renderer";
 
 /**
@@ -97,9 +103,36 @@ describe("降級：未知 variant", () => {
 
 describe("降級：未實作的 type", () => {
   it("顯示可辨識的佔位，而非靜默略過", () => {
-    // 靜默略過會讓人以為「Agent 沒做事」，實際上是「這個 type 還沒有元件」
+    /*
+     * 靜默略過會讓人以為「Agent 沒做事」，實際上是「這個 type 還沒有元件」。
+     *
+     * ⚠️ 這裡的 type 是**算出來的**，不是寫死的。
+     *
+     * 原本寫死 "pricing"，CR-003-2 把 pricing 實作出來之後這條就紅了——
+     * 測試釘住了「哪一個還沒做」這種一定會過期的事實。
+     *
+     * 換成不在 enum 裡的字串也不對：SiteRenderer 會先整份驗 schema，
+     * 非法的 type 在那一關就被擋成「這份網站設定目前無法呈現」，
+     * 根本走不到 UnknownSection。這個佔位真正的觸發條件很窄——
+     * **type 合法、但 registry 裡沒有它**——也就是 registry.test.ts 的
+     * DEFERRED 清單裡那些。所以直接去問 registry 現在缺哪一個。
+     */
+    const unimplemented = SITE_SECTION_TYPES.find((type) => !SECTION_REGISTRY[type]);
+
+    // 全部都實作完了的話，這個佔位就只剩「新增 type 卻忘了接元件」那個
+    // 開發中的空窗期會用到——那時直接驗元件本身，測試不會因此變成空殼。
+    if (!unimplemented) {
+      render(
+        <UnknownSection
+          section={{ id: "x", type: "hero", variant: "nope", content: {} } as SiteSection}
+        />,
+      );
+      expect(screen.getByText(/尚未實作的區塊類型/)).toBeInTheDocument();
+      return;
+    }
+
     const config = makeConfig([
-      { id: "pricing", type: "pricing", variant: "table", content: { title: "方案" } },
+      { id: "deferred", type: unimplemented, variant: "table", content: { title: "方案" } },
     ]);
 
     render(<SiteRenderer config={config} />);
@@ -107,9 +140,13 @@ describe("降級：未實作的 type", () => {
   });
 
   it("未實作的 type 不影響其他 section", () => {
+    // 同樣算出來而不是寫死。原本這裡放 "faq"，CR-003-2 之後它有元件了——
+    // 測試照樣是綠的，但驗的已經不是它名字說的那件事：一個名不副實的綠燈。
+    const unimplemented = SITE_SECTION_TYPES.find((type) => !SECTION_REGISTRY[type]) ?? "faq";
+
     const config = makeConfig([
       HERO,
-      { id: "faq", type: "faq", variant: "list", content: {} },
+      { id: "gap", type: unimplemented, variant: "list", content: {} },
       { id: "cta", type: "cta", variant: "banner", content: { title: "現在就開始" } },
     ]);
 

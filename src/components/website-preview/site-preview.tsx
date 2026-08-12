@@ -3,6 +3,8 @@
 import { PreviewAssistant } from "@/components/website-preview/preview-assistant";
 import { useSitePreview } from "@/features/website-engine/preview-context";
 import { SiteRenderer } from "@/features/website-engine/site-renderer";
+import { site as siteClasses } from "@/features/website-engine/site-classes";
+import { SiteScope } from "@/features/website-engine/site-scope";
 import type { Device } from "@/features/website-engine/types";
 
 /**
@@ -68,10 +70,35 @@ export function SitePreview() {
 
         {/*
          * 模板內的 AI 客服體驗（CR-003）。
+         *
          * 放在捲動容器外面、定位容器裡面——真實網站的客服泡泡
          * 是固定在視窗角落的，不是跟著內容捲走。
+         *
+         * ⚠️ 但這樣它就跑到 SiteRenderer 的 `[data-site-scope]` 外面了，
+         * 而 `--site-*` 全部宣告在那個元素上。泡泡用的 `site.accentBg`
+         * 於是解析到一個**不存在的變數**——背景變透明。
+         *
+         * 沒有錯誤、沒有紅字、類別也都在，只是那顆按鈕悄悄沒有顏色。
+         * 跟 4A 的 `font-[var(--x)]` 是同一種：寫法看起來對，產出是空的。
+         * 這次是實際去讀 computed style 才看到的（backgroundColor 量出來是完全透明），不是用看的。
+         *
+         * 所以這裡補一層 scope。radius 是必要的：SiteScope 會帶自己的
+         * 底色，方角的話會在圓角泡泡後面露出一圈。
          */}
-        <PreviewAssistant />
+        <SiteScope
+          theme={config.theme}
+          /*
+           * 寬度必須明寫。SiteScope 的 base 帶了 `@container`
+           * （container-type: inline-size），那會對行內軸做尺寸內縮——
+           * 這個框就**不再依內容撐開**，量出來是 width: 0，
+           * 泡泡整個溢出到預覽框外面。
+           *
+           * 又是「沒有錯誤、只是位置不對」的一種。量了 bounding box 才看到。
+           */
+          className={`${siteClasses.radius} absolute right-4 bottom-4 flex w-[min(22rem,calc(100%-2rem))] justify-end`}
+        >
+          <PreviewAssistant />
+        </SiteScope>
       </div>
     </div>
   );

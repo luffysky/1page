@@ -56,10 +56,20 @@ describe("addSection", () => {
   });
 
   it("不存在的區塊型別被拒絕", () => {
-    // 未知的 type 在渲染時會降級成佔位，畫面上看起來像少了東西。
-    // 那個降級是給既有舊資料的安全網，不是給新增用的。
+    /*
+     * 未知的 type 在渲染時會降級成佔位，畫面上看起來像少了東西。
+     * 那個降級是給既有舊資料的安全網，不是給新增用的。
+     *
+     * ⚠️ 這裡刻意用一個**根本不在 enum 裡**的字串，而不是「還沒實作的 type」。
+     * 原本寫的是 "pricing"，CR-003-2 把 pricing 實作出來之後這條就紅了——
+     * 測試釘的是「哪一個還沒做」這種會過期的事實，而它想驗的其實是
+     * 「schema 擋不擋得住非法的 type」，那件事永遠不會過期。
+     */
     const config = base();
-    const result = addSection(config, { ...newSection, type: "pricing" });
+    const result = addSection(config, {
+      ...newSection,
+      type: "not-a-real-type" as (typeof newSection)["type"],
+    });
 
     expect(result.ok).toBe(false);
   });

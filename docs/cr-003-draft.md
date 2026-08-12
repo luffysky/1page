@@ -130,7 +130,7 @@ Spec §23 現在的線是「聊天免費，開始產生成果時收費」，
 
 ```text
 CR-003-1  AI 客服體驗 Widget（模板內）        ✅ 已完成
-CR-003-2  擴充 Block 一批（faq/process/stats/team/testimonial/form）
+CR-003-2  擴充 Block 一批（faq/process/stats/team/testimonial/form）  ✅ 已完成
 CR-003-3  白名單嵌入（youtube / map）
 CR-003-4  Widget 編輯器（獨立 Phase，含鍵盤操作）
 ```
