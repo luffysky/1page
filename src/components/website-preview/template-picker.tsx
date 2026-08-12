@@ -24,7 +24,9 @@ export function TemplatePicker({ templates }: { templates: WebsiteTemplate[] }) 
   }
 
   return (
-    <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    // 有標籤的清單：螢幕閱讀器報得出「這是模板清單」，
+    // 頁面上也因此有一個穩定、非 testid 的定位點。
+    <ul aria-label="模板" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       {templates.map((template) => {
         const active = template.id === draft.templateId;
 

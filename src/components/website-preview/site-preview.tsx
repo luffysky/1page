@@ -2,6 +2,7 @@
 
 import { useSitePreview } from "@/features/website-engine/preview-context";
 import { SiteRenderer } from "@/features/website-engine/site-renderer";
+import type { Device } from "@/features/website-engine/types";
 
 /**
  * Preview 視窗（Spec §8.15 / §11）
@@ -14,17 +15,40 @@ import { SiteRenderer } from "@/features/website-engine/site-renderer";
  * 一定有一套模板是選中的（server 依 goal 決定初始值），
  * 沒有需要顯示空狀態的情況。
  */
+/**
+ * 裝置寬度（Spec §15）。
+ *
+ * 這裡改的只是**容器寬度**。Section 元件的斷點是 container query
+ * （`@3xl:` 而非 `md:`），所以窄下來之後版面是真的重排，
+ * 不是把桌機版縮小。見 site-scope.tsx 的說明。
+ *
+ * 每個都加 `max-w-full`：在手機上看「Desktop」時，
+ * 預覽仍然不能撐破頁面——那會讓整頁出現橫向捲動。
+ */
+const DEVICE_WIDTH: Record<Device, string> = {
+  desktop: "w-full",
+  tablet: "w-3xl max-w-full",
+  mobile: "w-96 max-w-full",
+};
+
 export function SitePreview() {
-  const { config, template } = useSitePreview();
+  const { config, device, template } = useSitePreview();
 
   return (
     <div className="border-brand-line bg-brand-paper rounded-xl border p-4">
       <div className="text-caption text-brand-muted flex items-center justify-between px-1 pb-3">
         <span className="font-black tracking-widest uppercase">Template Preview</span>
-        <span>{template.name}</span>
+        {/*
+         * 不用 opacity 做次要層級：外層已經是 text-brand-muted，
+         * 再乘 0.7 就掉到 AA 以下（axe 抓到過，serious）。
+         * 層級改用分隔符表示，顏色維持原樣。
+         */}
+        <span>
+          {template.name} · {device}
+        </span>
       </div>
 
-      <div className="bg-brand-ink rounded-lg p-2.5">
+      <div className={`bg-brand-ink mx-auto rounded-lg p-2.5 ${DEVICE_WIDTH[device]}`}>
         {/*
          * 可捲動區域必須能用鍵盤操作。
          *

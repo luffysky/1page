@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 
+import { PreviewControls } from "@/components/website-preview/preview-controls";
 import { SitePreview } from "@/components/website-preview/site-preview";
 import { TemplatePicker } from "@/components/website-preview/template-picker";
 import { useHomeGoal } from "@/features/home/goal-context";
@@ -64,6 +65,7 @@ export function TemplateExperienceSection() {
       )}
 
       <TemplatePicker templates={templates} />
+      <PreviewControls />
       <SitePreview />
     </div>
   );

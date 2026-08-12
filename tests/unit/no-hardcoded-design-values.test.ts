@@ -96,6 +96,10 @@ describe("設計數值只能來自 tokens.css", () => {
       // 全站唯一允許注入主題變數的地方（Plan §3）。
       // 用 inline style 而非 <style> 或 class 的理由見該檔說明。
       "src/features/website-engine/site-scope.tsx": "--site-* 主題變數注入點",
+      // accent 色票的顏色取決於「哪個主題 × 哪個色系」，共 12 種組合，
+      // 而且是被預覽網站的色值而非本站的設計數值。與進度條同一類：
+      // 類別表達不了執行期才決定的值。
+      "src/components/website-preview/preview-controls.tsx": "accent 色票（執行期決定的預覽色值）",
       // 示範 Section 元件如何只使用 --site-* 變數。僅開發環境存在。
       "src/app/%5Fdev/theme/page.tsx": "Theme Engine 視覺驗證頁（dev only）",
       // ImageResponse（Satori）在伺服器端算圖，完全不處理 Tailwind class，
@@ -119,6 +123,7 @@ describe("設計數值只能來自 tokens.css", () => {
     const allowed = [
       "src/app/admin/portfolio/media-manager.tsx",
       "src/features/website-engine/site-scope.tsx",
+      "src/components/website-preview/preview-controls.tsx",
       "src/app/%5Fdev/theme/page.tsx",
       "src/app/icon.tsx",
       "src/app/icon-maskable/route.tsx",

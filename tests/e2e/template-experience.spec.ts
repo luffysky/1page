@@ -18,7 +18,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("預設就有一套模板被選中，不是空狀態", async ({ page }) => {
-  const pressed = page.locator("#templates button[aria-pressed='true']");
+  const pressed = page.locator("ul[aria-label='模板'] button[aria-pressed='true']");
   await expect(pressed).toHaveCount(1);
 
   // 預覽區有實際內容，不是佔位
@@ -69,6 +69,68 @@ test("切換是 SiteConfig 的結果，不是有人去改 DOM 樣式", async ({ 
     getComputedStyle(document.documentElement).getPropertyValue("--site-color-background").trim(),
   );
   expect(leaked).toBe("");
+});
+
+test("換主題會換掉配色，但不換模板", async ({ page }) => {
+  const scope = page.locator(previewScope).first();
+  const background = () => scope.evaluate((element) => getComputedStyle(element).backgroundColor);
+
+  const before = await background();
+  const heading = await page.locator(`${previewScope} h1`).first().textContent();
+
+  await page.getByRole("button", { name: "精品一點" }).click();
+
+  await expect.poll(background, { message: "換了主題但配色沒變" }).not.toBe(before);
+  // 主題只換外觀。內容跟著換的話代表換的是模板，那是另一回事。
+  expect(await page.locator(`${previewScope} h1`).first().textContent()).toBe(heading);
+});
+
+test("換主色會換掉按鈕底色", async ({ page }) => {
+  const button = page.locator(`${previewScope} span[class*='inline-flex']`).first();
+  const background = () => button.evaluate((element) => getComputedStyle(element).backgroundColor);
+
+  const before = await background();
+  await page.getByRole("button", { name: /苔綠/ }).click();
+
+  await expect.poll(background, { message: "換了主色但按鈕底色沒變" }).not.toBe(before);
+});
+
+test("改品牌名稱，預覽即時跟著變", async ({ page }) => {
+  const field = page.getByLabel("品牌名稱");
+  await field.fill("測試工作室");
+
+  await expect(
+    page
+      .locator(previewScope)
+      .getByText(/測試工作室/)
+      .first(),
+  ).toBeVisible();
+});
+
+test("切換裝置時版面真的重排，不是把桌機版縮小", async ({ page }) => {
+  // 這條是 4C 最容易做假的一項：只改容器寬度、內容仍是三欄，
+  // 看起來「有切換」但其實什麼都沒發生（Spec §45.1 那類）。
+  // 判準因此是 grid 的欄數，不是容器寬度。
+  const grid = page.locator(`${previewScope} ul`).first();
+  const columns = () =>
+    grid.evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(" ").length);
+
+  const desktop = await columns();
+  expect(desktop).toBeGreaterThan(1);
+
+  await page.getByRole("button", { name: /Mobile/ }).click();
+
+  await expect.poll(columns, { message: "切到手機但欄數沒變" }).toBe(1);
+});
+
+test("在窄視窗切到 Desktop 也不會讓整頁出現橫向捲動", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.getByRole("button", { name: /Desktop/ }).click();
+
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(overflow).toBeLessThanOrEqual(0);
 });
 
 test("預覽區可用鍵盤捲動", async ({ page }) => {
