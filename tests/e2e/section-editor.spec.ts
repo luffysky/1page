@@ -2,16 +2,17 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
 /**
- * 區塊編輯器（CR-003-4 第一段）
+ * 區塊編輯器（CR-003-4）
  *
  * ── 這裡最重要的一條是「完全不用滑鼠」 ────────────────────────
  *
  * WCAG 2.1 §2.5.7：任何用拖曳完成的操作都要有不需拖曳的替代方式。
- * 這一段刻意先做鍵盤、後做拖曳，就是為了讓那條在第一版就成立——
+ * 第一段刻意先做鍵盤、第二段才疊上拖曳，就是為了讓那條在第一版成立——
  * 補做等於整個介面重寫。
  *
- * 所以這份測試裡搬動區塊的那一條**只用 Tab 與 Enter**。
- * 拖曳之後疊上來時，這條必須仍然是綠的。
+ * 所以「完全用鍵盤」那一條**只用 Tab 與 Enter**，而且它是在拖曳
+ * 加進來之後仍然要綠的那一條。兩者呼叫的是同一個 moveSection，
+ * 所以它們在結構上不可能有不同的行為。
  */
 
 const order = async (page: import("@playwright/test").Page) =>
@@ -134,6 +135,62 @@ test.describe("區塊編輯器", () => {
     const after = await order(page);
     expect(after[0]).toBe("hero");
     expect(after).toContain("faq");
+  });
+
+  test("拖曳搬動：放開之後真的落在目標位置", async ({ page }) => {
+    /*
+     * ⚠️ 這裡用明確派送的 DnD 事件，不用 Playwright 的 `dragTo`。
+     *
+     * `dragTo` 走的是滑鼠座標，而編輯區是一個有自己捲軸的容器：
+     * 它把來源捲進畫面、目標又被捲出去，放開時游標底下的其實是別塊。
+     * 實測拖 footer 到最上面，動到的是 about——**程式是對的，
+     * 是那個測試手法在這個容器裡量不準**。
+     *
+     * 拖曳的座標行為交給瀏覽器，這裡驗的是我們自己那段：
+     * 「被拖的是誰、放在誰身上、最後順序對不對」。
+     */
+    const drop = async (fromId: string, toId: string) => {
+      await page.evaluate(
+        ([from, to]) => {
+          const source = document.querySelector(`[data-section-widget="${from}"]`)!;
+          const target = document.querySelector(`[data-section-widget="${to}"]`)!;
+          const dataTransfer = new DataTransfer();
+          source.dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer }));
+          target.dispatchEvent(new DragEvent("dragover", { bubbles: true, dataTransfer }));
+          target.dispatchEvent(new DragEvent("drop", { bubbles: true, dataTransfer }));
+        },
+        [fromId, toId],
+      );
+    };
+
+    const before = await order(page);
+    const last = before.at(-1)!;
+    const first = before[0]!;
+
+    await drop(last, first);
+    await expect.poll(async () => (await order(page))[0]).toBe(last);
+
+    // 往回拖也要對——「往下拖」的索引偏移是這種功能最常見的錯
+    await drop(last, before[2]!);
+    const after = await order(page);
+    expect(after.indexOf(last)).toBeGreaterThan(after.indexOf(first));
+    expect(after).toHaveLength(before.length);
+  });
+
+  test("新增區塊會插在選取的那一塊後面，而且看得出是什麼", async ({ page }) => {
+    // 一律加到最底下的話，新區塊會出現在頁尾下面，看起來像壞了
+    const before = await order(page);
+
+    await page.locator("[data-section-widget]").nth(1).getByRole("group").first().click();
+    await page.getByText("新增區塊").click();
+    await page.getByRole("button", { name: "＋ 常見問題" }).click();
+
+    const after = await order(page);
+    expect(after).toHaveLength(before.length + 1);
+    expect(after[2], "沒有插在選取那一塊後面").toBe("faq");
+
+    // 加出來要有內容，不是一塊空白
+    await expect(page.getByText("常見問題").last()).toBeVisible();
   });
 
   test("axe 沒有 critical/serious，選取後也一樣", async ({ page }) => {

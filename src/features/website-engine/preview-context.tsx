@@ -15,7 +15,8 @@ import {
   type ThemeId,
   type WebsiteTemplate,
 } from "./templates";
-import { removeSection, reorderSections } from "./section-ops";
+import { addSection, removeSection, reorderSections } from "./section-ops";
+import { newSection } from "./section-presets";
 import { siteSectionSchema, type SiteSection } from "./schema";
 import type { Device, SiteConfig } from "./types";
 
@@ -79,6 +80,7 @@ type PreviewAction =
   | { type: "apply-patch"; patch: Record<string, unknown> }
   | { type: "move-section"; id: string; direction: "up" | "down" }
   | { type: "remove-section"; id: string }
+  | { type: "add-section"; sectionType: SiteSection["type"]; afterId: string | null }
   | { type: "reset-sections" };
 
 function reducer(state: PreviewState, action: PreviewAction): PreviewState {
@@ -167,6 +169,27 @@ function reducer(state: PreviewState, action: PreviewAction): PreviewState {
       [order[index], order[target]] = [order[target]!, order[index]!];
 
       const result = reorderSections(configOf(state), order);
+      return result.ok ? { ...state, sections: result.config.sections } : state;
+    }
+
+    case "add-section": {
+      const current = sectionsOf(state);
+      const section = newSection(
+        action.sectionType,
+        current.map((item) => item.id),
+      );
+
+      /*
+       * 加在選取那一塊的後面，不是永遠加在最下面。
+       *
+       * 使用者選了「關於」再按「新增常見問題」，他要的是加在關於旁邊。
+       * 一律加到最底下的話，他得再按十次下移——而頁尾永遠在最後，
+       * 新區塊會出現在頁尾**下面**，看起來像壞了。
+       */
+      const at = action.afterId ? current.findIndex((item) => item.id === action.afterId) : -1;
+      const position = at === -1 ? undefined : at + 1;
+
+      const result = addSection(configOf(state), section, position);
       return result.ok ? { ...state, sections: result.config.sections } : state;
     }
 
@@ -359,6 +382,7 @@ export interface SitePreviewValue extends PreviewState {
   /* 區塊編輯（CR-003-4）。拖曳與鍵盤按鈕呼叫的是同一組函式 */
   moveSection: (id: string, direction: "up" | "down") => void;
   removeSection: (id: string) => void;
+  addSection: (type: SiteSection["type"], afterId: string | null) => void;
   resetSections: () => void;
   /** 有沒有動過區塊結構。用來決定要不要顯示「回到模板原樣」 */
   sectionsEdited: boolean;
@@ -428,6 +452,7 @@ export function SitePreviewProvider({
       applyPatch: (patch) => dispatch({ type: "apply-patch", patch }),
       moveSection: (id, direction) => dispatch({ type: "move-section", id, direction }),
       removeSection: (id) => dispatch({ type: "remove-section", id }),
+      addSection: (sectionType, afterId) => dispatch({ type: "add-section", sectionType, afterId }),
       resetSections: () => dispatch({ type: "reset-sections" }),
       sectionsEdited: state.sections !== null,
     }),

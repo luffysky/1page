@@ -4,12 +4,13 @@ import { useState } from "react";
 
 import { SectionWidget } from "@/components/editor/section-widget";
 import { useSitePreview } from "@/features/website-engine/preview-context";
+import { addableSectionTypes, SECTION_LABELS } from "@/features/website-engine/section-presets";
 import { SiteRenderer } from "@/features/website-engine/site-renderer";
 
 /**
- * 區塊編輯器（CR-003-4 第一段）
+ * 區塊編輯器（CR-003-4）
  *
- * 每個區塊是一個 widget：點一下選取，用 ↑ ↓ 搬動，✕ 移除。
+ * 每個區塊是一個 widget：選取、搬動、移除、在中間插新的。
  *
  * ── 定價 B ────────────────────────────────────────────────────
  *
@@ -17,39 +18,51 @@ import { SiteRenderer } from "@/features/website-engine/site-renderer";
  * 排出來的東西存在 sessionStorage（見 preview-context）。
  * 要把它變成一個真的網站才進 Website Workshop。
  *
- * ── 第一段刻意還沒有的東西 ───────────────────────────────────
+ * ── 三種輸入方式，一條邏輯 ───────────────────────────────────
  *
- * 拖曳。順序是反過來做的：先鍵盤、再拖曳，兩者呼叫同一個
- * `moveSection`。先做拖曳再補鍵盤等於整個介面重寫一次，
- * 而 WCAG 2.1 §2.5.7 讓「不補」不是一個選項。
+ *   滑鼠   拖曳
+ *   鍵盤   Tab 到工具列按 Enter
+ *   觸控   直接點 ↑ ↓（按鈕本來就好點）
+ *
+ * 三者最後都呼叫同一個 `moveSection`。順序是刻意反過來做的：
+ * 第一段先做鍵盤，第二段才疊上拖曳——先做拖曳再補鍵盤等於整個介面
+ * 重寫一次，而 WCAG 2.1 §2.5.7 讓「不補」不是一個選項。
  */
 
-/** 區塊型別的中文名。工具列與螢幕閱讀器都要講得出這是哪一塊 */
-const SECTION_LABELS: Record<string, string> = {
-  hero: "主視覺",
-  about: "關於",
-  services: "服務",
-  features: "特色",
-  gallery: "作品",
-  portfolio: "作品集",
-  pricing: "方案",
-  testimonials: "見證",
-  faq: "常見問題",
-  process: "流程",
-  stats: "數字",
-  team: "團隊",
-  form: "表單",
-  embed: "嵌入",
-  cta: "行動呼籲",
-  contact: "聯絡",
-  footer: "頁尾",
-};
-
 export function SectionEditor() {
-  const { config, sectionsEdited, resetSections } = useSitePreview();
+  const { config, sectionsEdited, resetSections, moveSection, addSection } = useSitePreview();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [drag, setDrag] = useState<{ from: string | null; over: string | null }>({
+    from: null,
+    over: null,
+  });
 
   const total = config.sections.length;
+  const ids = config.sections.map((section) => section.id);
+
+  /*
+   * 拖放最後也是呼叫 moveSection，一次一步走到定位。
+   *
+   * 為什麼不另外寫一個「移到第 N 位」的 action：那會變成第二條
+   * 改順序的路徑，而兩條路徑遲早會在邊界條件上不一致
+   * （最常見的是「往下拖」時索引要不要減一）。
+   * 重用同一個 action 的代價只是多幾次 dispatch，換來的是
+   * 鍵盤與拖曳**在結構上不可能有不同的行為**。
+   */
+  const handleDrop = (from: string, targetId: string) => {
+    setDrag({ from: null, over: null });
+    if (!from || from === targetId) return;
+
+    const fromIndex = ids.indexOf(from);
+    const toIndex = ids.indexOf(targetId);
+    if (fromIndex === -1 || toIndex === -1) return;
+
+    const direction = fromIndex < toIndex ? "down" : "up";
+    for (let step = 0; step < Math.abs(toIndex - fromIndex); step += 1) {
+      moveSection(from, direction);
+    }
+    setSelectedId(from);
+  };
 
   return (
     <div>
@@ -72,6 +85,26 @@ export function SectionEditor() {
         ) : null}
       </div>
 
+      <details className="border-brand-line mb-4 rounded-lg border p-4">
+        <summary className="text-body-sm cursor-pointer font-bold">新增區塊</summary>
+        <p className="text-caption text-brand-muted mt-2">
+          {selectedId ? "會加在目前選取那一塊的後面。" : "會加在最後面。先選一塊就能插在它後面。"}
+        </p>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          {addableSectionTypes().map((type) => (
+            <button
+              key={type}
+              type="button"
+              onClick={() => addSection(type, selectedId)}
+              className="border-brand-line text-body-sm rounded-pill border px-4 py-2 font-bold"
+            >
+              ＋ {SECTION_LABELS[type] ?? type}
+            </button>
+          ))}
+        </div>
+      </details>
+
       {/*
        * 捲動容器要能用鍵盤操作，理由與首頁預覽相同：
        * 只有滑鼠捲得動的區塊，鍵盤使用者看不到下半部（axe serious）。
@@ -92,6 +125,17 @@ export function SectionEditor() {
               total={total}
               selected={selectedId === section.id}
               onSelect={setSelectedId}
+              dragging={drag.from === section.id}
+              dropTarget={
+                drag.over === section.id && drag.from !== null && drag.from !== section.id
+              }
+              onDragState={(from, over) =>
+                setDrag((current) => ({
+                  from: from ?? current.from,
+                  over: over ?? (from ? null : current.over),
+                }))
+              }
+              onDrop={handleDrop}
             >
               {rendered}
             </SectionWidget>

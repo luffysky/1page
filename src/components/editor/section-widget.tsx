@@ -32,6 +32,10 @@ export function SectionWidget({
   total,
   selected,
   onSelect,
+  dragging,
+  dropTarget,
+  onDragState,
+  onDrop,
   children,
 }: {
   id: string;
@@ -40,6 +44,12 @@ export function SectionWidget({
   total: number;
   selected: boolean;
   onSelect: (id: string) => void;
+  /** 正被拖著的是不是自己 */
+  dragging: boolean;
+  /** 放開的話會插在自己前面嗎 */
+  dropTarget: boolean;
+  onDragState: (id: string | null, over: string | null) => void;
+  onDrop: (draggedId: string, targetId: string) => void;
   children: React.ReactNode;
 }) {
   const { moveSection, removeSection } = useSitePreview();
@@ -50,7 +60,44 @@ export function SectionWidget({
   return (
     <div
       data-section-widget={id}
-      className={`relative ${selected ? "outline-brand-accent-strong outline-2 outline-offset-[-2px]" : ""}`}
+      /*
+       * 拖曳用原生 HTML5 DnD，不引函式庫。
+       *
+       * 三種輸入方式各自有路，而且**走的是同一個 moveSection**：
+       *   滑鼠   拖曳（這裡）
+       *   鍵盤   Tab 到工具列按 Enter
+       *   觸控   直接點工具列的 ↑ ↓（按鈕本來就可以點）
+       *
+       * 觸控刻意不做拖曳：手機上拖曳與頁面捲動會打架，
+       * 做半殘的觸控拖曳會讓人連捲都捲不動。按鈕在觸控上本來就好按。
+       */
+      draggable
+      onDragStart={(event) => {
+        event.dataTransfer.effectAllowed = "move";
+        // Firefox 沒有 setData 就不會開始拖曳
+        event.dataTransfer.setData("text/plain", id);
+        onDragState(id, null);
+      }}
+      onDragEnd={() => onDragState(null, null)}
+      onDragOver={(event) => {
+        // 沒有 preventDefault 就不會觸發 drop
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
+        onDragState(null, id);
+      }}
+      onDrop={(event) => {
+        event.preventDefault();
+        /*
+         * ⚠️ 被拖的是誰要從 dataTransfer 讀，不能從 React state 讀。
+         *
+         * 第一版把它存在 state 裡，結果拖 footer 到最上面時
+         * 動到的是別塊——drop 的處理函式抓到的是舊那一輪 render 的
+         * state 快照。dataTransfer 就是為了這件事存在的：
+         * 它跟著這一次拖曳走，不跟著 render 走。
+         */
+        onDrop(event.dataTransfer.getData("text/plain"), id);
+      }}
+      className={`relative ${selected ? "outline-brand-accent-strong outline-2 outline-offset-[-2px]" : ""} ${dragging ? "opacity-40" : ""} ${dropTarget ? "border-brand-accent-strong border-t-4" : ""}`}
     >
       {/*
        * 這一層負責「選取」。用 group 而非 button 的理由見檔頭。
@@ -80,7 +127,15 @@ export function SectionWidget({
           // 工具列是我們的介面，不是被預覽網站的一部分
           data-editor-chrome=""
         >
-          <span className="text-caption px-2 font-bold">{label}</span>
+          {/*
+           * 握把只是視覺提示：整塊都是 draggable，所以它不需要自己接事件。
+           * aria-hidden 是因為鍵盤使用者用的是旁邊那兩顆按鈕，
+           * 對他們宣告一個「拖曳握把」只會多一個到不了的東西。
+           */}
+          <span aria-hidden="true" className="cursor-grab px-1 text-sm">
+            ⠿
+          </span>
+          <span className="text-caption px-1 font-bold">{label}</span>
 
           <button
             type="button"
