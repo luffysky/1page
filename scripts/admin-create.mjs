@@ -93,7 +93,33 @@ const existing = await sql(
 let userId = existing[0]?.id;
 
 if (userId) {
+  /*
+   * ⚠️ 這裡原本只印一行「使用者已存在」就跳過了。
+   *
+   * 後果是：改了 .env.local 的 ADMIN_PASSWORD、再跑一次這支腳本，
+   * 它會印「使用者已存在」→「已授予 admin 權限」→「下一步：以此帳號登入」，
+   * 從頭到尾一副成功的樣子——但**密碼完全沒有被套用**。
+   * 資料庫裡還是建立當天那一組。
+   *
+   * 然後登入頁說「帳號或密碼不正確」，而你輸入的確實是你設定的那一組。
+   * 沒有任何一個地方會告訴你這兩件事對不起來。
+   *
+   * 這支腳本的 ADMIN_PASSWORD 就是密碼的來源，那它就該真的把密碼寫進去。
+   */
+  const response = await fetch(`${url}/auth/v1/admin/users/${userId}`, {
+    method: "PUT",
+    headers,
+    body: JSON.stringify({ password, email_confirm: true }),
+  });
+
+  if (!response.ok) {
+    console.error(`更新既有使用者的密碼失敗 HTTP ${response.status}`);
+    console.error(JSON.stringify(await response.json()).slice(0, 600));
+    process.exit(1);
+  }
+
   console.log(`使用者已存在：${email}`);
+  console.log("已把密碼更新成 .env.local 裡的 ADMIN_PASSWORD。");
 } else {
   const response = await fetch(`${url}/auth/v1/admin/users`, {
     method: "POST",

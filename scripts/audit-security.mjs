@@ -215,6 +215,51 @@ if (!agentGarbage) {
 
   const bare = await probe("/admin");
   check("裸 /admin 不存在", bare?.status === 404, `HTTP ${bare?.status}`);
+
+  /*
+   * CSP。
+   *
+   * 這幾條之所以存在：稽核跑了 21 項全綠，但**整個專案一行 CSP 都沒有**——
+   * 沒有任何一項在問這件事，所以沒有人發現。
+   * 一份稽核只證明它問過的問題，沒問到的不會自己冒出來。
+   *
+   * 驗的是「有沒有真的送出去」而不是「原始碼裡有沒有寫」，
+   * 因為 headers() 設錯、被覆寫、或部署平台吃掉，原始碼都還是好看的。
+   */
+  const csp = home?.headers.get("content-security-policy") ?? "";
+  const has = (directive, value) => new RegExp(`${directive}[^;]*${value}`).test(csp);
+
+  check("有送出 Content-Security-Policy", csp.length > 0);
+
+  if (csp) {
+    // CR-003-3 的白名單嵌入：瀏覽器這一層只准那兩個主機
+    check(
+      "frame-src 只允許白名單裡的嵌入來源",
+      has("frame-src", "youtube-nocookie\\.com") &&
+        has("frame-src", "google\\.com") &&
+        !has("frame-src", "\\*"),
+    );
+    check("object-src 是 none", has("object-src", "'none'"));
+    check("base-uri 鎖在 self", has("base-uri", "'self'"));
+    check("不可被他人內嵌（clickjacking）", has("frame-ancestors", "'none'"));
+    check("form-action 鎖在 self", has("form-action", "'self'"));
+
+    /*
+     * 這一條會在 dev 是綠的、在正式環境才有意義——
+     * React 在開發時需要 eval 來重建伺服器端的錯誤堆疊。
+     */
+    if (!siteUrl.includes("localhost") && !siteUrl.includes("127.0.0.1")) {
+      check("正式環境不給 unsafe-eval", !has("script-src", "unsafe-eval"));
+      check("正式環境會升級 http 請求", csp.includes("upgrade-insecure-requests"));
+    }
+  }
+
+  for (const [header, expected] of [
+    ["x-content-type-options", "nosniff"],
+    ["referrer-policy", "strict-origin"],
+  ]) {
+    check(`${header} 有設`, (home?.headers.get(header) ?? "").includes(expected));
+  }
 }
 
 /* ── 總結 ────────────────────────────────────────────────────── */

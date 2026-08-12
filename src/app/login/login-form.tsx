@@ -34,7 +34,30 @@ export function LoginForm({ next }: { next: string }) {
     const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
 
     if (signInError) {
-      setError("帳號或密碼不正確。");
+      /*
+       * ⚠️ 只有「真的是憑證問題」才說憑證不對。
+       *
+       * 這裡原本是一律 `setError("帳號或密碼不正確。")`，理由寫得沒錯——
+       * 不區分「帳號不存在」與「密碼錯誤」是為了不提供帳號列舉的管道。
+       * 但那個理由被過度套用了：它把**所有**失敗都講成密碼錯誤，
+       * 包括連不上伺服器、被 CSP 擋掉、太多次嘗試被限流、信箱還沒驗證。
+       *
+       * 代價是真的踩到時完全無從查起——畫面斬釘截鐵地說你密碼錯了，
+       * 你確定沒錯，然後就卡在那裡。（實際發生過一次，
+       * 真正的原因是 admin-create 沒有把新密碼寫進資料庫。）
+       *
+       * 防列舉要的是「不要分辨這個 email 存不存在」，
+       * 不是「不要分辨這是不是憑證問題」。後者對攻擊者沒有價值，
+       * 對自己人卻是唯一的線索。
+       */
+      const isCredentialError =
+        signInError.code === "invalid_credentials" || signInError.status === 400;
+
+      setError(
+        isCredentialError
+          ? "帳號或密碼不正確。"
+          : `目前無法登入（${signInError.message}）。這不是密碼的問題，請稍後再試。`,
+      );
       setPending(false);
       return;
     }
