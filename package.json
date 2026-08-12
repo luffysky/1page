@@ -31,7 +31,9 @@
     "admin:create": "node scripts/admin-create.mjs",
     "admin:list": "node scripts/admin-create.mjs --list",
     "audit:wiring": "node scripts/audit-wiring.mjs",
-    "agent:eval": "node scripts/agent-eval.mjs"
+    "agent:eval": "node scripts/agent-eval.mjs",
+    "audit:security": "node scripts/audit-security.mjs",
+    "audit:perf": "node scripts/audit-perf.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.116.0",

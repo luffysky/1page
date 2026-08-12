@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { Navbar, type NavLink } from "@/components/shared/navbar";
 import { SiteFooter } from "@/components/shared/site-footer";
+import { absoluteUrl } from "@/config/site";
 import { getAdminEntry } from "@/features/admin/auth";
 
 import { ProjectBuilder } from "./project-builder";
@@ -15,6 +16,9 @@ import { ProjectBuilder } from "./project-builder";
 export const metadata: Metadata = {
   title: "開始一個專案｜一頁起家",
   description: "你不需要先知道怎麼做。只需要告訴我們，你想完成什麼。",
+  // 這一頁會帶著 ?ref= 之類的參數進來，canonical 一律指向乾淨的網址，
+  // 否則搜尋引擎會把每一個來源各收錄成一頁。
+  alternates: { canonical: absoluteUrl("/start") },
 };
 
 const NAV_LINKS: NavLink[] = [

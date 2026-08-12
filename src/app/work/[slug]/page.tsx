@@ -1,4 +1,5 @@
 import { TrackPageView } from "@/components/analytics/page-view";
+import { ProjectJsonLd } from "@/components/seo/structured-data";
 import { TrackedExternalLink } from "@/components/analytics/tracked-external-link";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -91,6 +92,13 @@ export default async function WorkDetailPage({ params }: PageProps<"/work/[slug]
       {/* Spec §31。掛在詳細頁而不是列表的連結上——
           直接從搜尋進來的人也該被算到。 */}
       <TrackPageView event="portfolio_project_opened" payload={{ slug: project.slug }} />
+      {/* Spec §32。用 CreativeWork 而非 Product——標成產品等於宣稱賣過（§29） */}
+      <ProjectJsonLd
+        title={project.title}
+        summary={project.summary ?? undefined}
+        href={`/work/${project.slug}`}
+        year={project.year ?? undefined}
+      />
       <Navbar
         adminEntry={adminEntry}
         links={NAV_LINKS}

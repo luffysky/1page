@@ -1,3 +1,4 @@
+import { OrganizationJsonLd } from "@/components/seo/structured-data";
 import { TrackPageView } from "@/components/analytics/page-view";
 import { AdvisorSection } from "@/components/landing/advisor-section";
 import { GoalSelector } from "@/components/landing/goal-selector";
@@ -60,6 +61,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     <HomeGoalProvider initialGoal={goal}>
       <SitePreviewProvider initialTemplateId={initialTemplateId}>
         <AgentHandoffProvider>
+          <OrganizationJsonLd />
           <Navbar
             adminEntry={adminEntry}
             links={NAV_LINKS}
