@@ -202,6 +202,33 @@ const workHtml = await fetch(`${siteUrl}/work`).then((r) => r.text());
 const draftResponse = await fetch(`${siteUrl}/work/unpublished-draft`, { redirect: "manual" });
 (draftResponse.status === 404 ? pass : fail)("草稿詳細頁回 404", `HTTP ${draftResponse.status}`);
 
+// ── 6.5 每一張表都要關好 ──────────────────────────────────────
+console.log("\n【6.5】public schema 的 RLS");
+
+/*
+ * PostgREST 會把 public schema 的**每一張表**都變成一個端點，
+ * 包含不是我們刻意建的那些。
+ *
+ * 實測抓到過一次：遷移工具自己建的 `_migrations` 沒開 RLS，
+ * 匿名帶 anon key 就讀得到每一個 migration 的檔名——
+ * 整個資料庫的演進史、有哪些表、做了什麼功能，一次交出去。
+ *
+ * 所以這條不是列出「哪幾張表要開 RLS」，而是反過來問
+ * **有沒有哪一張沒開**。新加的表忘了開，這裡會自己發現。
+ */
+const unprotected = await sql(
+  "select tablename from pg_tables where schemaname = 'public' and not rowsecurity",
+);
+
+if (unprotected.length === 0) {
+  pass(`public schema 的每一張表都啟用了 RLS`);
+} else {
+  fail(
+    "有資料表沒有啟用 RLS",
+    unprotected.map((row) => row.tablename).join(", ") + "（PostgREST 會把它變成公開端點）",
+  );
+}
+
 // ── 7. 媒體網域設定 ────────────────────────────────────────────
 console.log("\n【7】媒體網域");
 
