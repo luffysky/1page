@@ -5,6 +5,7 @@ import { useEffect } from "react";
 import { PreviewControls } from "@/components/website-preview/preview-controls";
 import { SitePreview } from "@/components/website-preview/site-preview";
 import { TemplatePicker } from "@/components/website-preview/template-picker";
+import { useAgentHandoff } from "@/features/agent/handoff";
 import { useHomeGoal } from "@/features/home/goal-context";
 import { useSitePreview } from "@/features/website-engine/preview-context";
 import { listTemplates } from "@/features/website-engine/templates";
@@ -24,7 +25,8 @@ import { track } from "@/lib/analytics/track";
  */
 export function TemplateExperienceSection() {
   const { goal, definition, isFiltering } = useHomeGoal();
-  const { draft, selectTemplate } = useSitePreview();
+  const { config, draft, selectTemplate } = useSitePreview();
+  const { openAgent } = useAgentHandoff();
 
   const templates = listTemplates(definition.templateCategories);
   const withinFilter = templates.some((template) => template.id === draft.templateId);
@@ -67,6 +69,30 @@ export function TemplateExperienceSection() {
       <TemplatePicker templates={templates} />
       <PreviewControls />
       <SitePreview />
+
+      {/*
+       * Spec §8.15：「底部固定提供」的 Agent 入口。
+       *
+       * 用 <a href="#advisor"> 而非按鈕：捲到 Agent 那一段是導覽行為，
+       * 瀏覽器原生就會做，而且在網址列留下位置。onClick 只多做一件事——
+       * 把目前這份 SiteConfig 交過去。
+       */}
+      <div className="border-brand-line flex flex-wrap items-center gap-x-4 gap-y-2 border-t pt-5">
+        <p className="text-body-sm text-brand-muted">想讓 AI 幫你調整？</p>
+        <a
+          href="#advisor"
+          onClick={() => {
+            openAgent({ intent: "template", config });
+            track("template_to_agent_clicked", { template: draft.templateId });
+          }}
+          className="border-brand-ink text-body-sm rounded-pill hover:bg-brand-ink hover:text-brand-on-ink border px-4 py-2 font-bold transition-colors"
+        >
+          帶著這份設定去問 AI 顧問 ↓
+        </a>
+        <p className="text-caption text-brand-muted">
+          你在這裡調的東西會一起帶過去，不用重講一次。
+        </p>
+      </div>
     </div>
   );
 }

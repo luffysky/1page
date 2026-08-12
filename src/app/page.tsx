@@ -15,6 +15,7 @@ import { FINAL_CTA_COPY, HERO_COPY, SECTION_COPY } from "@/config/home-copy";
 import { getHomeGoal, parseHomeGoal } from "@/config/home-goals";
 import { HomeGoalProvider } from "@/features/home/goal-context";
 import { getPortfolioRepository } from "@/features/portfolio";
+import { AgentHandoffProvider } from "@/features/agent/handoff";
 import { SitePreviewProvider } from "@/features/website-engine/preview-context";
 import { listTemplates } from "@/features/website-engine/templates";
 
@@ -57,63 +58,65 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   return (
     <HomeGoalProvider initialGoal={goal}>
       <SitePreviewProvider initialTemplateId={initialTemplateId}>
-        <Navbar
-          adminEntry={adminEntry}
-          links={NAV_LINKS}
-          cta={{ label: "開始一個專案 ↗", href: "#contact" }}
-        />
+        <AgentHandoffProvider>
+          <Navbar
+            adminEntry={adminEntry}
+            links={NAV_LINKS}
+            cta={{ label: "開始一個專案 ↗", href: "#contact" }}
+          />
 
-        <main id="top">
-          <Hero {...HERO_COPY} />
+          <main id="top">
+            <Hero {...HERO_COPY} />
 
-          <EditorialSection {...SECTION_COPY.goals}>
-            <GoalSelector />
-          </EditorialSection>
-
-          <div id="work">
-            <EditorialSection {...SECTION_COPY.work}>
-              <SelectedWork items={featured} />
+            <EditorialSection {...SECTION_COPY.goals}>
+              <GoalSelector />
             </EditorialSection>
-          </div>
 
-          <div id="templates">
-            <EditorialSection {...SECTION_COPY.template}>
-              <TemplateExperienceSection />
-            </EditorialSection>
-          </div>
+            <div id="work">
+              <EditorialSection {...SECTION_COPY.work}>
+                <SelectedWork items={featured} />
+              </EditorialSection>
+            </div>
 
-          <div id="advisor">
-            <EditorialSection {...SECTION_COPY.advisor}>
-              <AdvisorSection />
-            </EditorialSection>
-          </div>
+            <div id="templates">
+              <EditorialSection {...SECTION_COPY.template}>
+                <TemplateExperienceSection />
+              </EditorialSection>
+            </div>
 
-          <EditorialSection {...SECTION_COPY.philosophy} />
+            <div id="advisor">
+              <EditorialSection {...SECTION_COPY.advisor}>
+                <AdvisorSection />
+              </EditorialSection>
+            </div>
 
-          <div id="services">
-            <EditorialSection {...SECTION_COPY.services}>
-              <ServicesBand />
-            </EditorialSection>
-          </div>
+            <EditorialSection {...SECTION_COPY.philosophy} />
 
-          <div id="pricing">
-            <EditorialSection {...SECTION_COPY.pricing}>
-              <PricingLadder />
-            </EditorialSection>
-          </div>
+            <div id="services">
+              <EditorialSection {...SECTION_COPY.services}>
+                <ServicesBand />
+              </EditorialSection>
+            </div>
 
-          <div id="process">
-            <EditorialSection {...SECTION_COPY.process}>
-              <ProcessSteps />
-            </EditorialSection>
-          </div>
+            <div id="pricing">
+              <EditorialSection {...SECTION_COPY.pricing}>
+                <PricingLadder />
+              </EditorialSection>
+            </div>
 
-          <div id="contact">
-            <DarkCtaBlock {...FINAL_CTA_COPY} />
-          </div>
-        </main>
+            <div id="process">
+              <EditorialSection {...SECTION_COPY.process}>
+                <ProcessSteps />
+              </EditorialSection>
+            </div>
 
-        <SiteFooter />
+            <div id="contact">
+              <DarkCtaBlock {...FINAL_CTA_COPY} />
+            </div>
+          </main>
+
+          <SiteFooter />
+        </AgentHandoffProvider>
       </SitePreviewProvider>
     </HomeGoalProvider>
   );

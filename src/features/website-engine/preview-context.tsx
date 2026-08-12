@@ -1,14 +1,17 @@
 "use client";
 
-import { createContext, useContext, useMemo, useReducer } from "react";
+import { createContext, useContext, useEffect, useMemo, useReducer, useRef } from "react";
+import { z } from "zod";
 
 import {
+  ACCENT_IDS,
   type AccentId,
   buildSiteConfig,
   draftFromTemplate,
   getTemplate,
   type SiteDraft,
   TEMPLATES,
+  THEME_IDS,
   type ThemeId,
   type WebsiteTemplate,
 } from "./templates";
@@ -47,6 +50,7 @@ interface PreviewState {
 }
 
 type PreviewAction =
+  | { type: "restore"; state: PreviewState }
   | { type: "select-template"; templateId: string }
   | { type: "set-theme"; themeId: ThemeId }
   | { type: "set-accent"; accentId: AccentId }
@@ -56,6 +60,11 @@ type PreviewAction =
 
 function reducer(state: PreviewState, action: PreviewAction): PreviewState {
   switch (action.type) {
+    case "restore":
+      // device 不還原：那是「現在想怎麼看」，不是訪客累積的設定。
+      // 回到頁面時停在上次的手機模式，比較像是壞掉。
+      return { ...action.state, device: state.device };
+
     case "select-template": {
       const template = getTemplate(action.templateId);
       // 未知 id 一律當作沒發生。切換模板不該有「切到一半」的狀態。
@@ -98,6 +107,72 @@ function reducer(state: PreviewState, action: PreviewAction): PreviewState {
   }
 }
 
+/* ------------------------------------------------------------------ */
+/* 跨頁保存（Spec §8.15「訪客累積的設定不會在跳轉時消失」）            */
+/* ------------------------------------------------------------------ */
+
+const STORAGE_KEY = "1page:preview-draft";
+
+/**
+ * 存 draft，不存 SiteConfig。
+ *
+ * config 是 draft 的函數，存 config 等於存了一份可能與程式碼分歧的快照：
+ * 模板文案改過之後，回來的訪客會看到舊版的內容，而且沒有任何跡象。
+ * draft 是六個純量，重新算一次就是最新的。
+ *
+ * ⚠️ sessionStorage 的內容是**不可信輸入**——使用者可以直接編輯它。
+ * 因此讀回來一律過 schema，而不是 `JSON.parse` 之後就當成 SiteDraft。
+ */
+const storedStateSchema = z.object({
+  templateId: z.string().min(1).max(64),
+  themeId: z.enum(THEME_IDS),
+  accentId: z.enum(ACCENT_IDS),
+  brandName: z.string().max(200),
+  industry: z.string().max(200),
+  edited: z.object({ brandName: z.boolean(), industry: z.boolean() }),
+});
+
+function readStoredState(): PreviewState | null {
+  let raw: string | null = null;
+
+  try {
+    raw = window.sessionStorage.getItem(STORAGE_KEY);
+  } catch {
+    // Safari 無痕模式等情境下存取 storage 會拋例外。
+    // 保存是加分項，不該讓整個 Preview 掛掉。
+    return null;
+  }
+
+  if (!raw) return null;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+
+  const result = storedStateSchema.safeParse(parsed);
+  if (!result.success) return null;
+
+  // 模板可能在這次瀏覽之後被移除。指向不存在的模板就當作沒存過。
+  if (!getTemplate(result.data.templateId)) return null;
+
+  const { edited, ...draft } = result.data;
+  return { draft, edited, device: "desktop" };
+}
+
+function writeStoredState(state: PreviewState): void {
+  try {
+    window.sessionStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ ...state.draft, edited: state.edited }),
+    );
+  } catch {
+    // 同上：存不進去就算了，不影響當下的操作。
+  }
+}
+
 export interface SitePreviewValue extends PreviewState {
   /** draft 的唯一衍生物。Preview 顯示的就是這一份 */
   config: SiteConfig;
@@ -128,6 +203,36 @@ export function SitePreviewProvider({
     device: "desktop" as Device,
     edited: { brandName: false, industry: false },
   }));
+
+  /*
+   * 還原只在掛載時做一次。
+   *
+   * 為什麼不在 useReducer 的初始值裡直接讀 sessionStorage：
+   * server 沒有 sessionStorage，首次渲染的輸出會與 client 不一致，
+   * 那是 hydration mismatch。代價是回訪時會有一瞬間顯示 server 那一版——
+   * 只影響「改過設定又離開再回來」的人，而讓首頁 hydration 出錯影響的是所有人。
+   */
+  useEffect(() => {
+    const stored = readStoredState();
+    if (stored) dispatch({ type: "restore", state: stored });
+  }, []);
+
+  /*
+   * ⚠️ 初始狀態**不寫回** storage。
+   *
+   * 兩個 effect 都在掛載時跑，而 dispatch 要等下一次 render 才生效——
+   * 若無條件寫入，掛載當下寫進去的就是「server 給的預設值」，
+   * 把訪客上次存的東西蓋掉。React StrictMode 會把 effect 跑兩次，
+   * 於是第二次還原讀到的正是剛剛被蓋掉的預設值，訪客的設定就這樣消失。
+   *
+   * 實際撞到過：e2e 的「離開首頁再回來」一直拿到預設的品牌名稱。
+   * 以物件識別判斷「有沒有任何變更（含還原）」，沒有變更就不動 storage。
+   */
+  const initialState = useRef(state);
+  useEffect(() => {
+    if (state === initialState.current) return;
+    writeStoredState(state);
+  }, [state]);
 
   const value = useMemo<SitePreviewValue>(
     () => ({

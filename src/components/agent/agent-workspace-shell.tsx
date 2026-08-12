@@ -1,6 +1,7 @@
 "use client";
 
 import type { HomeGoal } from "@/config/home-goals";
+import type { AgentHandoff } from "@/features/agent/handoff";
 
 /**
  * Agent Workspace Shell（Spec §16）
@@ -29,7 +30,14 @@ const SAMPLE_THREAD: SampleMessage[] = [
   },
 ];
 
-export function AgentWorkspaceShell({ initialIntent }: { initialIntent: HomeGoal }) {
+export function AgentWorkspaceShell({
+  initialIntent,
+  handoff = null,
+}: {
+  initialIntent: HomeGoal;
+  /** Template Experience 交接過來的設定（Spec §8.15）。沒有就是直接從這一段開始 */
+  handoff?: AgentHandoff | null;
+}) {
   return (
     <div className="border-brand-line bg-brand-paper rounded-xl border p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -40,9 +48,38 @@ export function AgentWorkspaceShell({ initialIntent }: { initialIntent: HomeGoal
           </p>
         </div>
         <p className="border-brand-line text-caption text-brand-muted rounded-pill border px-3 py-1.5">
-          initialIntent: {initialIntent}
+          initialIntent: {handoff ? handoff.intent : initialIntent}
         </p>
       </div>
+
+      {/*
+       * Spec §8.15：「訪客在此累積的 SiteConfig 必須能無損傳入 Agent，
+       * 不可要求訪客重新選一次。」
+       *
+       * Phase 5 之前這裡只能把收到的東西顯示出來——但那不是裝飾。
+       * 交接有沒有成功，是一件必須看得見、也必須測得到的事；
+       * 若等到 Phase 5 才第一次驗證，那時要查的是「Agent 為什麼不知道我選過什麼」，
+       * 而問題可能出在傳遞、儲存或消費三個地方的任何一個。
+       */}
+      {handoff ? (
+        <dl className="border-brand-line bg-brand-bg mt-5 grid gap-x-6 gap-y-2 rounded-lg border p-4 sm:grid-cols-3">
+          <div className="sm:col-span-3">
+            <p className="text-caption text-brand-muted">已從 Template Experience 帶入</p>
+          </div>
+          <div>
+            <dt className="text-caption text-brand-muted">品牌名稱</dt>
+            <dd className="text-body-sm mt-0.5">{handoff.config.brand.name}</dd>
+          </div>
+          <div>
+            <dt className="text-caption text-brand-muted">產業</dt>
+            <dd className="text-body-sm mt-0.5">{handoff.config.brand.industry ?? "未填"}</dd>
+          </div>
+          <div>
+            <dt className="text-caption text-brand-muted">區塊</dt>
+            <dd className="text-body-sm mt-0.5">{handoff.config.sections.length} 個</dd>
+          </div>
+        </dl>
+      ) : null}
 
       <ol className="mt-6 flex flex-col gap-2.5">
         {SAMPLE_THREAD.map((message, index) => (

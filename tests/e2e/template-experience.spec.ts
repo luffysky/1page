@@ -133,6 +133,56 @@ test("在窄視窗切到 Desktop 也不會讓整頁出現橫向捲動", async ({
   expect(overflow).toBeLessThanOrEqual(0);
 });
 
+/**
+ * 4D — SiteConfig 無損傳遞（Spec §8.15）
+ *
+ * 出口條件：「訪客累積的設定不會在跳轉時消失，不需要重新選一次。」
+ * 這一組驗的是那句話的兩半：交給 Agent、以及離開頁面再回來。
+ */
+test.describe("設定的傳遞", () => {
+  test("帶著設定去問 AI 顧問，Agent 那一區收得到", async ({ page }) => {
+    await page.getByRole("button", { name: /^Local Business/ }).click();
+    await page.getByLabel("品牌名稱").fill("南方麵包店");
+    await page.getByLabel("產業").fill("烘焙坊");
+
+    await page.getByRole("link", { name: /帶著這份設定去問 AI 顧問/ }).click();
+
+    const advisor = page.locator("#advisor");
+    await expect(advisor.getByText("已從 Template Experience 帶入")).toBeVisible();
+    await expect(advisor.getByText("南方麵包店")).toBeVisible();
+    await expect(advisor.getByText("烘焙坊")).toBeVisible();
+
+    // Spec §8.15 的 initialIntent 是 "template"，不是 goal
+    await expect(advisor.getByText(/initialIntent: template/)).toBeVisible();
+  });
+
+  test("交接之後再改預覽，Agent 手上的那份不跟著變", async ({ page }) => {
+    await page.getByLabel("品牌名稱").fill("交接時的名字");
+    await page.getByRole("link", { name: /帶著這份設定去問 AI 顧問/ }).click();
+
+    await page.getByLabel("品牌名稱").fill("後來才改的名字");
+
+    const advisor = page.locator("#advisor");
+    await expect(advisor.getByText("交接時的名字")).toBeVisible();
+    await expect(advisor.getByText("後來才改的名字")).toBeHidden();
+  });
+
+  test("離開首頁再回來，調過的設定還在", async ({ page }) => {
+    await page.getByRole("button", { name: /^Personal/ }).click();
+    await page.getByLabel("品牌名稱").fill("回來以後還在的名字");
+
+    // 導覽列的「作品」是首頁內的錨點，這裡要的是真的離開這一頁。
+    await page.goto("/work");
+    await page.goto("/");
+
+    await expect(page.getByLabel("品牌名稱")).toHaveValue("回來以後還在的名字");
+    await expect(page.getByRole("button", { name: /^Personal/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+});
+
 test("預覽區可用鍵盤捲動", async ({ page }) => {
   // 模板比視窗高，預覽因此內部捲動。只有滑鼠能捲的話，
   // 鍵盤使用者永遠看不到下半部。
