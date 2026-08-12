@@ -65,6 +65,15 @@ export const AGENT_LIMITS = {
 
   /** 單次請求的逾時。超過就是明確的 timeout，不是無聲卡住 */
   requestTimeoutMs: 90_000,
+
+  /**
+   * 一次回覆最多幾輪工具呼叫（Spec §20）。
+   *
+   * 這不是防呆，是成本上限：「模型查了作品 → 看了結果又去查模板 → 再查 FAQ」
+   * 每一輪都是一次完整的請求。沒有上限的話，一個問題可以無限往下滾。
+   * 四輪足夠讓它查完手上四個工具還有餘裕。
+   */
+  maxToolRounds: 4,
 } as const;
 
 /**
@@ -95,6 +104,8 @@ export const AGENT_ERROR_CODES = [
   "refused",
   /** 回覆被輸出上限截斷 */
   "truncated",
+  /** 工具來回次數達上限（Spec §20 的成本上限） */
+  "tool_loop",
 ] as const;
 
 export type AgentErrorCode = (typeof AGENT_ERROR_CODES)[number];
@@ -111,4 +122,5 @@ export const AGENT_ERROR_MESSAGES: Record<AgentErrorCode, string> = {
   timeout: "這次回覆花的時間超過上限，已經中止。可以換個問法再試一次。",
   refused: "這個問題我沒辦法回答。換個方式問，或直接留下聯絡方式讓真人回覆你。",
   truncated: "回覆太長被截斷了。可以請我針對其中一段再說清楚一點。",
+  tool_loop: "我查了太多次還是沒整理出答案。換個問法，或直接留下聯絡方式讓真人回覆你。",
 };

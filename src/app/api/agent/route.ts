@@ -1,3 +1,5 @@
+import type Anthropic from "@anthropic-ai/sdk";
+
 import {
   AGENT_EFFORT,
   AGENT_ERROR_MESSAGES,
@@ -8,6 +10,7 @@ import {
 import { classifyAgentError } from "@/features/agent/errors";
 import { agentRequestSchema, encodeStreamEvent } from "@/features/agent/schema";
 import { AGENT_SYSTEM_PROMPT, initialIntentHint } from "@/features/agent/system-prompt";
+import { AGENT_TOOLS, executeAgentTool } from "@/features/agent/tools";
 import { getAnthropicClient } from "@/lib/ai/anthropic";
 
 /**
@@ -78,61 +81,111 @@ export async function POST(request: Request): Promise<Response> {
         controller.enqueue(encoder.encode(encodeStreamEvent(event)));
       };
 
+      /*
+       * 對話串。工具輪次會往這裡追加，因此它是 let 而非 const。
+       *
+       * 開場情境放在快取點之後：它隨 goal 變動，
+       * 寫進系統提示會讓每種 goal 各自成為一份不同的快取前綴。
+       */
+      const thread: Anthropic.Beta.BetaMessageParam[] = [
+        ...(hint ? [{ role: "user" as const, content: hint }] : []),
+        ...messages,
+      ];
+
       try {
-        const upstream = client.beta.messages.stream(
-          {
-            model: AGENT_MODEL,
-            max_tokens: AGENT_LIMITS.maxOutputTokens,
-            output_config: { effort: AGENT_EFFORT },
-            /*
-             * 安全分類器擋下請求時，改由另一個模型回答，而不是把拒絕丟給訪客。
-             * "default" 讓 Anthropic 依拒絕的類別自動挑替代模型——
-             * 自己指定一個型號的話，那個型號將來停用時我們得再改一次。
-             */
-            betas: ["server-side-fallback-2026-07-01"],
-            fallbacks: "default",
-            system: [
-              {
-                type: "text",
-                text: AGENT_SYSTEM_PROMPT,
-                // 系統提示每一次請求都一樣，快取它。
-                // 讀取只要約一成的價格，而這段會出現在每一則訊息上。
-                cache_control: { type: "ephemeral" },
-              },
-            ],
-            messages: [
-              // 開場情境放在快取點之後：它隨 goal 變動，
-              // 寫進系統提示會讓每種 goal 各自成為一份不同的快取前綴。
-              ...(hint ? [{ role: "user" as const, content: hint }] : []),
-              ...messages,
-            ],
-          },
-          {
-            // 訪客關掉分頁或按了停止 → 上游一起中止。
-            // 少了這一行，使用者已經走了，token 還在燒。
-            signal: request.signal,
-          },
-        );
+        let outputTokens = 0;
 
-        upstream.on("text", (text) => {
-          send({ type: "delta", text });
-        });
+        /*
+         * 工具迴圈。
+         *
+         * ⚠️ 上限不是防呆，是**成本上限**。沒有上限的話，
+         * 一次「模型呼叫工具 → 看了結果又呼叫 → 再呼叫」的來回
+         * 可以無限跑下去，而每一輪都是一次完整的請求。
+         * 到達上限時把話講出來，不是靜靜地停住。
+         */
+        for (let round = 0; ; round += 1) {
+          if (round >= AGENT_LIMITS.maxToolRounds) {
+            send({
+              type: "error",
+              code: "tool_loop",
+              message: AGENT_ERROR_MESSAGES.tool_loop,
+            });
+            break;
+          }
 
-        const final = await upstream.finalMessage();
+          const upstream = client.beta.messages.stream(
+            {
+              model: AGENT_MODEL,
+              max_tokens: AGENT_LIMITS.maxOutputTokens,
+              output_config: { effort: AGENT_EFFORT },
+              /*
+               * 安全分類器擋下請求時，改由另一個模型回答，而不是把拒絕丟給訪客。
+               * "default" 讓 Anthropic 依拒絕的類別自動挑替代模型——
+               * 自己指定一個型號的話，那個型號將來停用時我們得再改一次。
+               */
+              betas: ["server-side-fallback-2026-07-01"],
+              fallbacks: "default",
+              tools: [...AGENT_TOOLS],
+              system: [
+                {
+                  type: "text",
+                  text: AGENT_SYSTEM_PROMPT,
+                  // 系統提示每一次請求都一樣，快取它。
+                  // 讀取只要約一成的價格，而這段會出現在每一則訊息上。
+                  cache_control: { type: "ephemeral" },
+                },
+              ],
+              messages: thread,
+            },
+            {
+              // 訪客關掉分頁或按了停止 → 上游一起中止。
+              // 少了這一行，使用者已經走了，token 還在燒。
+              signal: request.signal,
+            },
+          );
 
-        if (final.stop_reason === "refusal") {
-          send({ type: "error", code: "refused", message: AGENT_ERROR_MESSAGES.refused });
-        } else if (final.stop_reason === "max_tokens") {
-          // 截斷是一種失敗，但前面已經送出去的內容仍然有用，
-          // 所以不是丟掉重來，是把「這段話沒講完」講出來。
-          send({ type: "error", code: "truncated", message: AGENT_ERROR_MESSAGES.truncated });
+          upstream.on("text", (text) => {
+            send({ type: "delta", text });
+          });
+
+          const final = await upstream.finalMessage();
+          outputTokens += final.usage.output_tokens;
+
+          if (final.stop_reason === "refusal") {
+            send({ type: "error", code: "refused", message: AGENT_ERROR_MESSAGES.refused });
+          } else if (final.stop_reason === "max_tokens") {
+            // 截斷是一種失敗，但前面已經送出去的內容仍然有用，
+            // 所以不是丟掉重來，是把「這段話沒講完」講出來。
+            send({ type: "error", code: "truncated", message: AGENT_ERROR_MESSAGES.truncated });
+          }
+
+          if (final.stop_reason !== "tool_use") {
+            send({ type: "done", stopReason: final.stop_reason, outputTokens });
+            break;
+          }
+
+          // 整段 content 原樣接回去，不是只接文字——
+          // tool_use 區塊掉了的話，下一輪的 tool_result 就對不到它的 id。
+          thread.push({ role: "assistant", content: final.content });
+
+          const calls = final.content.filter((block) => block.type === "tool_use");
+
+          // 平行執行，但**所有結果放進同一則 user 訊息**。
+          // 拆成多則會讓模型慢慢學會不要一次呼叫多個工具。
+          const results = await Promise.all(
+            calls.map(async (call) => {
+              const result = await executeAgentTool(call.name, call.input);
+              return {
+                type: "tool_result" as const,
+                tool_use_id: call.id,
+                content: result.content,
+                is_error: result.isError,
+              };
+            }),
+          );
+
+          thread.push({ role: "user", content: results });
         }
-
-        send({
-          type: "done",
-          stopReason: final.stop_reason,
-          outputTokens: final.usage.output_tokens,
-        });
       } catch (error) {
         // 訪客自己中止的，不是錯誤，也沒有人在聽了。
         if (request.signal.aborted) {

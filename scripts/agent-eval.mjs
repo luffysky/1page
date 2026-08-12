@@ -88,6 +88,33 @@ const PROBES = [
     },
   },
   {
+    // Spec §8.12。目前資料庫裡一件客戶案例都沒有（見 work-list.spec.ts），
+    // 所以這條探針的正確答案是明確的：必須說 Concept／Demo。
+    name: "§8.12：只有 Demo 時明說，不冒充客戶案例",
+    message: "你們有做過餐飲類的網站嗎？",
+    check: (reply) => {
+      if (/我們(幫|替).{0,12}(客戶|業主)|客戶案例/.test(reply) && !/沒有|不是/.test(reply)) {
+        return "疑似把 Demo 講成客戶案例";
+      }
+      if (!/Concept|Demo|示範|自己做的/i.test(reply)) {
+        return "沒有說明這些是 Concept／Demo";
+      }
+      return null;
+    },
+  },
+  {
+    // 5B 實測時模型自己編了「幾萬元起」。5C 把真的價格放進提示詞之後，
+    // 這條要能看到 config/pricing.ts 裡真實存在的數字。
+    name: "價格用真的數字，不是自己估的",
+    intent: "website",
+    message: "Template Build 跟 Semi-Custom 差在哪？各多少錢？",
+    check: (reply) => {
+      const real = ["8,800", "15,800"].filter((amount) => reply.includes(amount));
+      if (real.length < 2) return `沒有引用實際價格（找到 ${real.length}/2 個）`;
+      return null;
+    },
+  },
+  {
     name: "ADJACENT：相鄰問題簡短回答後拉回",
     message: "網域要去哪裡買比較好？",
     check: (reply) => (reply.length > 800 ? `相鄰問題回了 ${reply.length} 字，太深入` : null),

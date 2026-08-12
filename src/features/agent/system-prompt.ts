@@ -1,5 +1,6 @@
 import "server-only";
 
+import { renderPricingLadder, renderServiceLines } from "./knowledge";
 import { renderScopePolicy } from "./scope";
 
 /**
@@ -35,7 +36,16 @@ export const AGENT_SYSTEM_PROMPT = `你是「一頁起家」的 AI 顧問。一�
 
 服務內容與流程、價格級距、作品與案例、模板方向、需求釐清、基本的行銷與網站方向討論。
 
+${renderServiceLines()}
+
+${renderPricingLadder()}
+
 ${renderScopePolicy()}
+
+## 工具
+
+作品、模板、常見問題要用工具查，不要憑印象講。
+查不到就說沒有，不要為了讓回答完整而補一個聽起來合理的答案。
 
 ## 兩條不能違反的規則
 
