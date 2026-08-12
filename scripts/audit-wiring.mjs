@@ -238,6 +238,10 @@ const UNLINKED_BY_DESIGN = [
   [/^\/admin(\/|$)/, "後台走密路徑改寫，公開頁面不得出現任何入口（見 admin-security.spec.ts）"],
   [/^\/_dev(\/|$)/, "開發用頁面，Guardrail 1 規定不得混入產品訊號"],
   [/^\/icon-maskable$/, "由 manifest.webmanifest 引用，不是給人點的"],
+  // API 端點由前端 fetch 呼叫，本來就不會是一條 <a href>。
+  // 「有沒有人在用」這件事對它們仍然要驗，只是判準不同——
+  // 見下方【9】：每個 /api/* 都必須有程式碼在呼叫它。
+  [/^\/api(\/|$)/, "API 端點，由 fetch 呼叫而非連結；接線由【9】檢查"],
 ];
 
 function routesOnDisk() {
@@ -319,6 +323,59 @@ if (brokenLinks.size === 0) {
   pass("爬到的連結都指向存在的頁面");
 } else {
   for (const link of brokenLinks) fail("死連結", link);
+}
+
+// ── 【9】API 端點有沒有人呼叫 ──────────────────────────────────
+//
+// 【8】驗的是「這個頁面有沒有入口」。API 端點沒有入口可言——
+// 它們不是連結，是 fetch 的目標。但同一個問題仍然存在，
+// 而且形式一模一樣：端點寫好了、放在那裡、沒有任何程式碼在呼叫它。
+//
+// `/login` 曾經躺了兩個 Phase 沒人進得去，靠的是【8】才發現。
+// 這一條是同一個教訓在 API 上的版本。
+console.log("\n【9】API 端點的接線");
+
+const apiRoutes = disk.filter((route) => route.startsWith("/api/"));
+
+if (apiRoutes.length === 0) {
+  pass("目前沒有 API 端點");
+} else {
+  /*
+   * ⚠️ 先把註解拿掉再找。
+   *
+   * 第一版是直接對整份原始碼做 `includes("/api/agent")`，結果它「通過」了——
+   * 因為 schema.ts 的註解裡寫著「`/api/agent` 是公開端點」。
+   * 一條在沒有任何呼叫端的情況下仍然顯示綠色的檢查，比沒有這條檢查更糟：
+   * 它會讓人以為已經檢查過了。
+   *
+   * 行註解只在 `//` 前面不是冒號時才移除，才不會把 https:// 從字串裡切掉。
+   */
+  const stripComments = (source) =>
+    source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+
+  const sources = [];
+  const collectSources = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const next = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) collectSources(next);
+      else if (/\.tsx?$/.test(entry.name) && !next.includes("/api/"))
+        sources.push(stripComments(readFileSync(next, "utf8")));
+    }
+  };
+  collectSources("src");
+
+  const haystack = sources.join("\n");
+
+  for (const route of apiRoutes) {
+    // 必須出現在字串字面值裡——那才是「有人在呼叫」的形狀。
+    const called = new RegExp(`["'\`]${route.replace(/[/]/g, "\\/")}["'\`]`).test(haystack);
+
+    if (called) {
+      pass(`${route} 有程式碼呼叫`);
+    } else {
+      warn(`${route} 沒有任何程式碼呼叫`, "端點做好了但還沒接上畫面");
+    }
+  }
 }
 
 // ── 總結 ───────────────────────────────────────────────────────

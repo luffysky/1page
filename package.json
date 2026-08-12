@@ -33,6 +33,7 @@
     "audit:wiring": "node scripts/audit-wiring.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.116.0",
     "@aws-sdk/client-s3": "^3.1106.0",
     "@aws-sdk/s3-request-presigner": "^3.1106.0",
     "@supabase/ssr": "^0.12.4",
