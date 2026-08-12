@@ -93,6 +93,8 @@ export type AgentStreamEvent =
   | { type: "delta"; text: string }
   /** Agent 改了預覽（Spec §21）。client 收到後套用到同一個 preview context */
   | { type: "preview"; patch: Record<string, unknown> }
+  /** Agent 問到的需求（Spec §30）。client 存起來讓 /start 不用重填 */
+  | { type: "lead"; lead: Record<string, unknown> }
   | { type: "done"; stopReason: string | null; outputTokens: number }
   | { type: "error"; code: AgentErrorCode; message: string };
 

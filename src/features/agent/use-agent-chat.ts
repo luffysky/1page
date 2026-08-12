@@ -35,9 +35,11 @@ export function useAgentChat(
     draft?: Record<string, unknown>;
     /** Agent 改了預覽時呼叫。套用的動作由呼叫端做——狀態的擁有者是 preview context */
     onPreviewPatch?: (patch: Record<string, unknown>) => void;
+    /** Agent 問到的需求（Spec §30）。呼叫端負責存起來讓 /start 帶入 */
+    onLeadContext?: (lead: Record<string, unknown>) => void;
   } = {},
 ): AgentChatState {
-  const { initialIntent, draft, onPreviewPatch } = options;
+  const { initialIntent, draft, onPreviewPatch, onLeadContext } = options;
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [error, setError] = useState<AgentChatState["error"]>(null);
   const [isStreaming, setStreaming] = useState(false);
@@ -122,6 +124,8 @@ export function useAgentChat(
               // 等講完的話，訪客會先讀到「我幫你換成暖色調了」，
               // 然後盯著沒動的畫面等一兩秒。
               onPreviewPatch?.(event.patch);
+            } else if (event.type === "lead") {
+              onLeadContext?.(event.lead);
             } else if (event.type === "error") {
               // 串流中的錯誤不會清掉已經收到的字：那些內容仍然有用。
               // 錯誤另外顯示，讓人知道後面沒有了。
@@ -147,7 +151,7 @@ export function useAgentChat(
         );
       }
     },
-    [draft, initialIntent, messages, onPreviewPatch],
+    [draft, initialIntent, messages, onLeadContext, onPreviewPatch],
   );
 
   return {

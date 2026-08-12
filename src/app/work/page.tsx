@@ -1,3 +1,4 @@
+import { TrackPageView } from "@/components/analytics/page-view";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -59,6 +60,8 @@ export default async function WorkPage({ searchParams }: PageProps<"/work">) {
 
   return (
     <>
+      {/* Spec §31 */}
+      <TrackPageView event="portfolio_viewed" />
       <Navbar
         adminEntry={adminEntry}
         links={NAV_LINKS}

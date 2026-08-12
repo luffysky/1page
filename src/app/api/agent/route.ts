@@ -30,6 +30,9 @@ import { getAnthropicClient } from "@/lib/ai/anthropic";
 // 串流回應不可被快取，也不該被靜態化。
 export const dynamic = "force-dynamic";
 
+/** 這兩個工具的輸入就是「目前問到的需求」（Spec §19 / §30） */
+const LEAD_CONTEXT_TOOLS = new Set(["collect_requirement", "create_lead_summary"]);
+
 function errorResponse(
   code: AgentErrorCode,
   status: number,
@@ -200,7 +203,14 @@ export async function POST(request: Request): Promise<Response> {
             })),
           );
 
-          for (const { result } of executed) {
+          for (const { call, result } of executed) {
+            // Spec §30：Agent 問到的需求要能帶到 Project Builder。
+            // 送的是模型傳進工具的那份，不是工具的回傳值——
+            // 前者才是「他到目前為止講了什麼」。
+            if (!result.isError && LEAD_CONTEXT_TOOLS.has(call.name)) {
+              send({ type: "lead", lead: call.input as Record<string, unknown> });
+            }
+
             // 預覽的變更立刻送出去，不等這一輪講完（Spec §21）。
             // 等講完才更新的話，訪客會先讀到「我幫你換成暖色調了」，
             // 然後盯著沒動的畫面等一兩秒。

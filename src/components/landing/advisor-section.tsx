@@ -3,6 +3,7 @@
 import { AgentChat } from "@/components/agent/agent-chat";
 import { useAgentHandoff } from "@/features/agent/handoff";
 import { useHomeGoal } from "@/features/home/goal-context";
+import { saveLeadContext } from "@/features/leads/context-store";
 import { useSitePreview } from "@/features/website-engine/preview-context";
 
 /**
@@ -44,6 +45,11 @@ export function AdvisorSection() {
          */
         previewDraft={{ ...draft }}
         onPreviewPatch={applyPatch}
+        /*
+         * Spec §30：Agent 問到的需求要能帶到 Project Builder。
+         * 存起來而不是直接送出——他還沒說要留下資料。
+         */
+        onLeadContext={(lead) => saveLeadContext(lead as never)}
       />
     </div>
   );

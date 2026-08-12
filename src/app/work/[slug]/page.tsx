@@ -1,3 +1,5 @@
+import { TrackPageView } from "@/components/analytics/page-view";
+import { TrackedExternalLink } from "@/components/analytics/tracked-external-link";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -86,6 +88,9 @@ export default async function WorkDetailPage({ params }: PageProps<"/work/[slug]
 
   return (
     <>
+      {/* Spec §31。掛在詳細頁而不是列表的連結上——
+          直接從搜尋進來的人也該被算到。 */}
+      <TrackPageView event="portfolio_project_opened" payload={{ slug: project.slug }} />
       <Navbar
         adminEntry={adminEntry}
         links={NAV_LINKS}
@@ -138,12 +143,15 @@ export default async function WorkDetailPage({ params }: PageProps<"/work/[slug]
             <ul className="mt-8 flex flex-wrap gap-3">
               {links.map(([kind, href]) => (
                 <li key={kind}>
-                  <a
+                  {/* Spec §31 portfolio_live_demo_clicked */}
+                  <TrackedExternalLink
                     href={href}
+                    event="portfolio_live_demo_clicked"
+                    payload={{ slug: project.slug, kind }}
                     className="border-brand-ink text-body-sm inline-flex rounded-pill border px-5 py-2.5 font-bold"
                   >
                     {kind === "live" ? "Live Site" : kind === "demo" ? "Live Demo" : kind} ↗
-                  </a>
+                  </TrackedExternalLink>
                 </li>
               ))}
             </ul>

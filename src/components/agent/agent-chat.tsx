@@ -2,6 +2,8 @@
 
 import { useId, useState } from "react";
 
+import { WorkshopGate } from "@/components/workshop/workshop-gate";
+
 import type { AgentHandoff } from "@/features/agent/handoff";
 import { AGENT_LIMITS } from "@/features/agent/config";
 import { useAgentChat } from "@/features/agent/use-agent-chat";
@@ -29,6 +31,7 @@ export function AgentChat({
   handoff = null,
   previewDraft,
   onPreviewPatch,
+  onLeadContext,
 }: {
   initialIntent?: string;
   /** Template Experience 交接過來的設定（Spec §8.15） */
@@ -38,14 +41,18 @@ export function AgentChat({
   previewDraft?: Record<string, unknown>;
   /** Agent 改了預覽時呼叫 */
   onPreviewPatch?: (patch: Record<string, unknown>) => void;
+  /** Agent 問到需求時呼叫（Spec §30） */
+  onLeadContext?: (lead: Record<string, unknown>) => void;
 }) {
   const { messages, error, isStreaming, remainingMessages, send, stop } = useAgentChat({
     initialIntent,
     draft: previewDraft,
     onPreviewPatch,
+    onLeadContext,
   });
 
   const [draft, setDraft] = useState("");
+  const [gateOpen, setGateOpen] = useState(false);
   const inputId = useId();
 
   const atLimit = remainingMessages <= 0;
@@ -190,6 +197,24 @@ export function AgentChat({
             </button>
           )}
         </div>
+
+        <div className="border-brand-line mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 border-t pt-4">
+          {/*
+           * Spec §23 的界線做成一個看得到的入口，而不是等訪客撞牆。
+           * 撞牆的版本是：他要求「幫我把文案寫好」，AI 說不行，
+           * 而他不知道那件事到底能不能做、要多少錢。
+           */}
+          <p className="text-body-sm text-brand-muted">想讓 AI 直接開始排版面、寫文案？</p>
+          <button
+            type="button"
+            onClick={() => setGateOpen(true)}
+            className="border-brand-ink text-body-sm rounded-pill hover:bg-brand-ink hover:text-brand-on-ink border px-4 py-2 font-bold transition-colors"
+          >
+            看 Website Workshop
+          </button>
+        </div>
+
+        <WorkshopGate open={gateOpen} onClose={() => setGateOpen(false)} />
 
         <p className="text-caption text-brand-muted mt-2">
           {tooLong

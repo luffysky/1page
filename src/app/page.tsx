@@ -1,3 +1,4 @@
+import { TrackPageView } from "@/components/analytics/page-view";
 import { AdvisorSection } from "@/components/landing/advisor-section";
 import { GoalSelector } from "@/components/landing/goal-selector";
 import { Hero } from "@/components/landing/hero";
@@ -62,7 +63,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
           <Navbar
             adminEntry={adminEntry}
             links={NAV_LINKS}
-            cta={{ label: "開始一個專案 ↗", href: "#contact" }}
+            cta={{ label: "開始一個專案 ↗", href: "/start" }}
           />
 
           <main id="top">
@@ -85,6 +86,8 @@ export default async function Home({ searchParams }: PageProps<"/">) {
             </div>
 
             <div id="advisor">
+              {/* Spec §31：免費顧問沒有另外的開關，對話區出現就算開啟過 */}
+              <TrackPageView event="agent_opened" />
               <EditorialSection {...SECTION_COPY.advisor}>
                 <AdvisorSection />
               </EditorialSection>
@@ -99,6 +102,8 @@ export default async function Home({ searchParams }: PageProps<"/">) {
             </div>
 
             <div id="pricing">
+              {/* Spec §31 */}
+              <TrackPageView event="pricing_viewed" />
               <EditorialSection {...SECTION_COPY.pricing}>
                 <PricingLadder />
               </EditorialSection>

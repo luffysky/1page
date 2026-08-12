@@ -72,6 +72,10 @@ function Card({ item, featured }: { item: PortfolioCard; featured: boolean }) {
       <div className="from-brand-ink/85 text-brand-on-ink absolute inset-x-0 bottom-0 bg-gradient-to-t to-transparent p-6">
         <p className="text-caption opacity-80">{item.kicker}</p>
         <h3 className="text-heading-1 mt-1.5">
+          {/*
+           * 這裡刻意不記事件。portfolio_project_opened 掛在詳細頁本身——
+           * 記在連結上的話，直接從搜尋結果進到詳細頁的人不會被算到。
+           */}
           <Link href={item.href} className="after:absolute after:inset-0">
             {item.title}
           </Link>

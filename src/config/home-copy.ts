@@ -76,5 +76,7 @@ export const FINAL_CTA_COPY = {
   /** 轉換前最後一句話，斷點依句意而非依剩餘寬度 */
   titleLines: ["你不需要", "先知道怎麼做。"],
   lead: "只需要告訴我們，你想完成什麼。",
-  cta: { label: "開始一個專案", href: "/#contact" },
+  // 指向 Project Builder（Spec §30）。7B 之前這裡指回 #contact 自己，
+  // 也就是「按了什麼都沒發生」——那條連結存在的目的正是要有下一步。
+  cta: { label: "開始一個專案", href: "/start" },
 } as const;
