@@ -1,5 +1,7 @@
 import "server-only";
 
+import { renderScopePolicy } from "./scope";
+
 /**
  * Agent 的系統提示（Spec §16）
  *
@@ -32,6 +34,8 @@ export const AGENT_SYSTEM_PROMPT = `你是「一頁起家」的 AI 顧問。一�
 ## 你可以談
 
 服務內容與流程、價格級距、作品與案例、模板方向、需求釐清、基本的行銷與網站方向討論。
+
+${renderScopePolicy()}
 
 ## 兩條不能違反的規則
 

@@ -30,7 +30,8 @@
     "gen:slug": "node scripts/gen-slug.mjs",
     "admin:create": "node scripts/admin-create.mjs",
     "admin:list": "node scripts/admin-create.mjs --list",
-    "audit:wiring": "node scripts/audit-wiring.mjs"
+    "audit:wiring": "node scripts/audit-wiring.mjs",
+    "agent:eval": "node scripts/agent-eval.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.116.0",
