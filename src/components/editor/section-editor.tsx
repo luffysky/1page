@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { ContentPanel } from "@/components/editor/content-panel";
 import { SectionWidget } from "@/components/editor/section-widget";
 import { useSitePreview } from "@/features/website-engine/preview-context";
 import { addableSectionTypes, SECTION_LABELS } from "@/features/website-engine/section-presets";
@@ -30,7 +31,17 @@ import { SiteRenderer } from "@/features/website-engine/site-renderer";
  */
 
 export function SectionEditor() {
-  const { config, sectionsEdited, resetSections, moveSection, addSection } = useSitePreview();
+  const {
+    config,
+    sectionsEdited,
+    resetSections,
+    moveSection,
+    addSection,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+  } = useSitePreview();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drag, setDrag] = useState<{ from: string | null; over: string | null }>({
     from: null,
@@ -39,6 +50,7 @@ export function SectionEditor() {
 
   const total = config.sections.length;
   const ids = config.sections.map((section) => section.id);
+  const selected = config.sections.find((section) => section.id === selectedId) ?? null;
 
   /*
    * 拖放最後也是呼叫 moveSection，一次一步走到定位。
@@ -71,18 +83,41 @@ export function SectionEditor() {
           點一下任何一塊來選取，然後用 ↑ ↓ 搬動它。共 {total} 塊。
         </p>
 
-        {sectionsEdited ? (
+        <div className="flex flex-wrap items-center gap-2">
+          {/*
+           * 復原／重做。刪錯一塊原本只能「回到模板原樣」——那等於全部重來，
+           * 排了十分鐘的人不敢按任何一顆看起來會刪東西的按鈕。
+           */}
           <button
             type="button"
-            onClick={() => {
-              resetSections();
-              setSelectedId(null);
-            }}
-            className="border-brand-line text-body-sm rounded-pill border px-4 py-2 font-bold"
+            onClick={undo}
+            disabled={!canUndo}
+            className="border-brand-line text-body-sm rounded-pill border px-4 py-2 font-bold disabled:opacity-40"
           >
-            回到模板原樣
+            ↺ 復原
           </button>
-        ) : null}
+          <button
+            type="button"
+            onClick={redo}
+            disabled={!canRedo}
+            className="border-brand-line text-body-sm rounded-pill border px-4 py-2 font-bold disabled:opacity-40"
+          >
+            ↻ 重做
+          </button>
+
+          {sectionsEdited ? (
+            <button
+              type="button"
+              onClick={() => {
+                resetSections();
+                setSelectedId(null);
+              }}
+              className="border-brand-line text-body-sm rounded-pill border px-4 py-2 font-bold"
+            >
+              回到模板原樣
+            </button>
+          ) : null}
+        </div>
       </div>
 
       <details className="border-brand-line mb-4 rounded-lg border p-4">
@@ -109,38 +144,54 @@ export function SectionEditor() {
        * 捲動容器要能用鍵盤操作，理由與首頁預覽相同：
        * 只有滑鼠捲得動的區塊，鍵盤使用者看不到下半部（axe serious）。
        */}
-      <div
-        tabIndex={0}
-        role="group"
-        aria-label="網站編輯區"
-        className="border-brand-line max-h-[42rem] overflow-y-auto rounded-lg border"
-      >
-        <SiteRenderer
-          config={config}
-          wrapSection={(section, index, rendered) => (
-            <SectionWidget
-              id={section.id}
-              label={SECTION_LABELS[section.type] ?? section.type}
-              index={index}
-              total={total}
-              selected={selectedId === section.id}
-              onSelect={setSelectedId}
-              dragging={drag.from === section.id}
-              dropTarget={
-                drag.over === section.id && drag.from !== null && drag.from !== section.id
-              }
-              onDragState={(from, over) =>
-                setDrag((current) => ({
-                  from: from ?? current.from,
-                  over: over ?? (from ? null : current.over),
-                }))
-              }
-              onDrop={handleDrop}
-            >
-              {rendered}
-            </SectionWidget>
-          )}
-        />
+      {/*
+       * 窄螢幕上下堆疊、寬螢幕左右並排。
+       *
+       * 手機上把編輯面板擠在旁邊只會讓兩邊都不能用；
+       * 堆疊之後預覽在上、正在改的欄位在下，捲一下就看得到結果。
+       */}
+      <div className="grid gap-5 lg:grid-cols-[1fr_20rem] lg:items-start">
+        <div
+          tabIndex={0}
+          role="group"
+          aria-label="網站編輯區"
+          className="border-brand-line max-h-[42rem] overflow-y-auto rounded-lg border"
+        >
+          <SiteRenderer
+            config={config}
+            wrapSection={(section, index, rendered) => (
+              <SectionWidget
+                id={section.id}
+                label={SECTION_LABELS[section.type] ?? section.type}
+                index={index}
+                total={total}
+                selected={selectedId === section.id}
+                onSelect={setSelectedId}
+                dragging={drag.from === section.id}
+                dropTarget={
+                  drag.over === section.id && drag.from !== null && drag.from !== section.id
+                }
+                onDragState={(from, over) =>
+                  setDrag((current) => ({
+                    from: from ?? current.from,
+                    over: over ?? (from ? null : current.over),
+                  }))
+                }
+                onDrop={handleDrop}
+              >
+                {rendered}
+              </SectionWidget>
+            )}
+          />
+        </div>
+
+        {selected ? (
+          <ContentPanel key={selected.id} section={selected} />
+        ) : (
+          <p className="border-brand-line text-body-sm text-brand-muted rounded-lg border border-dashed p-4">
+            選一塊來編輯它的文字與排版。
+          </p>
+        )}
       </div>
     </div>
   );

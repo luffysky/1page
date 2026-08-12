@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { SaveBar } from "@/components/editor/save-bar";
 import { SectionEditor } from "@/components/editor/section-editor";
 import { Navbar, type NavLink } from "@/components/shared/navbar";
 import { SiteFooter } from "@/components/shared/site-footer";
@@ -54,6 +55,7 @@ export default async function EditPage() {
             <TemplatePicker templates={templates} />
             <PreviewControls />
             <SectionEditor />
+            <SaveBar signedIn={accountEntry !== null} />
           </div>
         </SitePreviewProvider>
       </main>

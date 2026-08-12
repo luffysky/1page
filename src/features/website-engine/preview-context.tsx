@@ -15,7 +15,13 @@ import {
   type ThemeId,
   type WebsiteTemplate,
 } from "./templates";
-import { addSection, removeSection, reorderSections } from "./section-ops";
+import {
+  addSection,
+  removeSection,
+  reorderSections,
+  setSectionVariant,
+  updateSectionContent,
+} from "./section-ops";
 import { newSection } from "./section-presets";
 import { siteSectionSchema, type SiteSection } from "./schema";
 import type { Device, SiteConfig } from "./types";
@@ -67,6 +73,18 @@ interface PreviewState {
    * 「動過但剛好長得一樣」分得出來，換模板時才知道該不該覆蓋。
    */
   sections: SiteSection[] | null;
+  /**
+   * 復原用的歷史（CR-003-4 第四段）。
+   *
+   * 只記 sections，不記整個 state——復原的是「我剛剛動的那一下」，
+   * 不是「換過的主題色」。把主題也塞進歷史的話，按一次復原會同時
+   * 把顏色改回去，那不是使用者按那顆按鈕時想要的。
+   *
+   * 存在 state 裡而不是元件裡，是因為 reducer 是唯一會改 sections 的地方。
+   * 放在元件裡就得在每個呼叫點記得推一筆，而漏掉的那個就是
+   * 「這一步復原不了」——沒有任何徵兆。
+   */
+  history: { past: (SiteSection[] | null)[]; future: (SiteSection[] | null)[] };
 }
 
 type PreviewAction =
@@ -81,9 +99,84 @@ type PreviewAction =
   | { type: "move-section"; id: string; direction: "up" | "down" }
   | { type: "remove-section"; id: string }
   | { type: "add-section"; sectionType: SiteSection["type"]; afterId: string | null }
-  | { type: "reset-sections" };
+  | { type: "reset-sections" }
+  | { type: "update-content"; id: string; content: SiteSection["content"] }
+  | { type: "set-variant"; id: string; variant: string }
+  | { type: "undo" }
+  | { type: "redo" };
 
+/** 會改到 sections、因此要進歷史的動作 */
+const SECTION_ACTIONS = new Set([
+  "move-section",
+  "remove-section",
+  "add-section",
+  "update-content",
+  "set-variant",
+  "reset-sections",
+]);
+
+/** 歷史最多留這麼多步。無上限的話一直打字會把 sessionStorage 撐爆 */
+const MAX_HISTORY = 50;
+
+/**
+ * 在 reducer 外面包一層記錄歷史。
+ *
+ * ⚠️ 放在這裡而不是每個 case 裡面：漏掉任何一個 case 的後果是
+ * 「那一步復原不了」，而那件事不會報錯、測試也不會紅——
+ * 使用者按了復原，畫面跳回更早的狀態，他會以為復原壞了。
+ *
+ * 包一層之後，新增一種區塊操作只要把名字加進 SECTION_ACTIONS，
+ * 忘了加的表現是那一步不進歷史——仍然要靠測試抓，但至少
+ * 不必在每個 case 重複同一段程式。
+ */
 function reducer(state: PreviewState, action: PreviewAction): PreviewState {
+  if (action.type === "undo") {
+    const previous = state.history.past.at(-1);
+    if (previous === undefined) return state;
+
+    return {
+      ...state,
+      sections: previous,
+      history: {
+        past: state.history.past.slice(0, -1),
+        future: [state.sections, ...state.history.future].slice(0, MAX_HISTORY),
+      },
+    };
+  }
+
+  if (action.type === "redo") {
+    const next = state.history.future[0];
+    if (next === undefined) return state;
+
+    return {
+      ...state,
+      sections: next,
+      history: {
+        past: [...state.history.past, state.sections].slice(-MAX_HISTORY),
+        future: state.history.future.slice(1),
+      },
+    };
+  }
+
+  const result = baseReducer(state, action);
+
+  // 沒有真的改到 sections 就不記一筆——否則按了無效的操作
+  // （例如第一塊再往上移）也會多一步空的歷史，復原起來像卡住。
+  if (!SECTION_ACTIONS.has(action.type) || result.sections === state.sections) {
+    return result;
+  }
+
+  return {
+    ...result,
+    history: {
+      past: [...state.history.past, state.sections].slice(-MAX_HISTORY),
+      // 做了新動作就把 redo 清掉——分岔的歷史沒有人想得清楚
+      future: [],
+    },
+  };
+}
+
+function baseReducer(state: PreviewState, action: PreviewAction): PreviewState {
   switch (action.type) {
     case "restore":
       // device 不還原：那是「現在想怎麼看」，不是訪客累積的設定。
@@ -198,6 +291,20 @@ function reducer(state: PreviewState, action: PreviewAction): PreviewState {
       return result.ok ? { ...state, sections: result.config.sections } : state;
     }
 
+    case "update-content": {
+      const result = updateSectionContent(configOf(state), action.id, action.content);
+      /*
+       * 失敗就當作沒發生。最常見的失敗是使用者貼進了含 HTML 標籤的字
+       * （schema 的 plainText 擋下來），那時畫面不變比顯示半套內容好。
+       */
+      return result.ok ? { ...state, sections: result.config.sections } : state;
+    }
+
+    case "set-variant": {
+      const result = setSectionVariant(configOf(state), action.id, action.variant);
+      return result.ok ? { ...state, sections: result.config.sections } : state;
+    }
+
     case "reset-sections":
       return { ...state, sections: null };
 
@@ -247,6 +354,14 @@ function reducer(state: PreviewState, action: PreviewAction): PreviewState {
 
       return { ...state, draft: next, edited };
     }
+
+    /*
+     * undo / redo 在上面那層就處理掉了，走不到這裡。
+     * 需要這個分支只是為了讓 switch 窮盡——TypeScript 認得 action 的聯集型別，
+     * 少一個分支它就會說「這個函式可能沒有回傳值」。
+     */
+    default:
+      return state;
   }
 }
 
@@ -353,7 +468,12 @@ function readStoredState(): PreviewState | null {
    * 不該存在的欄位。它不會報錯，只會讓 buildSiteConfig 收到多餘的東西。
    */
   const { edited, sections, ...draft } = result.data;
-  return { draft, edited, sections, device: "desktop" };
+  /*
+   * 歷史不存進 sessionStorage：存的是**結果**，不是過程。
+   * 存歷史的話回訪時可以「復原」到上一次瀏覽的中間狀態，
+   * 那對使用者來說沒有意義，而且會讓儲存量隨著編輯次數無上限成長。
+   */
+  return { draft, edited, sections, device: "desktop", history: { past: [], future: [] } };
 }
 
 function writeStoredState(state: PreviewState): void {
@@ -383,6 +503,12 @@ export interface SitePreviewValue extends PreviewState {
   moveSection: (id: string, direction: "up" | "down") => void;
   removeSection: (id: string) => void;
   addSection: (type: SiteSection["type"], afterId: string | null) => void;
+  undo: () => void;
+  redo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
+  updateContent: (id: string, content: SiteSection["content"]) => void;
+  setVariant: (id: string, variant: string) => void;
   resetSections: () => void;
   /** 有沒有動過區塊結構。用來決定要不要顯示「回到模板原樣」 */
   sectionsEdited: boolean;
@@ -406,6 +532,7 @@ export function SitePreviewProvider({
     device: "desktop" as Device,
     edited: { brandName: false, industry: false },
     sections: null,
+    history: { past: [], future: [] },
   }));
 
   /*
@@ -453,7 +580,13 @@ export function SitePreviewProvider({
       moveSection: (id, direction) => dispatch({ type: "move-section", id, direction }),
       removeSection: (id) => dispatch({ type: "remove-section", id }),
       addSection: (sectionType, afterId) => dispatch({ type: "add-section", sectionType, afterId }),
+      updateContent: (id, content) => dispatch({ type: "update-content", id, content }),
+      setVariant: (id, variant) => dispatch({ type: "set-variant", id, variant }),
       resetSections: () => dispatch({ type: "reset-sections" }),
+      undo: () => dispatch({ type: "undo" }),
+      redo: () => dispatch({ type: "redo" }),
+      canUndo: state.history.past.length > 0,
+      canRedo: state.history.future.length > 0,
       sectionsEdited: state.sections !== null,
     }),
     [state],

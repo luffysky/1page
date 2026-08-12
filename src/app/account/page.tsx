@@ -1,9 +1,13 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { Navbar, type NavLink } from "@/components/shared/navbar";
 import { SiteFooter } from "@/components/shared/site-footer";
 import { getAccountEntry, requireMember } from "@/features/account/auth";
 import { getAdminEntry } from "@/features/admin/auth";
+import { listSavedSites } from "@/features/website-engine/saved-sites";
+
+import { removeSavedSite } from "../edit/actions";
 
 import { signOut, updateDisplayName } from "./actions";
 
@@ -34,7 +38,11 @@ const NAV_LINKS: NavLink[] = [
 
 export default async function AccountPage() {
   const member = await requireMember("/account");
-  const [adminEntry, accountEntry] = await Promise.all([getAdminEntry(), getAccountEntry()]);
+  const [adminEntry, accountEntry, savedSites] = await Promise.all([
+    getAdminEntry(),
+    getAccountEntry(),
+    listSavedSites(),
+  ]);
 
   return (
     <>
@@ -99,6 +107,52 @@ export default async function AccountPage() {
               儲存
             </button>
           </form>
+        </section>
+
+        {/*
+         * 存下來的網站。
+         *
+         * 沒有這一段的話，「存到我的帳號」就是又一個
+         * 「做好了但畫面上進不去」——存進資料庫，然後永遠找不到。
+         */}
+        <section className="border-brand-line mt-6 rounded-lg border p-6">
+          <h2 className="text-heading-2">存下來的網站</h2>
+
+          {savedSites.length === 0 ? (
+            <p className="text-body-sm text-brand-muted mt-2">
+              還沒有。到{" "}
+              <Link href="/edit" className="underline">
+                自己排版
+              </Link>{" "}
+              排一個，排好可以存下來。
+            </p>
+          ) : (
+            <ul className="mt-4 flex flex-col gap-3">
+              {savedSites.map((site) => (
+                <li
+                  key={site.id}
+                  className="border-brand-line flex flex-wrap items-center justify-between gap-3 rounded-md border p-3"
+                >
+                  <div>
+                    <p className="text-body font-bold">{site.name}</p>
+                    <p className="text-caption text-brand-muted mt-0.5">
+                      最後更新 {new Date(site.updatedAt).toLocaleString("zh-TW")}
+                    </p>
+                  </div>
+
+                  <form action={removeSavedSite}>
+                    <input type="hidden" name="id" value={site.id} />
+                    <button
+                      type="submit"
+                      className="border-brand-line text-body-sm rounded-pill border px-4 py-2 font-bold"
+                    >
+                      刪除
+                    </button>
+                  </form>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
 
         <section className="border-brand-line mt-6 rounded-lg border p-6">

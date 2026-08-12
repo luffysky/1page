@@ -193,6 +193,40 @@ test.describe("區塊編輯器", () => {
     await expect(page.getByText("常見問題").last()).toBeVisible();
   });
 
+  test("改文字，預覽跟著變", async ({ page }) => {
+    /*
+     * 內容面板是照著「值目前的形狀」產生欄位的，不是每種區塊手寫一份表單。
+     * 手寫的話那是第二份 schema，它與元件實際讀的欄位遲早分歧——
+     * 分歧的表現是「改了某個欄位，畫面沒反應」。所以這條驗的是
+     * **改了之後預覽真的跟著變**，不是「表單上有那個欄位」。
+     */
+    await page.locator("[data-section-widget]").first().getByRole("group").first().click();
+
+    await page.getByLabel("標題", { exact: true }).first().fill("這是我改的標題");
+
+    await expect(page.locator("[data-section-widget='hero']")).toContainText("這是我改的標題");
+  });
+
+  test("換排版不會弄丟已經改過的字", async ({ page }) => {
+    // 換排版換的是版面，不是內容。掉字的話使用者不敢再按第二次
+    await page.locator("[data-section-widget]").first().getByRole("group").first().click();
+    await page.getByLabel("標題", { exact: true }).first().fill("換排版也要留著");
+
+    await page.getByRole("button", { name: "minimal", exact: true }).click();
+
+    await expect(page.locator("[data-section-widget='hero']")).toContainText("換排版也要留著");
+  });
+
+  test("只列這個區塊真的有的排版", async ({ page }) => {
+    // setSectionVariant 會拒絕不存在的 variant，而使用者只看得到「按了沒反應」
+    await page.locator("[data-section-widget]").first().getByRole("group").first().click();
+
+    const buttons = await page
+      .getByRole("button", { name: /^(centered|editorial|minimal)$/ })
+      .count();
+    expect(buttons).toBe(3);
+  });
+
   test("axe 沒有 critical/serious，選取後也一樣", async ({ page }) => {
     const scan = async () => {
       const results = await new AxeBuilder({ page })
