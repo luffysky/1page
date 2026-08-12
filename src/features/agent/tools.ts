@@ -5,10 +5,14 @@ import { z } from "zod";
 import { searchFaq } from "@/config/faq";
 import { ALL_CATEGORIES, PORTFOLIO_CATEGORIES } from "@/config/portfolio-categories";
 import { HOME_GOAL_IDS, homeGoalSchema } from "@/config/home-goals";
+import { createLead } from "@/features/leads/repository";
+import { hasContactChannel, leadSchema, missingLeadFields } from "@/features/leads/schema";
 import { getPortfolioRepository } from "@/features/portfolio";
 import type { PortfolioListItem } from "@/features/portfolio/repository";
 import { PROJECT_TYPE_LABELS } from "@/features/portfolio/project-type";
 import { listTemplates } from "@/features/website-engine/templates";
+
+import { estimatePriceRange } from "./estimate";
 
 /**
  * Agent 知識工具（Spec §20 白名單 / §8.12）
@@ -77,6 +81,12 @@ const searchFaqInput = z.object({
   query: z.string().min(1).max(200),
 });
 
+const estimateInput = z.object({
+  needsCustomSections: z.boolean().optional(),
+  needsStrategy: z.boolean().optional(),
+  hasBrandGuideline: z.boolean().optional(),
+});
+
 /**
  * 送給模型的工具定義。
  *
@@ -122,6 +132,130 @@ export const AGENT_TOOLS = [
       type: "object" as const,
       properties: {
         category: { type: "string", description: "模板分類，例如 web 或 product；不確定時省略" },
+      },
+    },
+  },
+  {
+    name: "collect_requirement",
+    description:
+      "整理目前為止問到的需求。對方講出他的狀況、目標、時程或預算之後呼叫，" +
+      "會回傳「還缺什麼」，讓你知道下一句該問什麼。這個工具不會存檔，只是幫你整理。",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        contact: {
+          type: "object",
+          properties: {
+            name: { type: "string" },
+            email: { type: "string" },
+            phone: { type: "string" },
+          },
+        },
+        business: {
+          type: "object",
+          properties: {
+            name: { type: "string" },
+            industry: { type: "string" },
+            description: { type: "string" },
+          },
+        },
+        requirement: {
+          type: "object",
+          properties: {
+            service: { type: "array", items: { type: "string" } },
+            goal: { type: "string" },
+            deadline: { type: "string" },
+            budgetRange: { type: "string" },
+          },
+        },
+        assets: {
+          type: "object",
+          properties: {
+            logo: { type: "boolean" },
+            photos: { type: "boolean" },
+            copy: { type: "boolean" },
+            instagram: { type: "string" },
+            existingWebsite: { type: "string" },
+          },
+        },
+      },
+    },
+  },
+  {
+    name: "create_lead_summary",
+    description:
+      "把需求存下來，讓真人可以回覆。**要在對方已經給了信箱或電話、而且他同意留下資料之後才呼叫**，" +
+      "一段對話只呼叫一次。沒有聯絡方式的話不要呼叫——存下來也聯絡不到人。",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        contact: {
+          type: "object",
+          properties: {
+            name: { type: "string" },
+            email: { type: "string" },
+            phone: { type: "string" },
+          },
+        },
+        business: {
+          type: "object",
+          properties: {
+            name: { type: "string" },
+            industry: { type: "string" },
+            description: { type: "string" },
+          },
+        },
+        requirement: {
+          type: "object",
+          properties: {
+            service: { type: "array", items: { type: "string" } },
+            goal: { type: "string" },
+            deadline: { type: "string" },
+            budgetRange: { type: "string" },
+          },
+        },
+        assets: {
+          type: "object",
+          properties: {
+            logo: { type: "boolean" },
+            photos: { type: "boolean" },
+            copy: { type: "boolean" },
+            instagram: { type: "string" },
+            existingWebsite: { type: "string" },
+          },
+        },
+        website: {
+          type: "object",
+          properties: {
+            // 兩個欄位很容易互填。實測時模型把模板名「Local Business」
+            // 放進了 preferredTheme——不會壞，但後台看到的分類就錯了。
+            selectedTemplate: {
+              type: "string",
+              description: "模板名稱，例如 Studio、Local Business、Personal、Product",
+            },
+            preferredTheme: {
+              type: "string",
+              description: "風格，只有三種：暖一點、精品一點、更極簡",
+            },
+          },
+        },
+      },
+    },
+  },
+  {
+    name: "estimate_price_range",
+    description:
+      "推估這個需求落在價格階梯的哪一級。問清楚客製程度、有沒有既有品牌規範、" +
+      "要不要連策略內容一起做之後呼叫，不要自己判斷落點。回傳的是區間與理由，不是報價。",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        needsCustomSections: {
+          type: "boolean",
+          description: "要不要模板沒有的區塊，或版面要照品牌重新調整",
+        },
+        needsStrategy: { type: "boolean", description: "要不要連策略、內容、成效追蹤一起處理" },
+        hasBrandGuideline: { type: "boolean", description: "有沒有既有的品牌規範可以延用" },
       },
     },
   },
@@ -242,6 +376,58 @@ export async function executeAgentTool(name: string, input: unknown): Promise<Ag
                 ? "沒有這條資料。要說不確定，並提議留下聯絡方式由真人回覆——不要自己補一個答案。"
                 : "照這裡的內容回答，不要加上沒寫的細節。",
           }),
+          isError: false,
+        };
+      }
+
+      case "collect_requirement": {
+        const parsed = leadSchema.safeParse(input);
+        if (!parsed.success) return fail("需求格式不正確");
+
+        const missing = missingLeadFields(parsed.data);
+
+        return {
+          content: JSON.stringify({
+            collected: parsed.data,
+            missing,
+            hint:
+              missing.length === 0
+                ? "資訊夠了。問對方願不願意留下來讓真人回覆，他同意再呼叫 create_lead_summary。"
+                : "還缺上面這幾項。一次問一到兩個，不要列成清單要他填。",
+          }),
+          isError: false,
+        };
+      }
+
+      case "create_lead_summary": {
+        const parsed = leadSchema.safeParse(input);
+        if (!parsed.success) return fail("需求格式不正確");
+
+        if (!hasContactChannel(parsed.data)) {
+          // 沒有聯絡方式的 lead 是一段無法回覆的獨白。
+          // 直接告訴模型缺什麼，它才問得下去。
+          return fail("沒有聯絡方式（信箱或電話），還不能存。先問到再呼叫一次。");
+        }
+
+        const record = await createLead(parsed.data);
+        if (!record) return fail("這次沒有存成功。請對方直接用信箱聯絡，不要說已經記下來了。");
+
+        return {
+          content: JSON.stringify({
+            saved: true,
+            leadId: record.id,
+            hint: "已經存下來了。告訴對方會有真人回覆，不要承諾時間。",
+          }),
+          isError: false,
+        };
+      }
+
+      case "estimate_price_range": {
+        const parsed = estimateInput.safeParse(input);
+        if (!parsed.success) return fail("參數不正確");
+
+        return {
+          content: JSON.stringify(estimatePriceRange(parsed.data)),
           isError: false,
         };
       }

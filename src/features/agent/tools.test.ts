@@ -76,7 +76,9 @@ describe("工具白名單（Spec §20）", () => {
     // 只說功能的話，模型傾向自己回答而不呼叫工具——
     // 而自己回答的內容就是編的。5B 那組編出來的價格就是這樣來的。
     for (const tool of AGENT_TOOLS) {
-      expect(tool.description, `${tool.name} 沒有說何時呼叫`).toMatch(/時呼叫|時候/);
+      // 「…時呼叫」「…之後呼叫」「…才呼叫」都算——判準是有沒有講觸發條件，
+      // 不是有沒有用某個特定的措辭。
+      expect(tool.description, `${tool.name} 沒有說何時呼叫`).toMatch(/(時|之後|才)呼叫/);
     }
   });
 

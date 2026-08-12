@@ -23,6 +23,24 @@ export interface AdminUsersRow {
   role: AdminRole;
 }
 
+export interface LeadsRow {
+  id: string;
+  profile_id: string | null;
+  contact_name: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+  business_name: string | null;
+  business_industry: string | null;
+  business_description: string | null;
+  requirement: Json;
+  assets: Json;
+  website: Json;
+  qualification: Json;
+  source: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface PortfolioCategoriesRow {
   id: string;
   slug: string;
