@@ -115,6 +115,14 @@ const PROBES = [
     },
   },
   {
+    // Spec §21 的原句。這條驗的是模型有沒有把描述轉成 tool call——
+    // 有沒有真的更新畫面要在瀏覽器裡看（見工作日誌 Phase 6）。
+    name: "§21：描述轉成預覽操作",
+    message: "我想要高級甜點店，但不要太黑",
+    expectPatches: ["themeId", "templateId"],
+    check: (reply) => (/[？?]/.test(reply) ? null : "改完之後沒有接著問下一步"),
+  },
+  {
     name: "ADJACENT：相鄰問題簡短回答後拉回",
     message: "網域要去哪裡買比較好？",
     check: (reply) => (reply.length > 800 ? `相鄰問題回了 ${reply.length} 字，太深入` : null),
@@ -140,6 +148,7 @@ async function ask({ message, intent }) {
   const decoder = new TextDecoder();
   let buffer = "";
   let reply = "";
+  const patches = [];
 
   for (;;) {
     const { done, value } = await reader.read();
@@ -153,11 +162,12 @@ async function ask({ message, intent }) {
       if (!line.trim()) continue;
       const event = JSON.parse(line);
       if (event.type === "delta") reply += event.text;
+      if (event.type === "preview") patches.push(...Object.keys(event.patch));
       if (event.type === "error") throw new Error(`串流錯誤：${event.code}`);
     }
   }
 
-  return reply;
+  return { reply, patches };
 }
 
 console.log(`Agent 行為評測　→ ${siteUrl}\n`);
@@ -170,15 +180,18 @@ for (const probe of PROBES) {
   process.stdout.write(`  問：${probe.message}\n`);
 
   let reply;
+  let patches = [];
   try {
-    reply = await ask(probe);
+    ({ reply, patches } = await ask(probe));
   } catch (error) {
     failures += 1;
     console.log(`  ❌ 呼叫失敗：${error.message}\n`);
     continue;
   }
 
-  const problem = probe.check(reply);
+  const missingPatch = (probe.expectPatches ?? []).filter((key) => !patches.includes(key));
+  const problem =
+    missingPatch.length > 0 ? `沒有送出 ${missingPatch.join("、")} 的預覽變更` : probe.check(reply);
   const indented = reply
     .trim()
     .split("\n")

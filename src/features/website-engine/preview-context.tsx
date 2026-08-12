@@ -56,7 +56,8 @@ type PreviewAction =
   | { type: "set-accent"; accentId: AccentId }
   | { type: "set-brand-name"; value: string }
   | { type: "set-industry"; value: string }
-  | { type: "set-device"; device: Device };
+  | { type: "set-device"; device: Device }
+  | { type: "apply-patch"; patch: Record<string, unknown> };
 
 function reducer(state: PreviewState, action: PreviewAction): PreviewState {
   switch (action.type) {
@@ -104,8 +105,70 @@ function reducer(state: PreviewState, action: PreviewAction): PreviewState {
 
     case "set-device":
       return { ...state, device: action.device };
+
+    /*
+     * Agent 送過來的變更（Spec §21）。
+     *
+     * ⚠️ 走**同一個 reducer**，不是另外一條路徑。
+     * 「AI 改的」與「訪客自己按的」如果各有一套更新邏輯，兩者遲早會分歧——
+     * 而分歧的表現是「AI 換的模板不會保留我剛打的店名」。
+     *
+     * 內容當作不可信輸入：來源是模型的 tool call，經過 server 驗過一次，
+     * 但這裡是狀態的擁有者，該自己再確認一次。
+     */
+    case "apply-patch": {
+      const { patch } = action;
+
+      if (patch.reset === true) {
+        const template = getTemplate(state.draft.templateId);
+        // 重設回目前模板的原始樣子，包含被改過的品牌名——
+        // 「重來」的意思是全部重來，留一半下來更難理解。
+        return template
+          ? {
+              ...state,
+              draft: draftFromTemplate(template),
+              edited: { brandName: false, industry: false },
+            }
+          : state;
+      }
+
+      const next = { ...state.draft };
+      const edited = { ...state.edited };
+
+      if (typeof patch.templateId === "string" && getTemplate(patch.templateId)) {
+        const template = getTemplate(patch.templateId)!;
+        const defaults = draftFromTemplate(template);
+        // 與訪客自己換模板同樣的規則：改過的欄位保留，沒改過的跟著新模板走。
+        next.templateId = defaults.templateId;
+        next.themeId = defaults.themeId;
+        next.accentId = defaults.accentId;
+        if (!edited.brandName) next.brandName = defaults.brandName;
+        if (!edited.industry) next.industry = defaults.industry;
+      }
+
+      if (isThemeId(patch.themeId)) next.themeId = patch.themeId;
+      if (isAccentId(patch.accentId)) next.accentId = patch.accentId;
+
+      if (typeof patch.brandName === "string" && patch.brandName.trim()) {
+        next.brandName = patch.brandName;
+        edited.brandName = true;
+      }
+
+      if (typeof patch.industry === "string" && patch.industry.trim()) {
+        next.industry = patch.industry;
+        edited.industry = true;
+      }
+
+      return { ...state, draft: next, edited };
+    }
   }
 }
+
+const isThemeId = (value: unknown): value is ThemeId =>
+  typeof value === "string" && (THEME_IDS as readonly string[]).includes(value);
+
+const isAccentId = (value: unknown): value is AccentId =>
+  typeof value === "string" && (ACCENT_IDS as readonly string[]).includes(value);
 
 /* ------------------------------------------------------------------ */
 /* 跨頁保存（Spec §8.15「訪客累積的設定不會在跳轉時消失」）            */
@@ -183,6 +246,8 @@ export interface SitePreviewValue extends PreviewState {
   setBrandName: (value: string) => void;
   setIndustry: (value: string) => void;
   setDevice: (device: Device) => void;
+  /** Agent 送過來的變更（Spec §21）。走與訪客操作同一個 reducer */
+  applyPatch: (patch: Record<string, unknown>) => void;
 }
 
 const SitePreviewContext = createContext<SitePreviewValue | null>(null);
@@ -245,6 +310,7 @@ export function SitePreviewProvider({
       setBrandName: (value) => dispatch({ type: "set-brand-name", value }),
       setIndustry: (value) => dispatch({ type: "set-industry", value }),
       setDevice: (device) => dispatch({ type: "set-device", device }),
+      applyPatch: (patch) => dispatch({ type: "apply-patch", patch }),
     }),
     [state],
   );

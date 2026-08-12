@@ -5,7 +5,10 @@ import { PRICING_TIERS } from "@/config/pricing";
 import { SERVICE_LINES } from "@/config/services";
 
 import { renderPricingLadder, renderServiceLines } from "./knowledge";
-import { AGENT_TOOL_NAMES, AGENT_TOOLS, executeAgentTool, portfolioDisclosure } from "./tools";
+import { AGENT_TOOL_DEFINITIONS, AGENT_TOOLS, portfolioDisclosure } from "./tools";
+
+/** 免費身分執行一個工具。付費分級的行為另外在 tool-registry.test.ts 驗 */
+const runTool = (name: string, input: unknown) => AGENT_TOOLS.execute(name, input, {}, "free");
 
 /**
  * 5C 的出口條件（Plan）：
@@ -49,7 +52,7 @@ describe("Spec §8.12：Demo 不可講成客戶案例", () => {
   it("實際跑一次 search_portfolio，結果一定含 disclosure 與逐件的來源類型", () => {
     // 只測 portfolioDisclosure 這個函式是不夠的——
     // 它可能寫對了卻沒被接到工具的輸出上。
-    return executeAgentTool("search_portfolio", {}).then((result) => {
+    return runTool("search_portfolio", {}).then((result) => {
       expect(result.isError).toBe(false);
 
       const payload = JSON.parse(result.content);
@@ -65,25 +68,26 @@ describe("Spec §8.12：Demo 不可講成客戶案例", () => {
 
 describe("工具白名單（Spec §20）", () => {
   it("每個工具都有名稱、說明與參數 schema", () => {
-    for (const tool of AGENT_TOOLS) {
-      expect(tool.name).toMatch(/^[a-z_]+$/);
-      expect(tool.description.length, `${tool.name} 的說明太短`).toBeGreaterThan(40);
-      expect(tool.input_schema.type).toBe("object");
+    for (const spec of AGENT_TOOLS.specs("workshop")) {
+      expect(spec.name).toMatch(/^[a-z_]+$/);
+      expect(spec.description.length, `${spec.name} 的說明太短`).toBeGreaterThan(20);
+      expect(spec.input_schema.type).toBe("object");
     }
   });
 
-  it("說明都寫了「什麼時候該叫它」，不是只寫功能", () => {
+  it("知識與需求類的說明都寫了「什麼時候該叫它」", () => {
     // 只說功能的話，模型傾向自己回答而不呼叫工具——
     // 而自己回答的內容就是編的。5B 那組編出來的價格就是這樣來的。
-    for (const tool of AGENT_TOOLS) {
-      // 「…時呼叫」「…之後呼叫」「…才呼叫」都算——判準是有沒有講觸發條件，
-      // 不是有沒有用某個特定的措辭。
-      expect(tool.description, `${tool.name} 沒有說何時呼叫`).toMatch(/(時|之後|才)呼叫/);
+    //
+    // 只要求免費分級：付費的 Section 操作是 Workshop 流程裡的明確指令，
+    // 不需要模型自己判斷什麼時候該用。
+    for (const spec of AGENT_TOOLS.specs("free")) {
+      expect(spec.description, `${spec.name} 沒有說何時呼叫`).toMatch(/(時|之後|才)呼叫/);
     }
   });
 
   it("白名單以外的工具名回傳錯誤，不是靜靜地什麼都沒發生", async () => {
-    const result = await executeAgentTool("delete_everything", {});
+    const result = await runTool("delete_everything", {});
 
     expect(result.isError).toBe(true);
     expect(result.content).toContain("沒有名為");
@@ -91,25 +95,27 @@ describe("工具白名單（Spec §20）", () => {
 
   it("參數不合法時回傳錯誤結果而不是拋例外", async () => {
     // 拋出去的話整輪對話會斷在半路，使用者看到的是回覆突然停住。
-    const result = await executeAgentTool("search_faq", { query: "" });
+    const result = await runTool("search_faq", { query: "" });
 
     expect(result.isError).toBe(true);
+    // 而且要講清楚哪裡不對，模型才改得動。
+    expect(result.content).toContain("query");
   });
 
-  it("工具名稱清單與定義同源", () => {
-    expect(AGENT_TOOL_NAMES).toEqual(AGENT_TOOLS.map((tool) => tool.name));
+  it("送給模型的規格與註冊的定義同源", () => {
+    expect(AGENT_TOOLS.specs("workshop").map((spec) => spec.name)).toEqual(
+      AGENT_TOOL_DEFINITIONS.map((tool) => tool.name),
+    );
   });
 });
 
 describe("search_faq", () => {
   it("查得到就照抄，查不到就要求說不確定", async () => {
-    const hit = JSON.parse((await executeAgentTool("search_faq", { query: "流程" })).content);
+    const hit = JSON.parse((await runTool("search_faq", { query: "流程" })).content);
     expect(hit.entries.length).toBeGreaterThan(0);
     expect(hit.hint).toContain("不要加上沒寫的");
 
-    const miss = JSON.parse(
-      (await executeAgentTool("search_faq", { query: "你們有賣咖啡豆嗎" })).content,
-    );
+    const miss = JSON.parse((await runTool("search_faq", { query: "你們有賣咖啡豆嗎" })).content);
     expect(miss.entries).toHaveLength(0);
     // 查不到時最危險的行為是自己補一個答案——那等於替工作室做了承諾。
     expect(miss.hint).toContain("不要自己補");

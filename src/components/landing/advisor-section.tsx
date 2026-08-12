@@ -3,6 +3,7 @@
 import { AgentChat } from "@/components/agent/agent-chat";
 import { useAgentHandoff } from "@/features/agent/handoff";
 import { useHomeGoal } from "@/features/home/goal-context";
+import { useSitePreview } from "@/features/website-engine/preview-context";
 
 /**
  * Agent CTA 是 Goal Selector 必須同步的四處之一（Plan §6.1）。
@@ -16,6 +17,7 @@ import { useHomeGoal } from "@/features/home/goal-context";
 export function AdvisorSection() {
   const { definition } = useHomeGoal();
   const { handoff } = useAgentHandoff();
+  const { draft, applyPatch } = useSitePreview();
 
   return (
     <div className="flex flex-col gap-4">
@@ -32,6 +34,16 @@ export function AdvisorSection() {
         // 否則照 Goal Selector 選的那個。
         initialIntent={handoff ? handoff.intent : definition.agentInitialIntent}
         handoff={handoff}
+        /*
+         * Spec §21：Agent 操作 Website。
+         *
+         * 兩條線都接在這一層：把目前的預覽送過去讓它知道現況，
+         * 把它改的東西套回同一個 context。
+         * 元件自己不認識 preview context——組裝層知道兩邊的存在，
+         * 這是 Plan §6.1 一路沿用的分工。
+         */
+        previewDraft={{ ...draft }}
+        onPreviewPatch={applyPatch}
       />
     </div>
   );

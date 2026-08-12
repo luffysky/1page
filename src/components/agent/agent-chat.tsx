@@ -27,13 +27,23 @@ import { track } from "@/lib/analytics/track";
 export function AgentChat({
   initialIntent,
   handoff = null,
+  previewDraft,
+  onPreviewPatch,
 }: {
   initialIntent?: string;
   /** Template Experience 交接過來的設定（Spec §8.15） */
   handoff?: AgentHandoff | null;
+  /** 目前的預覽狀態。Agent 要知道現在長什麼樣子才改得動（Spec §21）。
+   *  刻意不叫 draft——元件裡的 draft 是輸入框的草稿，兩個混在一起會很難讀。 */
+  previewDraft?: Record<string, unknown>;
+  /** Agent 改了預覽時呼叫 */
+  onPreviewPatch?: (patch: Record<string, unknown>) => void;
 }) {
-  const { messages, error, isStreaming, remainingMessages, send, stop } =
-    useAgentChat(initialIntent);
+  const { messages, error, isStreaming, remainingMessages, send, stop } = useAgentChat({
+    initialIntent,
+    draft: previewDraft,
+    onPreviewPatch,
+  });
 
   const [draft, setDraft] = useState("");
   const inputId = useId();

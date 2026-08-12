@@ -11,7 +11,7 @@ import { classifyAgentError } from "@/features/agent/errors";
 import { checkRateLimit, requestIdentifier } from "@/features/agent/rate-limit";
 import { agentRequestSchema, encodeStreamEvent } from "@/features/agent/schema";
 import { AGENT_SYSTEM_PROMPT, initialIntentHint } from "@/features/agent/system-prompt";
-import { AGENT_TOOLS, executeAgentTool } from "@/features/agent/tools";
+import { AGENT_TOOLS } from "@/features/agent/tools";
 import { getAnthropicClient } from "@/lib/ai/anthropic";
 
 /**
@@ -89,7 +89,7 @@ export async function POST(request: Request): Promise<Response> {
     return errorResponse(code, 400);
   }
 
-  const { messages, initialIntent } = parsed.data;
+  const { messages, initialIntent, draft } = parsed.data;
   const hint = initialIntentHint(initialIntent);
 
   const encoder = new TextEncoder();
@@ -144,7 +144,9 @@ export async function POST(request: Request): Promise<Response> {
                */
               betas: ["server-side-fallback-2026-07-01"],
               fallbacks: "default",
-              tools: [...AGENT_TOOLS],
+              // 免費階段只拿得到 free 分級的工具（Spec §23）。
+              // 分級由 registry 過濾，不靠這裡記得篩。
+              tools: AGENT_TOOLS.specs("free"),
               system: [
                 {
                   type: "text",
@@ -191,19 +193,29 @@ export async function POST(request: Request): Promise<Response> {
 
           // 平行執行，但**所有結果放進同一則 user 訊息**。
           // 拆成多則會讓模型慢慢學會不要一次呼叫多個工具。
-          const results = await Promise.all(
-            calls.map(async (call) => {
-              const result = await executeAgentTool(call.name, call.input);
-              return {
-                type: "tool_result" as const,
-                tool_use_id: call.id,
-                content: result.content,
-                is_error: result.isError,
-              };
-            }),
+          const executed = await Promise.all(
+            calls.map(async (call) => ({
+              call,
+              result: await AGENT_TOOLS.execute(call.name, call.input, { draft }, "free"),
+            })),
           );
 
-          thread.push({ role: "user", content: results });
+          for (const { result } of executed) {
+            // 預覽的變更立刻送出去，不等這一輪講完（Spec §21）。
+            // 等講完才更新的話，訪客會先讀到「我幫你換成暖色調了」，
+            // 然後盯著沒動的畫面等一兩秒。
+            if (result.patch) send({ type: "preview", patch: result.patch });
+          }
+
+          thread.push({
+            role: "user",
+            content: executed.map(({ call, result }) => ({
+              type: "tool_result" as const,
+              tool_use_id: call.id,
+              content: result.content,
+              is_error: result.isError,
+            })),
+          });
         }
       } catch (error) {
         // 訪客自己中止的，不是錯誤，也沒有人在聽了。

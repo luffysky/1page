@@ -28,7 +28,16 @@ export interface AgentChatState {
   stop: () => void;
 }
 
-export function useAgentChat(initialIntent?: string): AgentChatState {
+export function useAgentChat(
+  options: {
+    initialIntent?: string;
+    /** 目前的預覽狀態。Agent 需要知道現在長什麼樣子才改得動（Spec §21） */
+    draft?: Record<string, unknown>;
+    /** Agent 改了預覽時呼叫。套用的動作由呼叫端做——狀態的擁有者是 preview context */
+    onPreviewPatch?: (patch: Record<string, unknown>) => void;
+  } = {},
+): AgentChatState {
+  const { initialIntent, draft, onPreviewPatch } = options;
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [error, setError] = useState<AgentChatState["error"]>(null);
   const [isStreaming, setStreaming] = useState(false);
@@ -68,6 +77,7 @@ export function useAgentChat(initialIntent?: string): AgentChatState {
           body: JSON.stringify({
             messages: outgoing.map(({ role, content: value }) => ({ role, content: value })),
             ...(initialIntent ? { initialIntent } : {}),
+            ...(draft ? { draft } : {}),
           }),
           signal: controller.signal,
         });
@@ -107,6 +117,11 @@ export function useAgentChat(initialIntent?: string): AgentChatState {
                 }
                 return next;
               });
+            } else if (event.type === "preview") {
+              // 預覽的變更立刻套用，不等這一輪講完——
+              // 等講完的話，訪客會先讀到「我幫你換成暖色調了」，
+              // 然後盯著沒動的畫面等一兩秒。
+              onPreviewPatch?.(event.patch);
             } else if (event.type === "error") {
               // 串流中的錯誤不會清掉已經收到的字：那些內容仍然有用。
               // 錯誤另外顯示，讓人知道後面沒有了。
@@ -132,7 +147,7 @@ export function useAgentChat(initialIntent?: string): AgentChatState {
         );
       }
     },
-    [initialIntent, messages],
+    [draft, initialIntent, messages, onPreviewPatch],
   );
 
   return {

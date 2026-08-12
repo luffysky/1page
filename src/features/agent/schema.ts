@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { ACCENT_IDS, THEME_IDS } from "@/features/website-engine/templates";
+
 import { AGENT_LIMITS, type AgentErrorCode } from "./config";
 
 /**
@@ -36,6 +38,28 @@ export const agentRequestSchema = z
      * 兩者恰好都叫 intent，5B 實作分類器時不可混用。
      */
     initialIntent: z.string().max(40).optional(),
+
+    /**
+     * 訪客目前的預覽狀態（Spec §21）。
+     *
+     * 由 client 隨請求送上來，server 不存——預覽的唯一狀態在瀏覽器裡。
+     * server 也存一份的話就有兩份可變狀態，而兩份一定會分歧，
+     * 表現是「AI 說改好了，畫面沒動」。
+     *
+     * 全部選填：沒有預覽的情境（例如未來從別的入口開對話）也要能用。
+     */
+    draft: z
+      .object({
+        templateId: z.string().max(64).optional(),
+        // 用真的列舉而不是任意字串：這份 draft 會直接進工具的 context，
+        // 而工具會照它決定要不要沿用目前的主題。收一個不存在的主題 id，
+        // 錯誤會在很後面才出現。
+        themeId: z.enum(THEME_IDS).optional(),
+        accentId: z.enum(ACCENT_IDS).optional(),
+        brandName: z.string().max(120).optional(),
+        industry: z.string().max(80).optional(),
+      })
+      .optional(),
   })
   .refine((value) => value.messages[value.messages.length - 1]?.role === "user", {
     message: "最後一則必須是使用者訊息",
@@ -67,6 +91,8 @@ export type AgentRequest = z.infer<typeof agentRequestSchema>;
  */
 export type AgentStreamEvent =
   | { type: "delta"; text: string }
+  /** Agent 改了預覽（Spec §21）。client 收到後套用到同一個 preview context */
+  | { type: "preview"; patch: Record<string, unknown> }
   | { type: "done"; stopReason: string | null; outputTokens: number }
   | { type: "error"; code: AgentErrorCode; message: string };
 
