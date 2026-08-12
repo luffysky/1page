@@ -1,6 +1,6 @@
 import { site } from "../site-classes";
 
-import { items, type SectionProps, text } from "./shared";
+import { ActionButton, items, type SectionProps, text } from "./shared";
 
 /**
  * Hero（Spec §10）
@@ -17,13 +17,7 @@ function Actions({ section }: SectionProps) {
   return (
     <div className="mt-10 flex flex-wrap gap-3">
       {actions.map((action) => (
-        <a
-          key={action.label}
-          href={action.href ?? "#"}
-          className={`${site.accentBg} ${site.onAccent} ${site.radius} inline-flex px-6 py-3 font-bold`}
-        >
-          {action.label}
-        </a>
+        <ActionButton key={action.label} action={action} />
       ))}
     </div>
   );
@@ -31,7 +25,7 @@ function Actions({ section }: SectionProps) {
 
 export function HeroCentered({ section }: SectionProps) {
   return (
-    <section className={`${site.bg} ${site.text} px-6 py-24 text-center`}>
+    <section className={`${site.bg} ${site.text} ${site.sectionYLoose} px-6 text-center`}>
       {text(section, "eyebrow") ? (
         <p className={`${site.muted} text-sm tracking-widest uppercase`}>
           {text(section, "eyebrow")}
@@ -39,7 +33,7 @@ export function HeroCentered({ section }: SectionProps) {
       ) : null}
 
       <h1
-        className={`${site.heading} mx-auto mt-4 max-w-[18em] text-4xl leading-tight md:text-6xl`}
+        className={`${site.heading} mx-auto mt-4 max-w-[18em] text-4xl leading-tight @3xl:text-6xl`}
       >
         {text(section, "title")}
       </h1>
@@ -59,7 +53,7 @@ export function HeroCentered({ section }: SectionProps) {
 
 export function HeroEditorial({ section }: SectionProps) {
   return (
-    <section className={`${site.bg} ${site.text} px-6 py-24`}>
+    <section className={`${site.bg} ${site.text} ${site.sectionYLoose} px-6`}>
       <div className="mx-auto max-w-5xl">
         {text(section, "eyebrow") ? (
           <p className={`${site.accent} text-sm font-bold tracking-widest uppercase`}>
@@ -67,7 +61,7 @@ export function HeroEditorial({ section }: SectionProps) {
           </p>
         ) : null}
 
-        <h1 className={`${site.heading} mt-5 max-w-[14em] text-5xl leading-[1.05] md:text-7xl`}>
+        <h1 className={`${site.heading} mt-5 max-w-[14em] text-5xl leading-[1.05] @3xl:text-7xl`}>
           {text(section, "title")}
         </h1>
 
@@ -85,9 +79,9 @@ export function HeroEditorial({ section }: SectionProps) {
 
 export function HeroMinimal({ section }: SectionProps) {
   return (
-    <section className={`${site.bg} ${site.text} px-6 py-16`}>
+    <section className={`${site.bg} ${site.text} ${site.sectionYTight} px-6`}>
       <div className="mx-auto max-w-3xl">
-        <h1 className={`${site.heading} text-3xl md:text-4xl`}>{text(section, "title")}</h1>
+        <h1 className={`${site.heading} text-3xl @3xl:text-4xl`}>{text(section, "title")}</h1>
         {text(section, "subtitle") ? (
           <p className={`${site.muted} ${site.body} mt-3`}>{text(section, "subtitle")}</p>
         ) : null}

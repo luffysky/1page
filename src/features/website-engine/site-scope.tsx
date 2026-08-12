@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 
 import type { ThemeConfig } from "./schema";
+import { site } from "./site-classes";
 import { themeToCssVars } from "./theme";
 import { SITE_SCOPE_ATTRIBUTE } from "./types";
 
@@ -32,11 +33,34 @@ export function SiteScope({
 }) {
   const vars = themeToCssVars(theme);
 
+  /*
+   * scope 容器同時是被預覽網站的「文件根」，因此要負責基底樣式。
+   *
+   * 沒有這一行的話，任何沒有明確掛上 site.body 的元素都會**繼承官網的字體**——
+   * 4A 實測到的就是這個：標題用了主題的 Georgia，按鈕文字卻還是官網的 Inter。
+   * 一份預覽混著兩套字，看起來只是「怪怪的」，很難指出哪裡不對。
+   *
+   * 放在 className 之前，呼叫端仍可覆寫。
+   *
+   * ── @container ────────────────────────────────────────────────
+   *
+   * Section 元件的斷點一律是 container query（`@3xl:` 而非 `md:`），
+   * 而這裡是那些查詢的參照容器。
+   *
+   * 為什麼不用視窗斷點：Preview 是頁面裡的一塊，不是整個視窗。
+   * 用 `md:` 的話，在 1440px 的螢幕上把預覽切成「手機」，
+   * 裡面的排版仍然是三欄——因為視窗還是 1440px。
+   * 那就變成 Spec §45.1 那種「看起來有切換、其實沒有」的假功能。
+   *
+   * 容器查詢讓 4C 的裝置切換只需要改容器寬度，內容自己會反應。
+   */
+  const base = `@container ${site.bg} ${site.text} ${site.body}`;
+
   return (
     <div
       {...{ [SITE_SCOPE_ATTRIBUTE]: "" }}
       style={vars as CSSProperties}
-      className={className}
+      className={className ? `${base} ${className}` : base}
       // 被預覽的網站有自己的語系設定，不繼承官網的 zh-Hant
       lang={undefined}
     >

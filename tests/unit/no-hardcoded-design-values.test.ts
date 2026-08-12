@@ -25,6 +25,8 @@ const ALLOWED_VALUE_FILES: Record<string, string> = {
     "tokens.css 的鏡像。PWA manifest 與動態圖示拿不到 CSS 變數，一致性由 brand-colors.test.ts 保證",
   "src/app/%5Fdev/theme/page.tsx":
     "Theme Engine 驗證頁（dev only）：色碼是示範用的「客戶網站主題」內容，不是本站的設計數值",
+  "src/features/website-engine/templates/themes.ts":
+    "Template 的主題預設集：色碼屬於「被預覽的客戶網站」，與本站設計數值是兩個系統。對比度由 templates.test.ts 實算",
 };
 
 /**

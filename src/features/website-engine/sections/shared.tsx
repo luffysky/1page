@@ -1,4 +1,5 @@
 import type { SiteSection } from "../schema";
+import { site } from "../site-classes";
 
 /**
  * Section 元件共用的取值輔助。
@@ -40,5 +41,32 @@ export function items(section: SiteSection, key: string): LinkItem[] {
   return value.filter(
     (item): item is LinkItem =>
       typeof item === "object" && item !== null && typeof (item as LinkItem).label === "string",
+  );
+}
+
+/**
+ * 行動按鈕。
+ *
+ * ⚠️ 沒有 href 時渲染成 `<span>`，而不是 `<a href="#">`。
+ *
+ * 原本的寫法是 `href={action.href ?? "#"}`。那在螢幕閱讀器上是一個
+ * 「可以按、按了什麼都不會發生」的連結——比沒有連結更糟，因為它承諾了一個動作。
+ * 在首頁的 Template Preview 裡還多一個問題：`#` 會把整個官網頁面捲回最上面，
+ * 訪客只是想看看按鈕長什麼樣子，結果畫面跳走了。
+ *
+ * 模板（Phase 4）的預設內容因此一律不帶 href——那些按鈕是**版面示意**。
+ * 真正要連去哪裡是 Agent（Phase 6）與 Project Builder（Phase 7）決定的事。
+ */
+export function ActionButton({ action }: { action: LinkItem }) {
+  const className = `${site.accentBg} ${site.onAccent} ${site.radius} inline-flex px-6 py-3 font-bold`;
+
+  if (!action.href) {
+    return <span className={className}>{action.label}</span>;
+  }
+
+  return (
+    <a href={action.href} className={className}>
+      {action.label}
+    </a>
   );
 }

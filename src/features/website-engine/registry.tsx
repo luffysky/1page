@@ -75,8 +75,10 @@ export function UnknownSection({ section }: SectionProps) {
   const showDetails = process.env.NODE_ENV !== "production";
 
   return (
-    <section className={`${site.bg} ${site.muted} ${site.body} px-6 py-16`}>
-      <div className={`${site.surface} ${site.radius} mx-auto max-w-5xl p-8 text-center`}>
+    <section className={`${site.bg} ${site.muted} ${site.body} ${site.sectionYTight} px-6`}>
+      <div
+        className={`${site.surface} ${site.radius} ${site.cardPad} mx-auto max-w-5xl text-center`}
+      >
         {showDetails ? (
           <p className="text-sm">
             尚未實作的區塊類型：<code className="font-mono">{section.type}</code>

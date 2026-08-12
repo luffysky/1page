@@ -17,6 +17,7 @@ const ROUTES = [
   { name: "work-detail", path: "/work/interior-studio" },
   { name: "dev-theme", path: "/_dev/theme" },
   { name: "dev-primitives", path: "/_dev/primitives" },
+  { name: "dev-templates", path: "/_dev/templates" },
 ];
 
 for (const route of ROUTES) {
