@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { Navbar, type NavLink } from "@/components/shared/navbar";
 import { SiteFooter } from "@/components/shared/site-footer";
 import { absoluteUrl } from "@/config/site";
+import { getAccountEntry } from "@/features/account/auth";
 import { getAdminEntry } from "@/features/admin/auth";
 
 import { ProjectBuilder } from "./project-builder";
@@ -28,7 +29,7 @@ const NAV_LINKS: NavLink[] = [
 
 export default async function StartPage({ searchParams }: PageProps<"/start">) {
   const params = await searchParams;
-  const adminEntry = await getAdminEntry();
+  const [adminEntry, accountEntry] = await Promise.all([getAdminEntry(), getAccountEntry()]);
 
   // 從作品頁過來時帶著參考作品（Spec §30 Selected Portfolio Reference）。
   const raw = Array.isArray(params.ref) ? params.ref[0] : params.ref;
@@ -38,7 +39,12 @@ export default async function StartPage({ searchParams }: PageProps<"/start">) {
 
   return (
     <>
-      <Navbar adminEntry={adminEntry} links={NAV_LINKS} cta={{ label: "回首頁", href: "/" }} />
+      <Navbar
+        adminEntry={adminEntry}
+        accountEntry={accountEntry}
+        links={NAV_LINKS}
+        cta={{ label: "回首頁", href: "/" }}
+      />
 
       <main className="max-w-page px-gutter lg:px-gutter-lg mx-auto w-full py-16">
         <p className="text-kicker text-brand-accent-strong uppercase">Project Builder</p>

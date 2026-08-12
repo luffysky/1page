@@ -25,6 +25,7 @@ export function Navbar({
   links,
   cta,
   adminEntry = null,
+  accountEntry = null,
 }: {
   links: NavLink[];
   cta: NavLink;
@@ -36,6 +37,17 @@ export function Navbar({
    * 而不是渲染給所有人再用 CSS 藏起來。
    */
   adminEntry?: { href: string; role: string } | null;
+  /**
+   * 會員入口。登入了給 email，沒登入給 null。
+   *
+   * ⚠️ 這個與 adminEntry 是**兩個不同的後台**，不是同一顆按鈕的兩種狀態：
+   *   會員中心  我的帳號（一般人用的，路徑公開）
+   *   後台      這個網站的管理（只有員工看得到，路徑是密的）
+   *
+   * 一開始整個選單只有 adminEntry，一般人登入完全沒有入口，
+   * 只能自己把 /login 打進網址列——等於這套帳號系統對一般人不存在。
+   */
+  accountEntry?: { email: string | null } | null;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [open, setOpen] = useState(false);
@@ -87,6 +99,22 @@ export function Navbar({
               <span className="text-brand-muted ml-1.5 font-normal">{adminEntry.role}</span>
             </Link>
           ) : null}
+
+          {accountEntry ? (
+            <Link
+              href="/account"
+              className="border-brand-line text-caption hidden rounded-pill border px-4 py-2 font-bold md:inline-flex"
+            >
+              會員中心
+            </Link>
+          ) : (
+            <Link
+              href="/login"
+              className="text-caption text-brand-muted hover:text-brand-ink hidden font-bold md:inline-flex"
+            >
+              登入
+            </Link>
+          )}
 
           <Link
             href={cta.href}
@@ -149,6 +177,14 @@ export function Navbar({
             className="bg-brand-accent-strong text-brand-on-accent inline-flex rounded-pill px-6 py-3.5 font-bold"
           >
             {cta.label}
+          </Link>
+
+          <Link
+            href={accountEntry ? "/account" : "/login"}
+            onClick={close}
+            className="border-brand-line text-body-sm inline-flex rounded-pill border px-5 py-3 font-bold"
+          >
+            {accountEntry ? "會員中心" : "登入"}
           </Link>
 
           {adminEntry ? (
