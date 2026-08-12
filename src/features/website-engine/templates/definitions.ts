@@ -212,6 +212,15 @@ const LOCAL_BUSINESS: WebsiteTemplate = {
       },
     },
     {
+      id: "map",
+      type: "embed",
+      variant: "map",
+      content: {
+        title: "在這裡",
+        query: "台北市大安區和平東路二段 100 號",
+      },
+    },
+    {
       id: "cta",
       type: "cta",
       variant: "banner",

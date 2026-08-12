@@ -27,7 +27,8 @@ import { SITE_SECTION_TYPES, type SiteSectionType } from "./schema";
  * 與「忘了」分得開——後者才是這條測試要抓的。
  */
 const DEFERRED: Partial<Record<SiteSectionType, string>> = {
-  map: "CR-003-3 的白名單嵌入。地圖一定是第三方 iframe，要先決定 sandbox 與允許來源，不是排版問題。",
+  // CR-003-3 之後這裡空了。空的清單是目標，不是失敗——
+  // 它代表 enum 裡沒有任何一個 type 是「宣告了但沒人實作」。
 };
 
 describe("SECTION_REGISTRY", () => {

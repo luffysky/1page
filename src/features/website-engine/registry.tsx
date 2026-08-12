@@ -2,6 +2,7 @@ import type { SiteSection, SiteSectionType } from "./schema";
 import { CtaBanner, ContactSimple, FooterSimple } from "./sections/action";
 import { AboutSimple, GalleryGrid, ServicesList } from "./sections/content";
 import { FaqList, FormSimple, PricingTiers, ProcessSteps } from "./sections/detail";
+import { EmbedFrame } from "./sections/embed";
 import { HeroCentered, HeroEditorial, HeroMinimal } from "./sections/hero";
 import { StatsRow, TeamGrid, TestimonialsQuotes } from "./sections/proof";
 import type { SectionProps } from "./sections/shared";
@@ -46,6 +47,7 @@ export const SECTION_REGISTRY: Partial<Record<SiteSectionType, Record<string, Se
     stats: { row: StatsRow },
     team: { grid: TeamGrid },
     form: { simple: FormSimple },
+    embed: { youtube: EmbedFrame, map: EmbedFrame },
     cta: { banner: CtaBanner },
     contact: { simple: ContactSimple },
     footer: { simple: FooterSimple },

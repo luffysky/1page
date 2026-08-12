@@ -150,7 +150,17 @@ export const SITE_SECTION_TYPES = [
   "form",
   "cta",
   "contact",
-  "map",
+  /*
+   * CR-003-3 把原本的 "map" 換成 "embed"。
+   *
+   * "map" 從一開始就只是一個宣告——沒有元件、沒有任何模板用它、
+   * 也沒有任何地方存過 SiteConfig（Workshop 還沒做），所以拿掉沒有相容性代價。
+   *
+   * 換掉而不是並存的理由：地圖與 YouTube 是同一件事的兩個提供者，
+   * 安全模型（提供者 + 識別碼，網址由我們組）也完全一樣。
+   * 留兩種型別表達同一件事，只會讓下一個人不知道該用哪一個。
+   */
+  "embed",
   "footer",
 ] as const;
 

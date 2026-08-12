@@ -158,11 +158,18 @@ test.describe("預覽裡的客服體驗", () => {
     for (const template of ["Product", "Studio", "Local Business", "Personal"]) {
       await page.getByRole("button", { name: new RegExp(`^${template}`) }).click();
 
-      // 只看模板內容（section 裡面）。客服泡泡也在 scope 裡，
-      // 但它是真的能用的東西，不在這條規則的範圍內。
+      /*
+       * 只看模板內容（section 裡面）。兩個例外：
+       *   - 客服泡泡在 scope 裡但不在 section 裡
+       *   - 嵌入區塊的 facade 按鈕在 section 裡，但它**真的會做事**
+       *     （按了才連線載入 iframe），所以明確排除
+       *
+       * 排除項要一個一個寫出來。改成「只檢查 input」之類的放寬做法，
+       * 下一顆假按鈕就會安靜地混進來。
+       */
       const focusable = page.locator(
         "[data-site-scope] section input, [data-site-scope] section textarea," +
-          "[data-site-scope] section select, [data-site-scope] section button",
+          "[data-site-scope] section select, [data-site-scope] section button:not([data-embed-facade])",
       );
 
       expect(await focusable.count(), `${template} 的預覽裡有沒有作用的表單控制項`).toBe(0);
