@@ -12,9 +12,11 @@ import { Navbar, type NavLink } from "@/components/shared/navbar";
 import { getAdminEntry } from "@/features/admin/auth";
 import { SiteFooter } from "@/components/shared/site-footer";
 import { FINAL_CTA_COPY, HERO_COPY, SECTION_COPY } from "@/config/home-copy";
-import { parseHomeGoal } from "@/config/home-goals";
+import { getHomeGoal, parseHomeGoal } from "@/config/home-goals";
 import { HomeGoalProvider } from "@/features/home/goal-context";
 import { getPortfolioRepository } from "@/features/portfolio";
+import { SitePreviewProvider } from "@/features/website-engine/preview-context";
+import { listTemplates } from "@/features/website-engine/templates";
 
 /**
  * 首頁組裝（Spec §4 IA）
@@ -48,65 +50,71 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   // 密路徑因此完全不會出現在送給瀏覽器的 HTML 裡。
   const adminEntry = await getAdminEntry();
 
+  // Preview 的初始模板在 server 就依 goal 決定，首次輸出即為正確的那一套。
+  // 若交給 client 進場後再校正，訪客會先看到一套模板再跳成另一套。
+  const initialTemplateId = listTemplates(getHomeGoal(goal).templateCategories)[0]?.id;
+
   return (
     <HomeGoalProvider initialGoal={goal}>
-      <Navbar
-        adminEntry={adminEntry}
-        links={NAV_LINKS}
-        cta={{ label: "開始一個專案 ↗", href: "#contact" }}
-      />
+      <SitePreviewProvider initialTemplateId={initialTemplateId}>
+        <Navbar
+          adminEntry={adminEntry}
+          links={NAV_LINKS}
+          cta={{ label: "開始一個專案 ↗", href: "#contact" }}
+        />
 
-      <main id="top">
-        <Hero {...HERO_COPY} />
+        <main id="top">
+          <Hero {...HERO_COPY} />
 
-        <EditorialSection {...SECTION_COPY.goals}>
-          <GoalSelector />
-        </EditorialSection>
-
-        <div id="work">
-          <EditorialSection {...SECTION_COPY.work}>
-            <SelectedWork items={featured} />
+          <EditorialSection {...SECTION_COPY.goals}>
+            <GoalSelector />
           </EditorialSection>
-        </div>
 
-        <div id="templates">
-          <EditorialSection {...SECTION_COPY.template}>
-            <TemplateExperienceSection />
-          </EditorialSection>
-        </div>
+          <div id="work">
+            <EditorialSection {...SECTION_COPY.work}>
+              <SelectedWork items={featured} />
+            </EditorialSection>
+          </div>
 
-        <div id="advisor">
-          <EditorialSection {...SECTION_COPY.advisor}>
-            <AdvisorSection />
-          </EditorialSection>
-        </div>
+          <div id="templates">
+            <EditorialSection {...SECTION_COPY.template}>
+              <TemplateExperienceSection />
+            </EditorialSection>
+          </div>
 
-        <EditorialSection {...SECTION_COPY.philosophy} />
+          <div id="advisor">
+            <EditorialSection {...SECTION_COPY.advisor}>
+              <AdvisorSection />
+            </EditorialSection>
+          </div>
 
-        <div id="services">
-          <EditorialSection {...SECTION_COPY.services}>
-            <ServicesBand />
-          </EditorialSection>
-        </div>
+          <EditorialSection {...SECTION_COPY.philosophy} />
 
-        <div id="pricing">
-          <EditorialSection {...SECTION_COPY.pricing}>
-            <PricingLadder />
-          </EditorialSection>
-        </div>
+          <div id="services">
+            <EditorialSection {...SECTION_COPY.services}>
+              <ServicesBand />
+            </EditorialSection>
+          </div>
 
-        <div id="process">
-          <EditorialSection {...SECTION_COPY.process}>
-            <ProcessSteps />
-          </EditorialSection>
-        </div>
+          <div id="pricing">
+            <EditorialSection {...SECTION_COPY.pricing}>
+              <PricingLadder />
+            </EditorialSection>
+          </div>
 
-        <div id="contact">
-          <DarkCtaBlock {...FINAL_CTA_COPY} />
-        </div>
-      </main>
+          <div id="process">
+            <EditorialSection {...SECTION_COPY.process}>
+              <ProcessSteps />
+            </EditorialSection>
+          </div>
 
-      <SiteFooter />
+          <div id="contact">
+            <DarkCtaBlock {...FINAL_CTA_COPY} />
+          </div>
+        </main>
+
+        <SiteFooter />
+      </SitePreviewProvider>
     </HomeGoalProvider>
   );
 }

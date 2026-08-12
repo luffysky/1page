@@ -78,19 +78,18 @@ test.describe("Mobile Nav", () => {
 });
 
 test.describe("Shell 禁止假互動", () => {
-  test("Template Experience 的切換控制項點下去毫無反應", async ({ page }) => {
-    const warm = page.getByRole("button", { name: "暖一點" });
-    await expect(warm).toBeDisabled();
-
-    const before = await page.locator("[data-site-scope]").getAttribute("style");
-    await warm.click({ force: true });
-    const after = await page.locator("[data-site-scope]").getAttribute("style");
-
-    // Demo 就是在這裡用 element.style.background 偽造主題切換（Spec §45.1）
-    expect(after).toBe(before);
-    expect(after).toBeNull();
-  });
-
+  /*
+   * 4B 之前這裡有一條「Template Experience 的切換控制項點下去毫無反應」。
+   * 那條測的是殼——控制項一律 disabled，寧可不能按也不要假裝會動。
+   *
+   * 4B 把它接上真的 SiteConfig 之後，那個判準就過期了：
+   * 現在它**應該**有反應。對應的驗證搬到兩個地方，
+   * 分別驗單元與瀏覽器兩層：
+   *   src/components/shared/no-fake-interaction.test.tsx
+   *   tests/e2e/template-experience.spec.ts
+   *
+   * 這一頁只留 Agent 那一半——它到 Phase 5 之前仍然是殼。
+   */
   test("Agent 輸入框無法輸入", async ({ page }) => {
     const input = page.getByRole("textbox");
     await expect(input).toBeDisabled();
@@ -104,7 +103,7 @@ test("八個 primitive 全數呈現", async ({ page }) => {
     "Hero",
     "EditorialSection",
     "PortfolioLayout",
-    "TemplateExperienceShell",
+    "SitePreview",
     "AgentWorkspaceShell",
     "PricingLadder",
     "DarkCtaBlock",

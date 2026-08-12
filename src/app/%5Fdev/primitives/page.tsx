@@ -7,7 +7,8 @@ import { PricingLadder } from "@/components/pricing/pricing-ladder";
 import { DarkCtaBlock } from "@/components/shared/dark-cta-block";
 import { EditorialSection } from "@/components/shared/editorial-section";
 import { Navbar, type NavLink } from "@/components/shared/navbar";
-import { TemplateExperienceShell } from "@/components/website-preview/template-experience-shell";
+import { SitePreview } from "@/components/website-preview/site-preview";
+import { SitePreviewProvider } from "@/features/website-engine/preview-context";
 import { FINAL_CTA_COPY, HERO_COPY } from "@/config/home-copy";
 
 export const metadata: Metadata = {
@@ -137,11 +138,13 @@ export default function PrimitivesPage() {
 
         <Specimen
           index="05"
-          name="TemplateExperienceShell"
-          note="殼。Theme / Device 切換 disabled，內含 data-site-scope 容器，Phase 3 才注入 --site-* 變數。"
+          name="SitePreview"
+          note="4B 起是真的：吃 SitePreviewProvider 算出來的 SiteConfig，走與正式網站相同的 SiteRenderer。切換控制項在首頁那一段。"
         >
           <div className="mx-auto w-full max-w-page px-gutter lg:px-gutter-lg">
-            <TemplateExperienceShell />
+            <SitePreviewProvider>
+              <SitePreview />
+            </SitePreviewProvider>
           </div>
         </Specimen>
 

@@ -48,8 +48,14 @@ test("選 goal 後四處同步反應（Plan §6.1）", async ({ page }) => {
   await expect(page.getByRole("link", { name: "AI Website Workshop" })).toBeVisible();
   await expect(page.getByRole("link", { name: "山序設計 / Interior Studio" })).toBeHidden();
 
-  // 2. Template Experience → 顯示對應模板分類
-  await expect(page.getByText(/篩選模板分類：product/)).toBeVisible();
+  // 2. Template Experience → 模板清單收斂到 product 分類，預覽跟著換過去。
+  //    4B 之前這裡只驗一句「將依…篩選模板分類」的說明文字——
+  //    那證明的是「我們知道要篩什麼」，不是「真的篩了」。
+  await expect(page.getByText(/依「我要導入 AI」篩選，共 1 套/)).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Product/ })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
 
   // 3. Services → highlight AI & Automation
   await expect(
