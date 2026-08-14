@@ -71,6 +71,67 @@ export interface CmsRevisionsRow {
   saved_by: string | null;
 }
 
+export interface DealItemsRow {
+  id: string;
+  deal_id: string;
+  service_id: string | null;
+  description: string;
+  quantity: number;
+  unit_price: number;
+  sort_order: number;
+}
+
+export interface DealsRow {
+  id: string;
+  client_id: string;
+  title: string;
+  stage: string;
+  amount: number | null;
+  currency: string;
+  expected_close: string | null;
+  lost_reason: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EngagementsRow {
+  id: string;
+  client_id: string;
+  deal_id: string | null;
+  title: string;
+  status: string;
+  started_on: string | null;
+  due_on: string | null;
+  delivered_on: string | null;
+  portfolio_project_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InvoiceLinesRow {
+  id: string;
+  invoice_id: string;
+  description: string;
+  quantity: number;
+  unit_price: number;
+  sort_order: number;
+}
+
+export interface InvoicesRow {
+  id: string;
+  client_id: string;
+  engagement_id: string | null;
+  number: string;
+  status: string;
+  issued_on: string | null;
+  due_on: string | null;
+  subtotal: number;
+  tax: number;
+  total: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface LeadsRow {
   id: string;
   profile_id: string | null;
@@ -90,6 +151,16 @@ export interface LeadsRow {
   client_id: string | null;
 }
 
+export interface MilestonesRow {
+  id: string;
+  engagement_id: string;
+  title: string;
+  due_on: string | null;
+  done_on: string | null;
+  payment_ratio: number | null;
+  sort_order: number;
+}
+
 export interface NotesRow {
   id: string;
   subject_type: string;
@@ -97,6 +168,16 @@ export interface NotesRow {
   body: string;
   internal: boolean;
   author_id: string | null;
+  created_at: string;
+}
+
+export interface PaymentsRow {
+  id: string;
+  invoice_id: string;
+  paid_on: string;
+  amount: number;
+  method: string | null;
+  note: string | null;
   created_at: string;
 }
 
@@ -175,4 +256,14 @@ export interface SavedSitesRow {
   created_at: string;
   updated_at: string;
   draft: Json;
+}
+
+export interface TimeEntriesRow {
+  id: string;
+  engagement_id: string;
+  worked_on: string;
+  minutes: number;
+  note: string | null;
+  actor_id: string | null;
+  created_at: string;
 }

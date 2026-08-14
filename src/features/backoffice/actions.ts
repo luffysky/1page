@@ -228,3 +228,139 @@ export async function convertLeadToClient(formData: FormData): Promise<Backoffic
   revalidatePath("/admin/clients");
   return { ok: true, id: client.id };
 }
+
+/* ------------------------------------------------------------------ */
+/* 報價與成交（CR-004 / Phase B BE）                                    */
+/* ------------------------------------------------------------------ */
+
+const dealSchema = z.object({
+  id: z.uuid().optional(),
+  clientId: z.uuid(),
+  title: z.string().trim().min(1, "報價名稱不可空白").max(200),
+  stage: z.enum(["inquiry", "quoted", "negotiating", "won", "lost"]),
+  /*
+   * 金額可以留白（還沒報價），但填了就必須是數字。
+   *
+   * `.catch(null)` 會把打錯的字默默變成 null——那等於「金額不見了」，
+   * 而使用者以為自己填了。所以這裡讓它紅。
+   */
+  amount: z.number().min(0).max(99999999).nullable(),
+  expectedClose: z.union([z.iso.date(), z.literal("")]),
+  lostReason: z.string().trim().max(500),
+});
+
+export async function saveDeal(formData: FormData): Promise<BackofficeResult> {
+  await requireStaff();
+
+  const rawAmount = text(formData, "amount");
+  const parsed = dealSchema.safeParse({
+    id: text(formData, "id") || undefined,
+    clientId: text(formData, "clientId"),
+    title: formData.get("title"),
+    stage: formData.get("stage"),
+    amount: rawAmount === "" ? null : Number(rawAmount),
+    expectedClose: text(formData, "expectedClose"),
+    lostReason: text(formData, "lostReason"),
+  });
+
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    return { ok: false, message: issue?.message ?? "輸入有誤" };
+  }
+
+  const data = parsed.data;
+
+  /*
+   * 「未成交」一定要寫原因，在這裡先擋。
+   *
+   * 資料庫也有 check constraint 擋著（那是真正的邊界），
+   * 但那條會回一個看不懂的錯誤訊息。這裡擋是為了說人話。
+   */
+  if (data.stage === "lost" && !data.lostReason) {
+    return { ok: false, message: "標成「未成交」要寫原因——那是這張表最有用的一欄。" };
+  }
+
+  const payload = {
+    client_id: data.clientId,
+    title: data.title,
+    stage: data.stage,
+    amount: data.amount,
+    expected_close: data.expectedClose || null,
+    // 不是 lost 就把原因清掉：留著一個舊原因會讓下次看的人以為它輸過
+    lost_reason: data.stage === "lost" ? data.lostReason : null,
+  };
+
+  const supabase = await createSupabaseServerClient();
+
+  const saved = data.id
+    ? await supabase.from("deals").update(payload).eq("id", data.id).select("id").single()
+    : await supabase.from("deals").insert(payload).select("id").single();
+
+  if (saved.error) return { ok: false, message: `儲存失敗：${saved.error.message}` };
+
+  revalidatePath("/admin/deals");
+  revalidatePath(`/admin/clients/${data.clientId}`);
+  return { ok: true, id: saved.data.id };
+}
+
+const dealItemSchema = z.object({
+  dealId: z.uuid(),
+  description: z.string().trim().min(1, "項目說明不可空白").max(300),
+  quantity: z.number().positive().max(9999),
+  unitPrice: z.number().min(0).max(99999999),
+  serviceId: z.string().trim().max(40),
+});
+
+export async function addDealItem(formData: FormData): Promise<BackofficeResult> {
+  await requireStaff();
+
+  const parsed = dealItemSchema.safeParse({
+    dealId: text(formData, "dealId"),
+    description: formData.get("description"),
+    quantity: Number(text(formData, "quantity") || "1"),
+    unitPrice: Number(text(formData, "unitPrice") || "0"),
+    serviceId: text(formData, "serviceId"),
+  });
+
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "輸入有誤" };
+  }
+
+  const supabase = await createSupabaseServerClient();
+
+  // 排在最後面。查一次目前的最大值，而不是用筆數——刪過項目之後兩者會不一樣
+  const { data: last } = await supabase
+    .from("deal_items")
+    .select("sort_order")
+    .eq("deal_id", parsed.data.dealId)
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const { error } = await supabase.from("deal_items").insert({
+    deal_id: parsed.data.dealId,
+    description: parsed.data.description,
+    quantity: parsed.data.quantity,
+    unit_price: parsed.data.unitPrice,
+    service_id: parsed.data.serviceId || null,
+    sort_order: (last?.sort_order ?? -1) + 1,
+  });
+
+  if (error) return { ok: false, message: `儲存失敗：${error.message}` };
+
+  revalidatePath(`/admin/deals/${parsed.data.dealId}`);
+  return { ok: true };
+}
+
+export async function deleteDealItem(formData: FormData): Promise<void> {
+  await requireStaff();
+
+  const id = text(formData, "id");
+  const dealId = text(formData, "dealId");
+  if (!id) return;
+
+  const supabase = await createSupabaseServerClient();
+  await supabase.from("deal_items").delete().eq("id", id);
+
+  revalidatePath(`/admin/deals/${dealId}`);
+}

@@ -72,6 +72,7 @@ export const ADMIN_NAV: NavGroup[] = [
     items: [
       { label: "收件匣", href: "/admin/inbox", hint: "訪客留下的需求" },
       { label: "客戶", href: "/admin/clients", hint: "聯絡人、備註與往來紀錄" },
+      { label: "報價", href: "/admin/deals", hint: "手上還有多少沒收的錢" },
     ],
   },
 ];

@@ -52,6 +52,7 @@ const isDynamic = (route: string) => route.includes("[");
 const NOT_IN_NAV: Array<[string, string]> = [
   ["/admin/portfolio/new", "從「作品」列表的『新增』按鈕進入，不是選單上的一個區段"],
   ["/admin/clients/new", "同上，從「客戶」列表的『新增客戶』按鈕進入"],
+  ["/admin/deals/new", "從「報價」列表、以及客戶詳細頁的『新增報價』按鈕進入"],
 ];
 
 function missingFromNav(routes: string[], nav: NavGroup[]): string[] {

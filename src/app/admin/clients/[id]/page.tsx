@@ -5,6 +5,8 @@ import { toAdminUrl } from "@/config/admin";
 import { addNote, deleteContact } from "@/features/backoffice/actions";
 import { CLIENT_STATUS_LABELS } from "@/features/backoffice/client-types";
 import { getClient } from "@/features/backoffice/clients";
+import { DEAL_STAGE_LABELS, formatAmount } from "@/features/backoffice/deal-types";
+import { listDealsForClient } from "@/features/backoffice/deals";
 
 import { AddContactForm } from "../client-actions";
 import { ClientForm } from "../client-form";
@@ -29,7 +31,7 @@ const input = "border-brand-line bg-brand-bg text-body-sm w-full rounded-md bord
 
 export default async function AdminClientDetailPage({ params }: PageProps<"/admin/clients/[id]">) {
   const { id } = await params;
-  const detail = await getClient(id);
+  const [detail, deals] = await Promise.all([getClient(id), listDealsForClient(id)]);
 
   if (!detail) notFound();
 
@@ -120,6 +122,39 @@ export default async function AdminClientDetailPage({ params }: PageProps<"/admi
         )}
 
         <AddContactForm clientId={client.id} />
+      </section>
+
+      {/* ── 報價 ─────────────────────────────────────────────── */}
+      <section className="border-brand-line mt-10 border-t pt-8">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-heading-2">報價</h2>
+          <Link
+            href={toAdminUrl(`/admin/deals/new?client=${client.id}`)}
+            className="border-brand-ink text-body-sm rounded-pill border px-5 py-2.5 font-bold"
+          >
+            新增報價
+          </Link>
+        </div>
+
+        {deals.length === 0 ? (
+          <p className="text-body-sm text-brand-muted mt-4">還沒有跟這個客戶談過任何一筆。</p>
+        ) : (
+          <ul className="mt-4 flex flex-col gap-2">
+            {deals.map((deal) => (
+              <li key={deal.id}>
+                <Link
+                  href={toAdminUrl(`/admin/deals/${deal.id}`)}
+                  className="border-brand-line hover:border-brand-ink flex flex-wrap items-center justify-between gap-3 rounded-md border p-3"
+                >
+                  <span className="text-body-sm font-bold">{deal.title}</span>
+                  <span className="text-caption text-brand-muted">
+                    {DEAL_STAGE_LABELS[deal.stage]} · {formatAmount(deal.amount, deal.currency)}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       {/* ── 備註 ─────────────────────────────────────────────── */}
