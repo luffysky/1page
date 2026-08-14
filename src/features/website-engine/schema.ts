@@ -94,6 +94,22 @@ const siteImageUrl = z
   .max(2048)
   .refine(isAllowedImageUrl, "圖片只能放在本站的媒體網域上，請先上傳");
 
+/**
+ * 影片來源。
+ *
+ * 與圖片**完全同一條規則**（只認自己的媒體網域），刻意不放寬。
+ *
+ * 影片其實比圖片更該嚴格：`<video src>` 一樣會叫訪客的瀏覽器去連那個網址，
+ * 而影片是持續性的請求，對方拿得到的不只是一次 IP，是整段觀看行為。
+ *
+ * 命名上分成兩個常數而不是共用一個，是為了讓錯誤訊息說得出是哪一種。
+ */
+const siteVideoUrl = z
+  .string()
+  .trim()
+  .max(2048)
+  .refine(isAllowedImageUrl, "影片只能放在本站的媒體網域上，請先上傳");
+
 /** 站內路徑或外部連結 */
 const linkTarget = z.union([
   z.string().regex(/^\/(?![/\\])[^\s]*$/, "站內路徑必須以單一斜線開頭"),
@@ -267,6 +283,56 @@ const sectionContent = z.record(z.string().max(60), contentValue).check((ctx) =>
   });
 });
 
+/* ------------------------------------------------------------------ */
+/* Section 背景（CR-004 / Phase B BJ）                                  */
+/* ------------------------------------------------------------------ */
+
+export const SECTION_BACKGROUND_TYPES = ["none", "color", "gradient", "image", "video"] as const;
+
+export const sectionBackgroundTypeSchema = z.enum(SECTION_BACKGROUND_TYPES);
+export type SectionBackgroundType = z.infer<typeof sectionBackgroundTypeSchema>;
+
+/**
+ * 一塊的背景。
+ *
+ * ── 為什麼四種來源各有自己的欄位 ──────────────────────────────
+ *
+ * 共用一個 `src` 的話，從「圖片」切到「影片」再切回來，
+ * 原本挑好的那張圖已經不見了——而使用者只是想比較一下哪個好看。
+ * 切換是**預覽**行為，不該有破壞性。
+ *
+ * ⚠️ `imageUrl` 在影片模式下是**封面**（poster）。
+ *
+ * 這不只是省一個欄位：影片還沒載完、或訪客開了「減少動態效果」時，
+ * 畫面上必須有東西——沒有的話那一塊會是一片空白，而文字浮在空白上
+ * 看起來像壞掉。詳見 `section-background.tsx`。
+ */
+export const sectionBackgroundSchema = z.object({
+  type: sectionBackgroundTypeSchema,
+  color: cssColor.optional(),
+  gradientFrom: cssColor.optional(),
+  gradientTo: cssColor.optional(),
+  /** 漸層角度。0 = 由下往上，90 = 由左往右（與 CSS 的 deg 一致） */
+  gradientAngle: z.number().int().min(0).max(360).optional(),
+  imageUrl: siteImageUrl.optional(),
+  videoUrl: siteVideoUrl.optional(),
+  /*
+   * 遮罩濃度。
+   *
+   * ⚠️ 這一欄不是裝飾。一張隨手拍的照片後面壓著文字，
+   * 對比度幾乎一定不合格——而那件事在設計稿上很難看出來，
+   * 因為看的人已經知道那行字寫什麼。
+   *
+   * 所以編輯器在選了圖片或影片時會**預設給一個遮罩**，
+   * 而不是從 0 開始（見 section-background.ts 的 DEFAULT_MEDIA_OVERLAY）。
+   */
+  overlay: z.number().min(0).max(1).optional(),
+  /** 背景模糊，單位 px。讓照片退到後面去，文字才站得出來 */
+  blur: z.number().int().min(0).max(20).optional(),
+});
+
+export type SectionBackground = z.infer<typeof sectionBackgroundSchema>;
+
 export const siteSectionSchema = z.object({
   id: z
     .string()
@@ -280,6 +346,8 @@ export const siteSectionSchema = z.object({
     .max(40)
     .regex(/^[a-z0-9-]+$/, "variant 只能是小寫英數與連字號"),
   content: sectionContent,
+  /** 背景。沒有這一欄的舊資料照原本的樣子渲染（CR-004 / BJ） */
+  background: sectionBackgroundSchema.optional(),
   settings: z
     .record(z.string().max(60), z.union([z.string().max(200), z.number(), z.boolean()]))
     .optional(),

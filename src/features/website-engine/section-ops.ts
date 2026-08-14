@@ -1,5 +1,10 @@
 import { resolveSection, variantsFor } from "./registry";
-import { type SiteConfig, type SiteSection, validateSiteConfig } from "./schema";
+import {
+  type SectionBackground,
+  type SiteConfig,
+  type SiteSection,
+  validateSiteConfig,
+} from "./schema";
 
 /**
  * Section 操作（Spec §22 / Phase 6C）
@@ -138,6 +143,41 @@ export function setSectionVariant(
 
   const sections = [...config.sections];
   sections[index] = { ...section, variant };
+
+  return finalize({ ...config, sections });
+}
+
+/**
+ * 換一塊的背景（CR-004 / Phase B BJ）。
+ *
+ * ⚠️ 整份取代，不是合併。
+ *
+ * 與 `updateSectionContent` 相反，而那個相反是刻意的：內容是很多欄位，
+ * 改標題不該把說明弄丟；背景則是**一個選擇**——選了「純色」之後，
+ * 上一次那張圖不該還留在資料裡，不然存出去的設定會帶著一個
+ * 沒有任何地方會用到、但下一個讀的人看得到的網址。
+ *
+ * 要保留哪些值由 `switchBackgroundType` 決定，那是介面層的事。
+ */
+export function setSectionBackground(
+  config: SiteConfig,
+  id: string,
+  background: SectionBackground | undefined,
+): SectionOpResult {
+  const index = indexOfSection(config, id);
+  if (index < 0) return { ok: false, error: `找不到 id 是 ${id} 的區塊` };
+
+  const sections = [...config.sections];
+  const section = { ...sections[index]! };
+
+  if (!background || background.type === "none") {
+    // 沒有背景就把欄位整個拿掉，不要留一個 { type: "none" } 在那裡
+    delete section.background;
+  } else {
+    section.background = background;
+  }
+
+  sections[index] = section;
 
   return finalize({ ...config, sections });
 }

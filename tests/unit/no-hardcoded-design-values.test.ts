@@ -27,6 +27,8 @@ const ALLOWED_VALUE_FILES: Record<string, string> = {
     "Theme Engine 驗證頁（dev only）：色碼是示範用的「客戶網站主題」內容，不是本站的設計數值",
   "src/features/website-engine/templates/themes.ts":
     "Template 的主題預設集：色碼屬於「被預覽的客戶網站」，與本站設計數值是兩個系統。對比度由 templates.test.ts 實算",
+  "src/components/editor/background-panel.tsx":
+    "色票的預設停留位置與 placeholder：屬於「被編輯網站」的顏色，不是本站設計數值。兩個值都具名在檔案頂端",
 };
 
 /**
@@ -52,9 +54,26 @@ function collectFiles(dir: string): string[] {
   });
 }
 
+/**
+ * 註解要先去掉。
+ *
+ * ⚠️ 這正是 CLAUDE.md 記著的那個地雷，而這支測試自己踩了一次：
+ * 「稽核腳本比對原始碼前要先去掉註解。同一個原因造成過一次假通過、
+ *   一次假失敗。」
+ *
+ * 這次是假失敗——BJ 的背景模組在註解裡解釋「為什麼不寫死一個
+ * rgb(0 0 0 / x)」，而這條規則把那句解釋本身當成了違規。
+ *
+ * 反方向（假通過）也不成問題：註解裡的色碼不會被渲染出來。
+ * 規則的原文是「元件與樣式中不得出現硬編色碼」，而註解不是元件也不是樣式。
+ */
+function stripComments(input: string): string {
+  return input.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+}
+
 const files = collectFiles(SCAN_DIR).map((file) => ({
   path: relative(ROOT, file).split("\\").join("/"),
-  content: readFileSync(file, "utf8"),
+  content: stripComments(readFileSync(file, "utf8")),
 }));
 
 describe("設計數值只能來自 tokens.css", () => {
@@ -110,6 +129,11 @@ describe("設計數值只能來自 tokens.css", () => {
       // 與上傳進度條同一類：CSS 類別表達不了連續變化的值。
       // 顏色仍然來自 tokens.css（--color-brand-scrim），只有位置是 inline。
       "src/components/editor/image-editor.tsx": "裁切／模糊框的位置（執行期百分比）",
+      // 一塊的背景是使用者選的顏色、漸層、照片與遮罩濃度——
+      // 全部是執行期才知道的值，而且是**被編輯網站**的色值，
+      // 不是本站的設計數值。與 site-scope 同一類。
+      "src/features/website-engine/sections/section-background.tsx":
+        "Section 背景（執行期決定的色值與媒體）",
     };
 
     const offenders = files

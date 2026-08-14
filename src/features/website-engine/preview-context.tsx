@@ -18,12 +18,13 @@ import {
   addSection,
   removeSection,
   reorderSections,
+  setSectionBackground,
   setSectionVariant,
   updateSectionContent,
 } from "./section-ops";
 import { newSection } from "./section-presets";
 import { type EditorState, type StoredEditorState, storedEditorStateSchema } from "./editor-state";
-import type { SiteSection } from "./schema";
+import type { SectionBackground, SiteSection } from "./schema";
 import type { Device, SiteConfig } from "./types";
 
 /**
@@ -117,6 +118,7 @@ type PreviewAction =
   | { type: "reset-sections" }
   | { type: "update-content"; id: string; content: SiteSection["content"] }
   | { type: "set-variant"; id: string; variant: string }
+  | { type: "set-background"; id: string; background: SectionBackground | undefined }
   | { type: "undo" }
   | { type: "redo" }
   | { type: "set-saved-site"; id: string | null };
@@ -128,6 +130,7 @@ const SECTION_ACTIONS = new Set([
   "add-section",
   "update-content",
   "set-variant",
+  "set-background",
   "reset-sections",
 ]);
 
@@ -315,6 +318,16 @@ function baseReducer(state: PreviewState, action: PreviewAction): PreviewState {
 
     case "set-variant": {
       const result = setSectionVariant(configOf(state), action.id, action.variant);
+      return result.ok ? { ...state, sections: result.config.sections } : state;
+    }
+
+    case "set-background": {
+      const result = setSectionBackground(configOf(state), action.id, action.background);
+      /*
+       * 失敗就當作沒發生（與 update-content 同一個判斷）。
+       * 最常見的失敗是貼進了非本站網域的網址——schema 會擋，
+       * 而那時畫面不變比顯示一半好。訊息由介面層自己顯示。
+       */
       return result.ok ? { ...state, sections: result.config.sections } : state;
     }
 
@@ -541,6 +554,8 @@ export interface SitePreviewValue extends PreviewState {
   canRedo: boolean;
   updateContent: (id: string, content: SiteSection["content"]) => void;
   setVariant: (id: string, variant: string) => void;
+  /** 換一塊的背景。傳 undefined 或 type: "none" 就是拿掉（CR-004 / BJ） */
+  setBackground: (id: string, background: SectionBackground | undefined) => void;
   resetSections: () => void;
   /** 有沒有動過區塊結構。用來決定要不要顯示「回到模板原樣」 */
   sectionsEdited: boolean;
@@ -649,6 +664,7 @@ export function SitePreviewProvider({
       },
       updateContent: (id, content) => dispatch({ type: "update-content", id, content }),
       setVariant: (id, variant) => dispatch({ type: "set-variant", id, variant }),
+      setBackground: (id, background) => dispatch({ type: "set-background", id, background }),
       resetSections: () => dispatch({ type: "reset-sections" }),
       undo: () => dispatch({ type: "undo" }),
       redo: () => dispatch({ type: "redo" }),

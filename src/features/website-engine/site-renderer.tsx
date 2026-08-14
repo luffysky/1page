@@ -1,6 +1,8 @@
 import { Fragment } from "react";
 
 import { resolveSection, UnknownSection } from "./registry";
+import { hasVisibleBackground } from "./section-background";
+import { SectionBackgroundLayer } from "./sections/section-background";
 import { type SiteConfig, type SiteSection, validateSiteConfig } from "./schema";
 import { SiteScope } from "./site-scope";
 
@@ -70,10 +72,29 @@ export function SiteRenderer({ config, className, wrapSection }: SiteRendererPro
           const resolved = resolveSection(section);
 
           // 未知的 type：顯示可辨識的佔位，不中斷其餘區塊的渲染
-          const rendered = resolved ? (
+          const body = resolved ? (
             <resolved.component section={section} />
           ) : (
             <UnknownSection section={section} />
+          );
+
+          /*
+           * 背景包在 Section 元件外面，而不是傳進去（CR-004 / BJ）。
+           *
+           * 傳進去的話，十幾個 Section 元件每一個都要自己記得畫背景——
+           * 而漏掉的那一個不會報錯，它只是沒有背景。這與 SiteFooter
+           * 為什麼自己讀 CMS 是同一個判斷：**忘記做的那一次不能沒有代價**。
+           *
+           * `isolate` 建立新的 stacking context，`-z-10` 的背景層
+           * 才不會鑽到上一塊的內容底下去。
+           */
+          const rendered = hasVisibleBackground(section.background) ? (
+            <div className="relative isolate">
+              <SectionBackgroundLayer background={section.background!} />
+              {body}
+            </div>
+          ) : (
+            body
           );
 
           /*

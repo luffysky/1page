@@ -7,7 +7,7 @@ import { getMemberIdentity } from "@/features/account/auth";
 import { buildSiteObjectKey, createUploadUrl, hasR2Config, publicUrlFor } from "@/lib/storage/r2";
 
 /**
- * 編輯器的圖片上傳（CR-003-4）
+ * 編輯器的媒體上傳（CR-003-4，CR-004 / BJ 起也收影片）
  *
  * ── 這條路徑為什麼一定要登入 ──────────────────────────────────
  *
@@ -34,7 +34,7 @@ export type SiteImageUploadResult =
 export async function createSiteImageUploadUrl(input: unknown): Promise<SiteImageUploadResult> {
   const identity = await getMemberIdentity();
   if (!identity) {
-    return { ok: false, message: "要先登入才能上傳圖片。編輯本身不用登入。" };
+    return { ok: false, message: "要先登入才能上傳檔案。編輯本身不用登入。" };
   }
 
   if (!hasR2Config()) {
@@ -49,14 +49,20 @@ export async function createSiteImageUploadUrl(input: unknown): Promise<SiteImag
 
   const kind = findMediaKind(contentType);
   /*
-   * 只收圖片。
+   * 收圖片與影片，不收 PDF。
    *
-   * 白名單裡還有 mp4 與 pdf，那是作品集要用的。網站區塊目前沒有任何
-   * 地方會播影片或嵌 PDF——收得進來卻沒有人讀，那就只是一個
-   * 100MB 的上傳孔。
+   * ⚠️ 這一段原本只收圖片，理由寫得很清楚：
+   * 「網站區塊沒有任何地方會播影片——收得進來卻沒有人讀，
+   *   那就只是一個 100MB 的上傳孔。」
+   *
+   * CR-004 / BJ 讓每一塊都可以用影片當背景，所以現在真的有讀取端了
+   * （`sections/section-background.tsx`）。條件放寬的同時把理由改掉，
+   * 而不是留著一句已經不成立的註解——過期的註解比沒有註解更糟。
+   *
+   * PDF 仍然不收：那是作品集的東西，走後台那條路徑。
    */
-  if (!kind || kind.type !== "image") {
-    return { ok: false, message: `只能上傳圖片（${contentType} 不行）` };
+  if (!kind || (kind.type !== "image" && kind.type !== "video")) {
+    return { ok: false, message: `只能上傳圖片或影片（${contentType} 不行）` };
   }
 
   // 副檔名必須與 MIME 相符。只驗其中一項擋不住改副檔名或偽造 MIME

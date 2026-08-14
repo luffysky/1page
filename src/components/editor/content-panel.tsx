@@ -3,6 +3,7 @@
 import { useId } from "react";
 
 import { ImageUploadField } from "@/components/editor/image-upload-field";
+import { BackgroundPanel } from "@/components/editor/background-panel";
 import { useSitePreview } from "@/features/website-engine/preview-context";
 import { variantsFor } from "@/features/website-engine/registry";
 import {
@@ -374,6 +375,15 @@ export function ContentPanel({ section, signedIn }: { section: SiteSection; sign
           );
         })}
       </div>
+
+      {/*
+       * 背景放在文字下面（CR-004 / BJ）。
+       *
+       * 順序是刻意的：先把要說的話寫好，再決定它站在什麼上面。
+       * 反過來的話，很容易先挑了一張很漂亮的照片，然後為了配合照片
+       * 去改文案——而文案才是那一塊存在的理由。
+       */}
+      <BackgroundPanel section={section} signedIn={signedIn} />
     </div>
   );
 }
