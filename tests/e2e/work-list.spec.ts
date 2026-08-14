@@ -87,6 +87,60 @@ test("上一頁可回到前一個篩選", async ({ page }) => {
   );
 });
 
+test("標籤與服務篩選真的會改變結果，而且進得了網址（Spec §8.7）", async ({ page }) => {
+  await page.goto("/work");
+  const before = await page.locator("article").count();
+  expect(before).toBeGreaterThan(1);
+
+  await page.getByText("更多篩選").click();
+
+  // 服務：Brand & Design。按下去結果要變少，不是變多也不是不變
+  await page.getByRole("button", { name: "Brand & Design", exact: true }).click();
+  await expect(page).toHaveURL(/service=brand-design/);
+
+  const afterService = await page.locator("article").count();
+  expect(afterService, "按了服務篩選，結果件數沒有變少").toBeLessThan(before);
+  expect(afterService, "篩到一件都不剩，這條就證明不了篩選是對的").toBeGreaterThan(0);
+
+  /*
+   * 重新整理之後條件還在——這是「篩選狀態進網址」的整個重點：
+   * 可分享、可作為廣告落地頁、重新整理不掉狀態。
+   */
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Brand & Design", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  expect(await page.locator("article").count()).toBe(afterService);
+});
+
+test("帶著 ?tag= 的連結進來時，那個條件看得見", async ({ page }) => {
+  /*
+   * 「更多篩選」預設是收起來的。從外部連結帶條件進來卻收著的話，
+   * 使用者會看到一份被篩過的清單，而畫面上找不到是誰在篩——
+   * 那比沒有篩選器更難理解。
+   */
+  await page.goto("/work?tag=landing-page");
+
+  const chip = page.getByRole("button", { name: "Landing Page", exact: true });
+  await expect(chip).toBeVisible();
+  await expect(chip).toHaveAttribute("aria-pressed", "true");
+});
+
+test("未知的 tag / service 參數退回不限，不是篩出零筆", async ({ page }) => {
+  // 舊連結或亂打的網址不該讓人看到一片空白
+  await page.goto("/work");
+  const all = await page.locator("article").count();
+
+  await page.goto("/work?tag=does-not-exist&service=nope");
+
+  /*
+   * 網址上那兩個參數會留著（server 不會替使用者改寫網址），
+   * 但它們不該篩掉任何東西——與既有的「非法分類退回 All」同樣的處理。
+   */
+  expect(await page.locator("article").count(), "亂打的參數把作品篩光了").toBe(all);
+});
+
 test("每件作品都標示來源類型（Spec §8.2 / §29）", async ({ page }) => {
   await page.goto("/work");
   const cards = page.locator("article");

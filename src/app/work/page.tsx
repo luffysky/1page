@@ -13,10 +13,15 @@ import { FINAL_CTA_COPY } from "@/config/home-copy";
 import {
   ALL_CATEGORIES,
   ALL_PROJECT_TYPES,
+  ALL_SERVICES,
+  ALL_TAGS,
   getCategoryName,
   parseCategoryFilter,
   parseProjectTypeFilter,
+  parseServiceFilter,
+  parseTagFilter,
 } from "@/config/portfolio-categories";
+import { SERVICE_LINES } from "@/config/services";
 import { getPortfolioRepository } from "@/features/portfolio";
 import { PROJECT_TYPE_LABELS } from "@/features/portfolio/project-type";
 
@@ -54,20 +59,38 @@ export default async function WorkPage({ searchParams }: PageProps<"/work">) {
    * 而那正是這次要修掉的分岔。
    */
   const repository = getPortfolioRepository();
-  const categories = await repository.listCategories();
+  const [categories, tags] = await Promise.all([
+    repository.listCategories(),
+    repository.listTags(),
+  ]);
 
   const category = parseCategoryFilter(params.category, categories);
   const projectType = parseProjectTypeFilter(params.type);
+  const tag = parseTagFilter(params.tag, tags);
+  const service = parseServiceFilter(
+    params.service,
+    SERVICE_LINES.map((line) => line.id),
+  );
 
-  const items = await repository.listPublished({ category, projectType });
+  const items = await repository.listPublished({ category, projectType, tag, service });
   // 後台入口只渲染給已驗證的後台人員；其他人拿到 null，
   // 密路徑因此完全不會出現在送給瀏覽器的 HTML 裡。
   const [adminEntry, accountEntry] = await Promise.all([getAdminEntry(), getAccountEntry()]);
 
-  const isFiltered = category !== ALL_CATEGORIES || projectType !== ALL_PROJECT_TYPES;
+  const isFiltered =
+    category !== ALL_CATEGORIES ||
+    projectType !== ALL_PROJECT_TYPES ||
+    tag !== ALL_TAGS ||
+    service !== ALL_SERVICES;
+
+  // 空狀態要說得出「是哪幾個條件」。少列一個的話，訊息會與畫面不符
   const activeLabels = [
     category !== ALL_CATEGORIES ? getCategoryName(category, categories) : null,
     projectType !== ALL_PROJECT_TYPES ? PROJECT_TYPE_LABELS[projectType] : null,
+    service !== ALL_SERVICES
+      ? (SERVICE_LINES.find((l) => l.id === service)?.name ?? service)
+      : null,
+    tag !== ALL_TAGS ? (tags.find((t) => t.slug === tag)?.name ?? tag) : null,
   ].filter(Boolean);
 
   return (
@@ -94,8 +117,11 @@ export default async function WorkPage({ searchParams }: PageProps<"/work">) {
           <PortfolioFilter
             category={category}
             projectType={projectType}
+            tag={tag}
+            service={service}
             resultCount={items.length}
             categories={categories}
+            tags={tags}
           />
         </section>
 

@@ -61,6 +61,36 @@ export function parseCategoryFilter(
   return typeof raw === "string" && slugs.has(raw) ? raw : ALL_CATEGORIES;
 }
 
+/* ------------------------------------------------------------------ */
+/* Tag 與 Service（Spec §8.7「另可依 … Tag / Service 篩選」）           */
+/* ------------------------------------------------------------------ */
+
+/**
+ * ⚠️ Tag 與 Service 是**兩個不同的東西**，不要因為都是字串陣列就合併。
+ *
+ *   services   我們賣的四條服務線（config/services.ts），一件作品用到哪幾條
+ *   tags       這件作品的特徵（Logo / Landing Page / Minimal …），數量會長
+ *
+ * 合併的話，篩選器上會出現「Web」與「Landing Page」並排，
+ * 而訪客分不出哪一個是「我要找的服務」哪一個是「順便描述」。
+ */
+export const ALL_TAGS = "all" as const;
+export type TagFilter = string | typeof ALL_TAGS;
+
+export function parseTagFilter(value: unknown, tags: readonly PortfolioCategory[]): TagFilter {
+  const raw = Array.isArray(value) ? value[0] : value;
+  const slugs = new Set(tags.map((tag) => tag.slug));
+  return typeof raw === "string" && slugs.has(raw) ? raw : ALL_TAGS;
+}
+
+export const ALL_SERVICES = "all" as const;
+export type ServiceFilter = string | typeof ALL_SERVICES;
+
+export function parseServiceFilter(value: unknown, serviceIds: readonly string[]): ServiceFilter {
+  const raw = Array.isArray(value) ? value[0] : value;
+  return typeof raw === "string" && serviceIds.includes(raw) ? raw : ALL_SERVICES;
+}
+
 export const ALL_PROJECT_TYPES = "all" as const;
 
 export type ProjectTypeFilter = PortfolioProjectType | typeof ALL_PROJECT_TYPES;

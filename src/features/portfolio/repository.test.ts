@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { parseCategoryFilter, parseProjectTypeFilter } from "@/config/portfolio-categories";
 
 import { inMemoryPortfolioRepository } from "./in-memory-repository";
-import { filterForList, type PortfolioListItem } from "./repository";
+import { filterForList, type PortfolioListFilter, type PortfolioListItem } from "./repository";
 
 const ITEMS: PortfolioListItem[] = [
   {
@@ -13,6 +13,8 @@ const ITEMS: PortfolioListItem[] = [
     projectType: "demo",
     href: "/work/a",
     categories: ["web"],
+    tags: ["landing-page"],
+    services: ["web"],
   },
   {
     id: "b",
@@ -21,6 +23,8 @@ const ITEMS: PortfolioListItem[] = [
     projectType: "internal",
     href: "/work/b",
     categories: ["ai", "automation"],
+    tags: ["agent"],
+    services: ["ai-automation"],
   },
   {
     id: "c",
@@ -29,6 +33,8 @@ const ITEMS: PortfolioListItem[] = [
     projectType: "concept",
     href: "/work/c",
     categories: ["brand", "web"],
+    tags: ["logo", "landing-page"],
+    services: ["brand-design", "web"],
   },
 ];
 
@@ -55,6 +61,63 @@ describe("filterForList（Spec §8.7）", () => {
   it("無結果時回傳空陣列，不退回全部", () => {
     // 偷偷退回全部會讓使用者以為篩選有作用，實際上沒有
     expect(filterForList(ITEMS, { category: "video", projectType: "all" })).toEqual([]);
+  });
+
+  it("依標籤篩選（Spec §8.7）", () => {
+    const base = { category: "all", projectType: "all" } as const;
+    expect(filterForList(ITEMS, { ...base, tag: "landing-page" }).map((i) => i.id)).toEqual([
+      "a",
+      "c",
+    ]);
+    expect(filterForList(ITEMS, { ...base, tag: "agent" }).map((i) => i.id)).toEqual(["b"]);
+  });
+
+  it("依服務篩選（Spec §8.7）", () => {
+    const base = { category: "all", projectType: "all" } as const;
+    expect(filterForList(ITEMS, { ...base, service: "web" }).map((i) => i.id)).toEqual(["a", "c"]);
+    expect(filterForList(ITEMS, { ...base, service: "brand-design" }).map((i) => i.id)).toEqual([
+      "c",
+    ]);
+  });
+
+  it("四個維度一起生效，而且是 AND", () => {
+    /*
+     * OR 的話「Web + Logo」會回傳所有 Web 加上所有 Logo，
+     * 而訪客按下第二個條件時期待的是結果變少，不是變多。
+     */
+    expect(
+      filterForList(ITEMS, {
+        category: "web",
+        projectType: "concept",
+        tag: "logo",
+        service: "brand-design",
+      }).map((i) => i.id),
+    ).toEqual(["c"]);
+
+    // 換掉其中任何一個條件就沒有東西——證明四個都真的參與了判斷
+    const breakages: Partial<PortfolioListFilter>[] = [
+      { category: "video" },
+      { projectType: "demo" },
+      { tag: "agent" },
+      { service: "content-growth" },
+    ];
+
+    for (const broken of breakages) {
+      const filter: PortfolioListFilter = {
+        category: "web",
+        projectType: "concept",
+        tag: "logo",
+        service: "brand-design",
+        ...broken,
+      };
+      expect(filterForList(ITEMS, filter), `${JSON.stringify(broken)} 沒有被納入判斷`).toEqual([]);
+    }
+  });
+
+  it("沒有傳 tag / service 時不做額外篩選", () => {
+    // sitemap 與 Agent 的工具就是這樣呼叫的。預設值變成「篩掉全部」的話，
+    // 網站地圖會一件作品都不列，而且不會有任何錯誤
+    expect(filterForList(ITEMS, { category: "all", projectType: "all" })).toHaveLength(3);
   });
 });
 

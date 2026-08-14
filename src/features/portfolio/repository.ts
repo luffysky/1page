@@ -4,9 +4,13 @@ import { getHomeGoal, type HomeGoal, isFilteringGoal } from "@/config/home-goals
 import {
   ALL_CATEGORIES,
   ALL_PROJECT_TYPES,
+  ALL_SERVICES,
+  ALL_TAGS,
   type CategoryFilter,
   type PortfolioCategory,
   type ProjectTypeFilter,
+  type ServiceFilter,
+  type TagFilter,
 } from "@/config/portfolio-categories";
 
 /**
@@ -27,11 +31,25 @@ import {
  */
 export interface PortfolioListItem extends PortfolioCard {
   categories: string[];
+  /** 標籤的 slug（不是顯示名稱）。篩選比對用 slug，顯示才用名稱 */
+  tags: string[];
+  /** 對應 config/services.ts 的 id（Spec §8.13） */
+  services: string[];
 }
 
 export interface PortfolioListFilter {
   category: CategoryFilter;
   projectType: ProjectTypeFilter;
+  /*
+   * Tag 與 Service 是選填的（Spec §8.7 寫的是「另可依 … 篩選」）。
+   *
+   * 選填而不是必填，是因為呼叫端有三種：`/work` 四個都給，
+   * 而 sitemap 與 Agent 的工具要的是「不額外篩」。強迫它們寫
+   * `tag: "all", service: "all"` 只是噪音，而且下一個新增的篩選維度
+   * 又要再去改一次那些跟篩選無關的地方。
+   */
+  tag?: TagFilter;
+  service?: ServiceFilter;
 }
 
 export interface PortfolioRepository {
@@ -46,6 +64,14 @@ export interface PortfolioRepository {
    * 現在畫面讀資料庫，程式碼那份退成「沒有資料庫時的種子」。
    */
   listCategories(): Promise<PortfolioCategory[]>;
+  /**
+   * 目前有作品在用的標籤（Spec §8.7）。
+   *
+   * ⚠️ 只回「有作品在用的」，不是整張 `portfolio_tags`。
+   * 列出沒有任何作品的標籤，訪客按下去就是一片空白——
+   * 一個永遠篩不出東西的按鈕比沒有那顆按鈕更糟。
+   */
+  listTags(): Promise<PortfolioCategory[]>;
   /** 首頁只顯示 Featured Projects（Spec §8.11），建議 3～6 件 */
   listFeatured(): Promise<PortfolioListItem[]>;
   /** 依 Home Goal 篩選（Spec §6.1 對應表） */
@@ -82,10 +108,20 @@ export function filterForList<T extends PortfolioListItem>(
   filter: PortfolioListFilter,
 ): T[] {
   return items.filter((item) => {
+    /*
+     * 四個條件是 AND。
+     *
+     * OR 的話「Web + Logo」會回傳所有 Web 加上所有 Logo，
+     * 而訪客按下第二個條件時期待的是結果變少，不是變多。
+     */
     const categoryOk =
       filter.category === ALL_CATEGORIES || item.categories.includes(filter.category);
     const typeOk =
       filter.projectType === ALL_PROJECT_TYPES || item.projectType === filter.projectType;
-    return categoryOk && typeOk;
+    const tag = filter.tag ?? ALL_TAGS;
+    const service = filter.service ?? ALL_SERVICES;
+    const tagOk = tag === ALL_TAGS || item.tags.includes(tag);
+    const serviceOk = service === ALL_SERVICES || item.services.includes(service);
+    return categoryOk && typeOk && tagOk && serviceOk;
   });
 }

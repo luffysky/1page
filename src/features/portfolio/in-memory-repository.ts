@@ -27,6 +27,8 @@ const SEED: PortfolioListItem[] = [
     href: "/work/interior-studio",
     placeholderTone: "cream",
     categories: ["web", "ui-ux"],
+    tags: ["landing-page", "luxury", "minimal"],
+    services: ["web", "brand-design"],
   },
   {
     id: "yipage-identity",
@@ -36,6 +38,8 @@ const SEED: PortfolioListItem[] = [
     href: "/work/yipage-identity",
     placeholderTone: "accent",
     categories: ["brand", "web", "internal-product"],
+    tags: ["design-system", "editorial"],
+    services: ["brand-design", "web"],
   },
   {
     id: "ai-website-workshop",
@@ -45,6 +49,8 @@ const SEED: PortfolioListItem[] = [
     href: "/work/ai-website-workshop",
     placeholderTone: "ink",
     categories: ["ai", "automation", "internal-product"],
+    tags: ["agent", "siteconfig"],
+    services: ["ai-automation", "web"],
   },
   {
     id: "dessert-brand",
@@ -54,6 +60,8 @@ const SEED: PortfolioListItem[] = [
     href: "/work/dessert-brand",
     placeholderTone: "cream",
     categories: ["brand", "graphic"],
+    tags: ["logo", "packaging"],
+    services: ["brand-design"],
   },
   {
     id: "cafe-social-kit",
@@ -63,6 +71,8 @@ const SEED: PortfolioListItem[] = [
     href: "/work/cafe-social-kit",
     placeholderTone: "accent",
     categories: ["social", "advertising", "content"],
+    tags: ["campaign", "instagram"],
+    services: ["content-growth"],
   },
   {
     id: "ops-automation",
@@ -72,6 +82,8 @@ const SEED: PortfolioListItem[] = [
     href: "/work/ops-automation",
     placeholderTone: "ink",
     categories: ["automation", "ai", "internal-product"],
+    tags: ["agent", "workflow"],
+    services: ["ai-automation"],
   },
 ];
 
@@ -88,6 +100,22 @@ export const inMemoryPortfolioRepository: PortfolioRepository = {
    */
   async listCategories() {
     return [...PORTFOLIO_CATEGORIES];
+  },
+
+  /*
+   * 標籤沒有一份程式碼裡的種子（它們只存在資料庫的 seed.sql），
+   * 所以這裡從作品自己身上算出來——與 Supabase 實作同樣的規則：
+   * 只回「有作品在用的」。
+   *
+   * 名稱用 slug 湊出可讀的形式（landing-page → Landing Page）。
+   * 這只影響沒有資料庫的開發環境，正式環境讀得到真的名稱。
+   */
+  async listTags() {
+    const slugs = [...new Set(SEED.flatMap((project) => project.tags))].sort();
+    return slugs.map((slug) => ({
+      slug,
+      name: slug.replace(/-/g, " ").replace(/\w/g, (char) => char.toUpperCase()),
+    }));
   },
 
   async listFeatured() {

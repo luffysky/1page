@@ -7,6 +7,7 @@ import type { Json, PortfolioProjectsRow } from "@/types/database";
 import type { PortfolioCaseStudy, PortfolioDetail, PortfolioLinks, PortfolioMedia } from "./detail";
 import {
   filterByGoal,
+  filterForList,
   type PortfolioListFilter,
   type PortfolioListItem,
   type PortfolioRepository,
@@ -24,8 +25,9 @@ import {
 
 /** PostgREST 的巢狀選取：一次把分類與標籤帶回來，避免 N+1 */
 const LIST_SELECT = `
-  id, slug, title, kicker, summary, project_type, featured, sort_order,
+  id, slug, title, kicker, summary, project_type, featured, sort_order, services,
   portfolio_project_categories ( portfolio_categories ( slug ) ),
+  portfolio_project_tags ( portfolio_tags ( slug ) ),
   portfolio_media ( url, alt, role )
 `;
 
@@ -39,12 +41,23 @@ const DETAIL_SELECT = `
 
 type CategoryJoin = { portfolio_categories: { slug: string } | null }[] | null;
 type TagJoin = { portfolio_tags: { name: string } | null }[] | null;
+/** 列表只需要 slug（比對用），詳細頁要 name（顯示用）——兩者刻意不共用型別 */
+type TagSlugJoin = { portfolio_tags: { slug: string } | null }[] | null;
 
 interface ListRow extends Pick<
   PortfolioProjectsRow,
-  "id" | "slug" | "title" | "kicker" | "summary" | "project_type" | "featured" | "sort_order"
+  | "id"
+  | "slug"
+  | "title"
+  | "kicker"
+  | "summary"
+  | "project_type"
+  | "featured"
+  | "sort_order"
+  | "services"
 > {
   portfolio_project_categories: CategoryJoin;
+  portfolio_project_tags: TagSlugJoin;
   portfolio_media: { url: string; alt: string | null; role: string }[] | null;
 }
 
@@ -94,6 +107,10 @@ function toListItem(row: ListRow): PortfolioListItem {
     href: `/work/${row.slug}`,
     placeholderTone: toneOf(row.slug),
     categories: categoriesOf(row.portfolio_project_categories),
+    tags: (row.portfolio_project_tags ?? [])
+      .map((join) => join.portfolio_tags?.slug)
+      .filter((slug): slug is string => Boolean(slug)),
+    services: row.services ?? [],
   };
 }
 
@@ -138,6 +155,33 @@ export const supabasePortfolioRepository: PortfolioRepository = {
     return (data ?? []).map((row) => ({ slug: row.slug, name: row.name }));
   },
 
+  async listTags() {
+    /*
+     * 只回「有作品在用的」標籤。
+     *
+     * 走 join 表往回撈而不是整張 portfolio_tags：列出沒有任何作品的標籤，
+     * 訪客按下去就是一片空白——一個永遠篩不出東西的按鈕比沒有更糟。
+     *
+     * ⚠️ 這裡看得到的作品受 RLS 限制（未發布的讀不到），所以只被草稿
+     * 使用的標籤自然不會出現。那是對的：它對訪客而言確實不存在。
+     */
+    const { data, error } = await getSupabasePublicClient()
+      .from("portfolio_project_tags")
+      .select("portfolio_tags ( slug, name ), portfolio_projects!inner ( slug )")
+      .returns<{ portfolio_tags: { slug: string; name: string } | null }[]>();
+
+    if (error) throw new Error(`listTags 失敗：${error.message}`);
+
+    const seen = new Map<string, string>();
+    for (const row of data ?? []) {
+      if (row.portfolio_tags) seen.set(row.portfolio_tags.slug, row.portfolio_tags.name);
+    }
+
+    return [...seen]
+      .map(([slug, name]) => ({ slug, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  },
+
   async listFeatured() {
     const { data, error } = await getSupabasePublicClient()
       .from("portfolio_projects")
@@ -172,11 +216,18 @@ export const supabasePortfolioRepository: PortfolioRepository = {
 
     const items = (data ?? []).map(toListItem);
 
-    // 分類篩選在記憶體完成：PostgREST 對「巢狀關聯的條件」需要 inner join 語法，
-    // 而那會連帶影響回傳的關聯資料（只剩符合條件的分類），
-    // 導致卡片上顯示的分類不完整。作品數量在此規模下不值得為此犧牲正確性。
-    if (filter.category === ALL_CATEGORIES) return items;
-    return items.filter((item) => item.categories.includes(filter.category));
+    /*
+     * 分類／標籤／服務的篩選在記憶體完成。
+     *
+     * PostgREST 對「巢狀關聯的條件」需要 inner join 語法，而那會連帶影響
+     * 回傳的關聯資料（只剩符合條件的那幾筆），導致卡片上顯示的分類不完整。
+     * 作品數量在此規模下不值得為此犧牲正確性。
+     *
+     * ⚠️ 用 `filterForList` 而不是在這裡自己寫條件：那支函式同時被
+     * in-memory 實作使用，兩邊各寫一份的話，「Web + Logo」在有沒有資料庫
+     * 的環境下會得到不同結果——而那種差異只會在正式環境出現。
+     */
+    return filterForList(items, filter);
   },
 
   async getBySlug(slug: string) {
@@ -190,7 +241,7 @@ export const supabasePortfolioRepository: PortfolioRepository = {
     if (!data) return null; // 不存在與未發布走同一條路徑，不從差異洩漏草稿存在
 
     // 詳細查詢帶回更多媒體欄位，因此排除 ListRow 較窄的 portfolio_media 定義
-    const row = data as unknown as Omit<ListRow, "portfolio_media"> & {
+    const row = data as unknown as Omit<ListRow, "portfolio_media" | "portfolio_project_tags"> & {
       industry: string | null;
       year: number | null;
       services: string[] | null;
