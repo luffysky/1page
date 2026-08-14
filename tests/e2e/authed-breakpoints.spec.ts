@@ -199,3 +199,88 @@ test.describe("後台", () => {
     expect(response?.url()).toContain("/login");
   });
 });
+
+// ── 會員 dashboard ──────────────────────────────────────────────
+//
+// ⚠️ 這一段是補的。`a11y-all-routes.spec.ts` 把 `/account/*` 列為
+// 「在 authed-breakpoints.spec.ts（需要登入）」——而這個檔案**從來沒有掃過它**。
+// 例外清單寫了理由，理由卻不成立：那是一個名不副實的綠燈。
+//
+// 會員頁面用的是與後台同一個 DashboardShell，但兩邊的內容不同，
+// 而橫向捲動與焦點問題出在內容上。
+test.describe("會員 dashboard", () => {
+  const MEMBER_EMAIL = "e2e-member-rwd@1page.test";
+  const MEMBER_PASSWORD = "E2e!MemberRwd#2026";
+
+  let memberId: string | undefined;
+
+  test.beforeAll(async () => {
+    const existing = await sql(`select id from auth.users where email = '${MEMBER_EMAIL}'`);
+    for (const row of existing) await gotrue(`/users/${row.id}`, { method: "DELETE" });
+
+    const created = await gotrue("/users", {
+      method: "POST",
+      body: JSON.stringify({ email: MEMBER_EMAIL, password: MEMBER_PASSWORD, email_confirm: true }),
+    });
+    const body = (await created.json()) as { id?: string };
+    if (!body.id) throw new Error(`建立測試會員失敗：${JSON.stringify(body)}`);
+    memberId = body.id;
+  });
+
+  test.afterAll(async () => {
+    if (memberId) await gotrue(`/users/${memberId}`, { method: "DELETE" });
+  });
+
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/login?next=%2Faccount");
+    await page.getByLabel("Email").fill(MEMBER_EMAIL);
+    await page.getByLabel("密碼").fill(MEMBER_PASSWORD);
+    await page.getByRole("button", { name: "登入" }).click();
+    await page.waitForURL(/\/account/, { timeout: 20_000 });
+  });
+
+  // 四個區段都掃，最窄與最寬兩端。側欄在窄螢幕收成抽屜，
+  // 而「收起來」與「用 CSS 藏起來」的差別正是這裡要驗的東西。
+  const pages = [
+    ["總覽", "/account"],
+    ["我的網站", "/account/sites"],
+    ["我的詢問", "/account/inquiries"],
+    ["帳號設定", "/account/settings"],
+  ] as const;
+
+  const [narrow] = VIEWPORTS;
+  const wide = VIEWPORTS[VIEWPORTS.length - 1]!;
+
+  for (const [label, path] of pages) {
+    for (const viewport of [narrow, wide]) {
+      test(`${label} @ ${viewport.name}px 無違規且無橫向捲動`, async ({ page }) => {
+        await page.setViewportSize({ width: viewport.width, height: viewport.height });
+        await page.goto(path);
+
+        expect(await scan(page)).toEqual([]);
+        expect(
+          await horizontalOverflow(page),
+          `${viewport.name}px 出現橫向捲動`,
+        ).toBeLessThanOrEqual(0);
+      });
+    }
+  }
+
+  test("窄螢幕的側欄收起來時，鍵盤不會 Tab 進看不見的連結", async ({ page }) => {
+    /*
+     * 用 CSS 藏起來的側欄仍然在 Tab 順序上——使用者會依序停在一整排
+     * 看不見的連結上，而 axe 不會報這件事（那是表單區塊踩過的同一個坑：
+     * readOnly input 仍然吃 Tab）。
+     *
+     * 所以關閉時整組不進 DOM，這條就是在驗那件事。
+     */
+    await page.setViewportSize({ width: narrow!.width, height: narrow!.height });
+    await page.goto("/account");
+
+    const links = await page.getByRole("navigation").getByRole("link").count();
+    expect(links, "抽屜收起來時不該有任何導覽連結留在 DOM 裡").toBe(0);
+
+    await page.getByRole("button", { name: "選單" }).click();
+    expect(await page.getByRole("navigation").getByRole("link").count()).toBeGreaterThan(0);
+  });
+});
