@@ -20,6 +20,15 @@ export default function NewProjectPage() {
           project_type: "demo",
           featured: false,
           sort_order: 0,
+
+          // 新作品一律留白。預設文字會被原封不動地留在公開頁面上
+          industry: "",
+          year: "",
+          services: [],
+          caseStudy: {},
+          links: {},
+          aiUsed: false,
+          aiDescription: "",
         }}
       />
     </>

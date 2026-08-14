@@ -1,14 +1,18 @@
-# 待辦狀態校正 0813
+# 待辦狀態校正 0815
 
-> 這份是 2026-08-13 收工時**對照實際程式與實測結果**校正過的權威狀態。
-> 前一版是 `todo_list_0811.md`（本檔即由它更名而來）。
+> 這份是 2026-08-15 收工時**對照實際程式與實測結果**校正過的權威狀態。
+> 前一版是 `todo_list_0813.md`（本檔即由它更名而來）。
 > Phase 進度以 `docs/gate-log.md` 的 Gate 紀錄為準，那份是逐段的驗收證據。
 > 規格以 `docs/1page-v1-spec.md`（**V1.4**，CR-001～003 已併入）為唯一來源。
 >
 > 劃掉的是 0811 之後已經完成的。
 
-**測試總數：386 unit + 252 e2e + 56 db = 694。**（0811 時是 349）
-> 當天的逐項工作紀錄見 `daily_works_0813.md`。
+**測試總數：420 unit + 214 e2e + 69 db = 703。**（0813 時是 694）
+> 逐項工作紀錄見 `daily_works_0813.md` 與 `daily_works_0814.md`。
+>
+> ⚠️ e2e 目前有 **2 條紅的，而且是刻意的**：R2 bucket 沒有 CORS 設定，
+> 瀏覽器上傳一律送不出去。那是基礎設施沒設好，不是程式壞了——
+> 紅燈要留到它真的能用為止。修法見「需 Luffy 操作」那一節。
 
 ---
 
@@ -146,42 +150,96 @@ Security 稽核 21 項全綠，而整個專案一行 CSP 都沒有——**沒有
 
 ---
 
-## 🔴 真正還沒做（純程式、沒被外部卡）
+## ✅ 0814–0815 做掉的（原本列在「真正還沒做」）
 
-### 編輯器還缺的（CR-003-4 之後）
+### ~~草稿載回編輯器~~ ✅
+
+存檔功能原本**只寫不讀**：`saved_sites` 存的是 `buildSiteConfig()` 算出來的
+成品，而成品裡沒有「當初選的是哪一套模板」——那個資訊在算出成品的
+那一刻就被丟掉了。存得進去、永遠打不開。
+
+改成存輸入：資料庫與 sessionStorage 現在是同一份文件、同一個 schema
+（`editor-state.ts`）。兩邊各存各的形狀正是這次載不回來的原因。
+`/edit?draft=<id>`，入口在會員中心的「編輯」；再按存檔是更新那一份。
+
+### ~~編輯器新增／刪除單一項目~~ ✅
+
+模板給三個服務、使用者有四個，那第四個原本永遠加不上去。
+刪到剩一項停手——不是為了留內容，是因為欄位形狀是從現在的值認出來的，
+空陣列既是空字串清單也是空項目清單，分不出來。
+
+順帶修掉這功能一加上去就會出現的 bug：各 section 元件一律用
+`key={item.label}`，而新增出來的項目 label 是空字串。
+
+### ~~編輯器圖片上傳~~ ✅（程式完成，卡在 R2 CORS）
+
+做這件事的過程中發現**媒體上傳從來沒有在瀏覽器裡成功過**，三層都擋著：
 
 ```text
-新增/刪除單一項目   現在只能改既有項目的文字，加不了第四個服務
-圖片上傳            gallery 目前是色塊佔位
-多份草稿的載入      存得進去、列得出來，但還不能從會員中心點回編輯器
+1. next.config 沒有 images.remotePatterns   已修
+   r2.ts 的 publicHostnames() 註解寫著「供 next.config 取得」，零呼叫點
+2. CSP 的 connect-src 沒有 R2 的 S3 端點     已修
+   昨天加 CSP 那天擋掉的，而 21 項稽核沒有一項在問「加了 CSP 之後
+   既有功能還能不能用」
+3. R2 bucket 沒有 CORS 設定                  🔴 要在 Cloudflare 後台設
 ```
 
-⚠️ **存檔的門檻目前是「登入」不是「付費」**——這個專案還沒有任何金流。
-真要收費時擋的位置是 `saveCurrentSite` 這個 server action，不是畫面上的按鈕。
+### ~~分類清單接上資料庫~~ ✅
 
-### 分類清單沒有接上資料庫
+`/work` 與 `/work/[slug]` 改讀 `portfolio_categories`；
+`config/portfolio-categories.ts` 退成種子（seed.sql 的來源 + 無資料庫時的
+fallback），`test:db` 有一條在比對兩者。
 
-`portfolio_categories` 表已建立且灌了 11 筆種子，但 `/work` 的篩選 UI
-讀的是 `config/portfolio-categories.ts` 的硬編清單。
-兩份內容目前一致，但**沒有任何機制保證它們維持一致**——
-在後台新增分類不會出現在篩選器上。
+### ~~Tag 與 Service 篩選（Spec §8.7）~~ ✅
 
-同理未接線的欄位（`audit:wiring`【3】）：
-`portfolio_categories.active`、`portfolio_tags` 的 join、`admin_users.note`、
-`created_at`、`profiles.display_name`（MB／ME 才有讀取端）、`profiles.snowrealm_id`（等 SSO）。
+`portfolio_project_tags` 的 join 終於有讀取端。收在「更多篩選」裡。
+Industry 沒做：目前只有兩個不同的值，一個兩選一的篩選器不值得一排 chips。
 
-> `profiles.display_name` 已在 0813 部分接線——`/account` 可以改它了，
-> 但後台收件匣（MD）還沒有讀它的地方。
+### ~~後台可編輯 Case Study~~ ✅
 
-### 作品詳細頁的 Case Study 無法從後台編輯
+`case_study_json` / `links_json` / `ai_disclosure_json` 加上 industry、
+year、services 全部進了後台表單。原本只能直接改資料庫——
+公開頁面畫得出來、後台填不進去，是「有讀取端沒有寫入端」。
 
-`case_study_json` / `links_json` / `ai_disclosure_json` 在 schema 與公開頁完整支援，
-後台編輯表單只有基本欄位。目前只能改資料庫。
+⚠️ 過程中踩到一個只有用真資料才問得出來的問題：連結欄位用了
+`type="url"`，而 `interior-studio` 的 demo 連結是站內路徑
+`/work/interior-studio`。**打開那件作品、什麼都不改、按儲存就會失敗**，
+而且瀏覽器只給一個氣泡提示，畫面上沒有任何我們自己的錯誤訊息。
 
-### Tag 與 Service 篩選
+### ~~可達性檢查帶已登入 session（ME）~~ ✅
 
-Spec §8.7 列出「另可依 Project Type / Industry / Tag / Service 篩選」，
-目前只做了 Category + Project Type。
+`audit:wiring`【8】的爬蟲是匿名的，看不到只給登入者的入口。
+`authed-reachability.spec.ts` 帶真的 session 爬兩次（會員 / 員工），
+後台每一頁都必須在後台自己的選單裡走得到。
+
+順帶修掉 `audit:wiring`【3】：它掃的是**五個寫死的檔案**，
+之後新增的 leads、profiles、saved_sites 全部不在清單上，
+於是它們用到的欄位一律被報成「沒有任何程式碼取用」。
+改成掃整個 src（173 個檔案），實際取用的欄位從 20 變成 37。
+**audit:wiring 現在 0 失敗 0 警告。**
+
+### ~~`_dev/theme` 過期的降級示範~~ ✅
+
+註解說最後一塊是「尚未實作的 pricing」，而 CR-003-2 之後 pricing 有元件了。
+同一個錯誤在兩條測試裡犯過，這是第三次也最安靜的一次——那不是測試，
+沒有東西會紅。改成去 registry 算。
+
+---
+
+## 🔴 真正還沒做（純程式、沒被外部卡）
+
+### 後台仍然編不了分類與標籤
+
+`portfolio_project_categories` / `portfolio_project_tags` 是 join 表，
+要多選介面加上 delete/insert，與這次做的單列欄位不同性質。
+
+⚠️ 這件事現在比之前重要：分類篩選改讀資料庫之後，
+**在後台新建的作品沒有任何分類，於是它在任何分類篩選下都找不到**。
+
+### CR-004（Luffy 0814 追加）
+
+兩個 dashboard、CRM、ERP、CMS、前台的 CRM 設計器。
+草案在 `docs/cr-004-draft.md`，裡面有五個要裁決的問題。
 
 ### 「畫面上進不去」的守衛只覆蓋連結
 
@@ -191,12 +249,9 @@ Spec §8.7 列出「另可依 Project Type / Industry / Tag / Service 篩選」�
 按鈕存在但點了沒反應（onClick 沒接）
 表單送出後沒有任何回饋
 連結存在但被 CSS 蓋住／z-index 壓住
-需要登入才看得到的入口（爬蟲是匿名的）
 ```
 
-最後一項在 0813 真的發生了一次——`/account` 的入口只給登入者看，
-匿名爬蟲看不到，所以它被列進 `UNLINKED_BY_DESIGN`（理由與 `/admin` 不同，
-已寫明）。**ME 收尾時要讓可達性檢查帶一個已登入 session 再爬一次。**
+需要登入才看得到的入口那一項已由 `authed-reachability.spec.ts` 補上。
 
 ---
 
@@ -232,6 +287,12 @@ Phase M 的 MB   註冊/登入/忘記密碼 UI
 
 - ~~`.env.local` 的 `ADMIN_PASSWORD` 與實際帳號密碼不符~~ ✅ 0813 已修，
   且 `admin:create` 現在會真的更新既有帳號的密碼並印出來說它做了。
+- 🔴 **R2 bucket 要加 CORS 設定。** 沒有它，瀏覽器上傳一律送不出去
+  （後台的作品上傳與編輯器的圖片上傳都是）。設定內容見
+  `scripts/r2-cors.mjs`——在 Cloudflare 後台照著填，或給一組有
+  Admin Read & Write 權限的 R2 token 讓 `node scripts/r2-cors.mjs --apply` 跑。
+  目前的 token 讀 bucket CORS 回 AccessDenied。
+  `tests/e2e/site-images.spec.ts` 有兩條紅著，設好就會綠。
 - **ai_island_v3 密路徑 `Ak83QDhUOVqx` 必須更換。**（仍未處理）
   它曾出現在公開的 robots.txt 與每位訪客都載入的根版面 JS chunk 中。
   改程式碼救不回來——那串已經公開過。可用 `pnpm gen:slug` 產新的。
@@ -257,7 +318,8 @@ Phase 2  ✅   Phase 6  ✅
 Phase 3  ✅   Phase 7  ✅
 Phase 4  ✅   Phase 8  ✅
 Phase M  MA ✅ ／ MB–ME 卡在 SMTP
-CR-003   1 ✅ 2 ✅ 3 ✅ 4 全五段 ✅（編輯器剩餘項目見上方）
+CR-003   1 ✅ 2 ✅ 3 ✅ 4 全五段 ✅ + 草稿載回／項目增刪／圖片上傳 ✅
+CR-004   草案已寫（dashboard / CRM / ERP / CMS / 前台 CRM 設計器）待裁決
 ```
 
 ### Phase M — 會員系統（Spec V1.3 CR-002）

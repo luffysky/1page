@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { PortfolioProjectType, PortfolioStatus } from "@/types/database";
+import type { Json, PortfolioProjectType, PortfolioStatus } from "@/types/database";
 
 /**
  * 後台的作品資料存取。
@@ -32,6 +32,35 @@ export interface AdminProjectRow {
   published_at: string | null;
 }
 
+/**
+ * 編輯頁需要的完整資料。
+ *
+ * ⚠️ 與列表分開：列表要的是「哪些作品、什麼狀態」，把三個 jsonb 欄位
+ * 也一起撈回來只是白白傳一堆用不到的東西。
+ *
+ * 這幾個欄位從 2E 起就在 schema 與公開頁面裡完整支援，
+ * 而後台表單一直沒有它們——也就是只能直接改資料庫。
+ */
+export interface AdminProjectDetailRow extends AdminProjectRow {
+  industry: string | null;
+  year: number | null;
+  services: string[] | null;
+  case_study_json: Json | null;
+  links_json: Json | null;
+  ai_disclosure_json: Json | null;
+}
+
+/** jsonb 是不可信輸入：它保證的只有「合法 JSON」 */
+export function asStringRecord(value: Json | null): Record<string, string> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+
+  return Object.fromEntries(
+    Object.entries(value).filter(
+      (entry): entry is [string, string] => typeof entry[1] === "string",
+    ),
+  );
+}
+
 export async function listAllProjects(): Promise<AdminProjectRow[]> {
   const supabase = await createSupabaseServerClient();
 
@@ -47,16 +76,16 @@ export async function listAllProjects(): Promise<AdminProjectRow[]> {
   return data ?? [];
 }
 
-export async function getProjectById(id: string): Promise<AdminProjectRow | null> {
+export async function getProjectById(id: string): Promise<AdminProjectDetailRow | null> {
   const supabase = await createSupabaseServerClient();
 
   const { data, error } = await supabase
     .from("portfolio_projects")
     .select(
-      "id, slug, title, kicker, summary, project_type, status, featured, sort_order, updated_at, published_at",
+      "id, slug, title, kicker, summary, project_type, status, featured, sort_order, updated_at, published_at, industry, year, services, case_study_json, links_json, ai_disclosure_json",
     )
     .eq("id", id)
-    .maybeSingle<AdminProjectRow>();
+    .maybeSingle<AdminProjectDetailRow>();
 
   if (error) throw new Error(`後台作品讀取失敗：${error.message}`);
   return data;

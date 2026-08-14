@@ -2,7 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { toAdminUrl } from "@/config/admin";
-import { getProjectById, listProjectMedia } from "@/features/admin/portfolio-repository";
+import {
+  asStringRecord,
+  getProjectById,
+  listProjectMedia,
+} from "@/features/admin/portfolio-repository";
 
 import { MediaManager } from "../media-manager";
 import { ProjectForm } from "../project-form";
@@ -46,6 +50,19 @@ export default async function EditProjectPage({ params }: PageProps<"/admin/port
           project_type: project.project_type,
           featured: project.featured,
           sort_order: project.sort_order,
+
+          industry: project.industry ?? "",
+          // 表單欄位是字串；`0` 與空白要分得出來，所以不能用 `?? ""` 之外的簡寫
+          year: project.year === null ? "" : String(project.year),
+          services: project.services ?? [],
+          caseStudy: asStringRecord(project.case_study_json),
+          links: asStringRecord(project.links_json),
+          aiUsed:
+            typeof project.ai_disclosure_json === "object" &&
+            project.ai_disclosure_json !== null &&
+            !Array.isArray(project.ai_disclosure_json) &&
+            project.ai_disclosure_json.used === true,
+          aiDescription: asStringRecord(project.ai_disclosure_json).description ?? "",
         }}
       />
 

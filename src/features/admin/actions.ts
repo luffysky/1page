@@ -37,6 +37,44 @@ const slugSchema = z
   .max(80, "網址代稱過長")
   .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "只能使用小寫英數與連字號，且不可連續或前後有連字號");
 
+/**
+ * 選填的長文欄位。
+ *
+ * 空字串一律當作「沒有」——Spec §8.10 明文要求「沒有完整 Case Study 資料時
+ * 只顯示存在的區塊，不要顯示空 Section」。存一個空字串進去的話，
+ * 公開頁面會多出一個只有標題的區塊。
+ */
+const optionalText = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .transform((value) => value || undefined)
+    .optional();
+
+/**
+ * 相關連結。
+ *
+ * 站內路徑或 https，與 SiteConfig 的 `linkTarget` 同一條規則。
+ * 這些網址會被放進公開頁面的 `<a href>`，`javascript:` 之類的東西
+ * 不該從後台表單流進去——後台是自己人在用，但「自己人」不是安全模型。
+ *
+ * ⚠️ 第一版只收 https，而 `interior-studio` 的 demo 連結是
+ * `/work/interior-studio`（站內路徑）。那個值合法、也一直在公開頁面上，
+ * 但表單存不回去——**打開那件作品、什麼都不改、按儲存就會失敗**。
+ * 用真的資料跑一次才問得出來。
+ */
+const optionalLink = z
+  .string()
+  .trim()
+  .max(2048)
+  .refine(
+    (value) => !value || /^\/(?![/\\])/.test(value) || /^https:\/\//.test(value),
+    "連結必須是站內路徑（/ 開頭）或 https:// 網址",
+  )
+  .transform((value) => value || undefined)
+  .optional();
+
 const projectSchema = z.object({
   id: z.string().uuid().optional(),
   slug: slugSchema,
@@ -46,11 +84,45 @@ const projectSchema = z.object({
   project_type: z.enum(["client", "concept", "demo", "internal"]),
   featured: z.boolean(),
   sort_order: z.number().int().min(0).max(9999),
+
+  industry: optionalText(60),
+  /*
+   * 年份用 nullable 而不是 optional：欄位清空時要真的把資料庫那格清掉，
+   * 而 `undefined` 在 update payload 裡等於「不要動這一欄」。
+   */
+  year: z.number().int().min(1900).max(2100).nullable().catch(null),
+  services: z.array(z.string().max(40)).max(10),
+
+  // Spec §8.10 的五段。全部選填
+  case_study: z.object({
+    problem: optionalText(2000),
+    goal: optionalText(2000),
+    thinking: optionalText(2000),
+    solution: optionalText(2000),
+    result: optionalText(2000),
+  }),
+
+  links: z.object({
+    live: optionalLink,
+    demo: optionalLink,
+    figma: optionalLink,
+    github: optionalLink,
+  }),
+
+  // Spec §28：AI 揭露。沒有使用 AI 時公開頁面不顯示這個區塊
+  ai_disclosure: z.object({
+    used: z.boolean(),
+    description: optionalText(1000),
+  }),
 });
 
 export type ActionResult = { ok: true } | { ok: false; message: string };
 
+const text = (formData: FormData, name: string) => String(formData.get(name) ?? "");
+
 function readForm(formData: FormData) {
+  const year = text(formData, "year").trim();
+
   return projectSchema.safeParse({
     id: (formData.get("id") as string) || undefined,
     slug: formData.get("slug"),
@@ -60,6 +132,32 @@ function readForm(formData: FormData) {
     project_type: formData.get("project_type"),
     featured: formData.get("featured") === "on",
     sort_order: Number(formData.get("sort_order") ?? 0),
+
+    industry: text(formData, "industry"),
+    // 空字串轉 null（清掉年份），不是 NaN——NaN 會讓整份表單驗證失敗，
+    // 而使用者只是想把年份留白
+    year: year === "" ? null : Number(year),
+    services: formData.getAll("services").map(String),
+
+    case_study: {
+      problem: text(formData, "case_study.problem"),
+      goal: text(formData, "case_study.goal"),
+      thinking: text(formData, "case_study.thinking"),
+      solution: text(formData, "case_study.solution"),
+      result: text(formData, "case_study.result"),
+    },
+
+    links: {
+      live: text(formData, "links.live"),
+      demo: text(formData, "links.demo"),
+      figma: text(formData, "links.figma"),
+      github: text(formData, "links.github"),
+    },
+
+    ai_disclosure: {
+      used: formData.get("ai_disclosure.used") === "on",
+      description: text(formData, "ai_disclosure.description"),
+    },
   });
 }
 
@@ -80,11 +178,36 @@ export async function saveProject(formData: FormData): Promise<ActionResult> {
     return { ok: false, message: parsed.error.issues[0]?.message ?? "輸入有誤" };
   }
 
-  const { id, kicker, summary, ...rest } = parsed.data;
+  const { id, kicker, summary, industry, case_study, links, ai_disclosure, ...rest } = parsed.data;
+
+  /*
+   * 三個 jsonb 欄位一律整份覆寫，而且把空的鍵拿掉。
+   *
+   * 留著 `{ problem: undefined }` 的話，JSON 序列化會把它丟掉——
+   * 那剛好是對的。但留著空字串就不對了：公開頁面的
+   * `presentCaseStudySections` 過濾的是「有沒有內容」，而空字串
+   * 會通過 `Boolean(section.body)` 之前的那一關嗎？不會——
+   * 它有 trim 判斷。即使如此還是不要存：資料庫裡一堆空字串會讓
+   * 「這件作品有沒有寫 case study」這個問題查不出答案。
+   */
+  const compact = (source: Record<string, unknown>) =>
+    Object.fromEntries(Object.entries(source).filter(([, value]) => value !== undefined));
+
   const payload = {
     ...rest,
     kicker: kicker || null,
     summary: summary || null,
+    industry: industry ?? null,
+    case_study_json: compact(case_study),
+    links_json: compact(links),
+    /*
+     * 沒有使用 AI 就整份存空物件，不是 `{ used: false }`。
+     *
+     * 公開頁面判斷的是 `aiJson.used === true`，兩種寫法在畫面上一樣。
+     * 但存 `{ used: false, description: "…" }` 會把一段沒有人看得到的
+     * 文字留在資料庫裡——之後有人把 used 打開，那段舊文字就會突然出現。
+     */
+    ai_disclosure_json: ai_disclosure.used ? compact(ai_disclosure) : {},
   };
 
   const supabase = await createSupabaseServerClient();
