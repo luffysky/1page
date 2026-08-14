@@ -97,21 +97,32 @@ function ColorField({
   );
 }
 
-export function BackgroundPanel({
-  section,
+/**
+ * 只認 background 與 onChange，不認任何 context。
+ *
+ * ⚠️ 這一層是為了讓**兩個編輯器**共用同一組控制項：
+ * 訪客的 `/edit`（狀態在 preview context 裡）與後台的版面編輯器
+ * （狀態在 CMS 文件裡）。
+ *
+ * 各做一份的話，兩邊的預設值與警告文字遲早分岔——
+ * 而分岔的表現是「後台調的遮罩跟前台看到的不一樣」，
+ * 那種 bug 沒有人會想到要去比對兩個檔案。
+ */
+export function BackgroundFields({
+  background: current,
   signedIn,
+  onChange,
 }: {
-  section: SiteSection;
+  background: SectionBackground | undefined;
   signedIn: boolean;
+  onChange: (next: SectionBackground) => void;
 }) {
-  const { setBackground } = useSitePreview();
   const typeId = useId();
 
-  const background: SectionBackground = section.background ?? { type: "none" };
+  const background: SectionBackground = current ?? { type: "none" };
   const warnings = backgroundWarnings(background);
 
-  const patch = (next: Partial<SectionBackground>) =>
-    setBackground(section.id, { ...background, ...next });
+  const patch = (next: Partial<SectionBackground>) => onChange({ ...background, ...next });
 
   return (
     <section className="border-brand-line mt-6 border-t pt-5">
@@ -125,10 +136,7 @@ export function BackgroundPanel({
           id={typeId}
           value={background.type}
           onChange={(event) =>
-            setBackground(
-              section.id,
-              switchBackgroundType(background, event.target.value as SectionBackgroundType),
-            )
+            onChange(switchBackgroundType(background, event.target.value as SectionBackgroundType))
           }
           className={`${inputClass} mt-1`}
         >
@@ -262,5 +270,29 @@ export function BackgroundPanel({
         </ul>
       ) : null}
     </section>
+  );
+}
+
+/**
+ * 訪客編輯器用的那一層：從 preview context 拿狀態。
+ *
+ * 只做「接線」，控制項本身在 `BackgroundFields`——
+ * 後台的版面編輯器用的是同一組。
+ */
+export function BackgroundPanel({
+  section,
+  signedIn,
+}: {
+  section: SiteSection;
+  signedIn: boolean;
+}) {
+  const { setBackground } = useSitePreview();
+
+  return (
+    <BackgroundFields
+      background={section.background}
+      signedIn={signedIn}
+      onChange={(next) => setBackground(section.id, next)}
+    />
   );
 }

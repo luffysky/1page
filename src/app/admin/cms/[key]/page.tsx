@@ -7,11 +7,24 @@ import { readCmsDocument } from "@/features/cms/read";
 import { CMS_DOCUMENTS, isCmsKey } from "@/features/cms/registry";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+import { getMemberIdentity } from "@/features/account/auth";
+import type { PageLayout } from "@/features/cms/page-layout";
+
 import { CmsEditor } from "./cms-editor";
+import { LayoutEditor } from "./layout-editor";
 
 /**
- * 編輯一份 CMS 文件（CR-004 / Phase B BH）
+ * 編輯一份 CMS 文件（CR-004 / Phase B BH + BJ-2）
+ *
+ * ⚠️ 版面那一份走另一個編輯器。
+ *
+ * 其他文件是「字」，照著內容的形狀長出表單就好；版面是**順序**，
+ * 而一個 JSON 陣列的順序沒有人排得動。那不是偷懶的差別，
+ * 是兩種不同的東西需要兩種不同的介面。
  */
+
+/** 走拖曳介面而不是通用表單的文件 */
+const LAYOUT_KEYS = new Set<string>(["home.layout"]);
 
 export default async function AdminCmsDocumentPage({ params }: PageProps<"/admin/cms/[key]">) {
   const { key } = await params;
@@ -21,6 +34,15 @@ export default async function AdminCmsDocumentPage({ params }: PageProps<"/admin
 
   const definition = CMS_DOCUMENTS[key];
   const current = await readCmsDocument(key);
+
+  /*
+   * 上傳背景要登入（R2 的 presign 端點會擋）。
+   *
+   * 後台的人一定已經登入了，但那是**後台身分**——上傳走的是
+   * 會員身分那條路。傳進去讓按鈕自己說得出「要先登入」，
+   * 而不是按了之後拿到一個看不懂的錯誤。
+   */
+  const signedIn = LAYOUT_KEYS.has(key) ? Boolean(await getMemberIdentity()) : false;
 
   const supabase = await createSupabaseServerClient();
 
@@ -48,7 +70,11 @@ export default async function AdminCmsDocumentPage({ params }: PageProps<"/admin
         </Link>
       </div>
 
-      <CmsEditor cmsKey={key} initial={current} />
+      {LAYOUT_KEYS.has(key) ? (
+        <LayoutEditor cmsKey={key} initial={current as PageLayout} signedIn={signedIn} />
+      ) : (
+        <CmsEditor cmsKey={key} initial={current} />
+      )}
 
       {/*
        * 版本清單。

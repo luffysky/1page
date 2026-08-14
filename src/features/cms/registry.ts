@@ -15,6 +15,8 @@ import { HOME_GOALS } from "@/config/home-goals";
 import { PRICING_GROUPS, PRICING_TIERS } from "@/config/pricing";
 import { SERVICE_LINES } from "@/config/services";
 
+import { defaultHomeLayout, pageLayoutSchema, type PageLayout } from "./page-layout";
+
 /**
  * CMS 文件登記處（CR-004 / Phase B BH + BI）
  *
@@ -412,6 +414,21 @@ export const CMS_DOCUMENTS = {
       cta: { ...FINAL_CTA_COPY.cta },
     },
   } satisfies CmsDocumentDefinition<CtaBlockDocument>,
+
+  /*
+   * 版面。
+   *
+   * ⚠️ 與其他文件不同，這一份不是「字」，是**順序、開關與背景**。
+   * 它在後台有自己的介面（拖曳），不走那個照形狀長出來的表單——
+   * 一個 JSON 陣列的順序沒有人排得動。
+   */
+  "home.layout": {
+    label: "首頁版面",
+    page: "home",
+    affects: "首頁每一段的順序、要不要顯示、以及各自的背景",
+    schema: pageLayoutSchema,
+    fallback: defaultHomeLayout(),
+  } satisfies CmsDocumentDefinition<PageLayout>,
 
   /* ── 其他頁 ────────────────────────────────────────────── */
 

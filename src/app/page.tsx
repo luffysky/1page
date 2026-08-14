@@ -17,6 +17,8 @@ import { getAdminEntry } from "@/features/admin/auth";
 import { SiteFooter } from "@/components/shared/site-footer";
 import { getHomeGoal, parseHomeGoal } from "@/config/home-goals";
 import { mergeGoalCopy } from "@/features/cms/merge";
+import { visibleBlocks } from "@/features/cms/page-layout";
+import { PageBlock } from "@/components/shared/page-block";
 import { HomeGoalProvider } from "@/features/home/goal-context";
 import { getPortfolioRepository } from "@/features/portfolio";
 import { AgentHandoffProvider } from "@/features/agent/handoff";
@@ -77,6 +79,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     processCopy,
     finalCta,
     pricing,
+    layout,
   ] = await Promise.all([
     readCmsDocument("home.hero"),
     readCmsDocument("home.goals"),
@@ -89,6 +92,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     readCmsDocument("home.process"),
     readCmsDocument("home.final-cta"),
     readCmsDocument("pricing.tiers"),
+    readCmsDocument("home.layout"),
   ]);
   // 後台入口只渲染給已驗證的後台人員；其他人拿到 null，
   // 密路徑因此完全不會出現在送給瀏覽器的 HTML 裡。
@@ -97,6 +101,94 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   // Preview 的初始模板在 server 就依 goal 決定，首次輸出即為正確的那一套。
   // 若交給 client 進場後再校正，訪客會先看到一套模板再跳成另一套。
   const initialTemplateId = listTemplates(getHomeGoal(goal).templateCategories)[0]?.id;
+
+  const blocks = visibleBlocks(layout);
+
+  /*
+   * id → 那一塊的畫面。
+   *
+   * 用一個 map 而不是一長串 if：`page-layout.test.ts` 會反過來問
+   * 「HOME_BLOCKS 裡有沒有哪一個 id 這裡沒有畫」，而那條問得出來的前提
+   * 是這份對應表是一個看得到全部鍵的物件。
+   */
+  const BLOCKS: Record<string, React.ReactNode> = {
+    hero: <Hero {...hero} />,
+
+    goals: (
+      <EditorialSection {...goalsCopy.section}>
+        <GoalSelector items={mergeGoalCopy(goalsCopy)} />
+      </EditorialSection>
+    ),
+
+    work: (
+      <div id="work">
+        <EditorialSection {...workCopy.section}>
+          <SelectedWork items={featured} />
+        </EditorialSection>
+      </div>
+    ),
+
+    template: (
+      <div id="templates">
+        <EditorialSection {...templateCopy.section}>
+          <TemplateExperienceSection />
+        </EditorialSection>
+      </div>
+    ),
+
+    advisor: (
+      <div id="advisor">
+        {/* Spec §31：免費顧問沒有另外的開關，對話區出現就算開啟過 */}
+        <TrackPageView event="agent_opened" />
+        <EditorialSection {...advisorCopy.section}>
+          <AdvisorSection />
+        </EditorialSection>
+      </div>
+    ),
+
+    philosophy: <EditorialSection {...philosophyCopy.section} />,
+
+    services: (
+      <div id="services">
+        <EditorialSection {...servicesCopy.section}>
+          <ServicesBand lines={servicesCopy.lines} />
+        </EditorialSection>
+      </div>
+    ),
+
+    pricing: (
+      <div id="pricing">
+        {/* Spec §31 */}
+        <TrackPageView event="pricing_viewed" />
+        <EditorialSection {...pricingCopy.section}>
+          <PricingLadder groups={pricing.groups} tiers={pricing.tiers} />
+        </EditorialSection>
+      </div>
+    ),
+
+    process: (
+      <div id="process">
+        <EditorialSection {...processCopy.section}>
+          <ProcessSteps steps={processCopy.steps} />
+        </EditorialSection>
+      </div>
+    ),
+
+    "final-cta": (
+      <div id="contact">
+        <DarkCtaBlock {...finalCta} />
+      </div>
+    ),
+  };
+
+  /*
+   * 認不得的 id 就跳過，不要炸掉整頁。
+   *
+   * `resolveHomeLayout` 已經把資料裡的未知 id 濾掉了，所以這裡理論上
+   * 不會發生——但「理論上不會」與「發生時整頁白掉」之間，
+   * 值得留這一行。
+   */
+  const renderBlock = (id: string) => BLOCKS[id] ?? null;
 
   return (
     <HomeGoalProvider initialGoal={goal}>
@@ -111,57 +203,20 @@ export default async function Home({ searchParams }: PageProps<"/">) {
           />
 
           <main id="top">
-            <Hero {...hero} />
-
-            <EditorialSection {...goalsCopy.section}>
-              <GoalSelector items={mergeGoalCopy(goalsCopy)} />
-            </EditorialSection>
-
-            <div id="work">
-              <EditorialSection {...workCopy.section}>
-                <SelectedWork items={featured} />
-              </EditorialSection>
-            </div>
-
-            <div id="templates">
-              <EditorialSection {...templateCopy.section}>
-                <TemplateExperienceSection />
-              </EditorialSection>
-            </div>
-
-            <div id="advisor">
-              {/* Spec §31：免費顧問沒有另外的開關，對話區出現就算開啟過 */}
-              <TrackPageView event="agent_opened" />
-              <EditorialSection {...advisorCopy.section}>
-                <AdvisorSection />
-              </EditorialSection>
-            </div>
-
-            <EditorialSection {...philosophyCopy.section} />
-
-            <div id="services">
-              <EditorialSection {...servicesCopy.section}>
-                <ServicesBand lines={servicesCopy.lines} />
-              </EditorialSection>
-            </div>
-
-            <div id="pricing">
-              {/* Spec §31 */}
-              <TrackPageView event="pricing_viewed" />
-              <EditorialSection {...pricingCopy.section}>
-                <PricingLadder groups={pricing.groups} tiers={pricing.tiers} />
-              </EditorialSection>
-            </div>
-
-            <div id="process">
-              <EditorialSection {...processCopy.section}>
-                <ProcessSteps steps={processCopy.steps} />
-              </EditorialSection>
-            </div>
-
-            <div id="contact">
-              <DarkCtaBlock {...finalCta} />
-            </div>
+            {/*
+             * 區塊照版面資料的順序渲染（CR-004 / BJ-2）。
+             *
+             * ⚠️ 這裡不是「什麼都能拖進來的畫布」——見 page-layout.ts 的檔頭。
+             * 能改的是順序、要不要顯示、以及各自的背景。
+             *
+             * `resolveHomeLayout` 保證每一塊都在：新加的區塊在舊資料上
+             * 會被補回來，不會因為一份存過的版面而永遠不出現。
+             */}
+            {blocks.map((block) => (
+              <PageBlock key={block.id} background={block.background}>
+                {renderBlock(block.id)}
+              </PageBlock>
+            ))}
           </main>
 
           <SiteFooter />
