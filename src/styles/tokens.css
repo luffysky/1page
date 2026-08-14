@@ -54,6 +54,10 @@
   --color-brand-on-accent: #ffffff; /* Accent 底上的文字 */
   --color-brand-focus: #1a5fd0; /* Focus ring — 刻意與 accent 區隔以保對比 */
 
+  /* 遮罩。用來壓暗「不會被採用的那一部分」，例如裁切框外面。
+   * 半透明的黑而非 ink 的半透明：ink 帶暖調，壓在照片上會偏色。 */
+  --color-brand-scrim: rgba(0, 0, 0, 0.5);
+
   /* == 2. Typography ======================================================= */
   /* 字族。實際檔案載入見 src/styles/fonts.ts */
   --font-sans:

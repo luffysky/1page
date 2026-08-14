@@ -1,10 +1,8 @@
 "use client";
 
-import Link from "next/link";
-import { useId, useState } from "react";
+import { useId } from "react";
 
-import { createSiteImageUploadUrl } from "@/app/edit/media-actions";
-import { ALLOWED_MEDIA } from "@/config/media";
+import { ImageUploadField } from "@/components/editor/image-upload-field";
 import { useSitePreview } from "@/features/website-engine/preview-context";
 import { variantsFor } from "@/features/website-engine/registry";
 import {
@@ -13,17 +11,6 @@ import {
   type SiteSection,
 } from "@/features/website-engine/schema";
 import { SECTION_LABELS } from "@/features/website-engine/section-presets";
-
-/**
- * 檔案選擇器只列得出我們真的收的類型。
- *
- * 從同一份白名單算出來，不另外寫一串 accept 字串——
- * 抄一份的話，加了新格式而忘了改這裡的表現是「選檔案時看不到那種檔」，
- * 而後端其實收得下；反過來則是選得到卻上傳失敗。
- */
-const IMAGE_MIME_TYPES = ALLOWED_MEDIA.filter((kind) => kind.type === "image").map(
-  (kind) => kind.mime,
-);
 
 /**
  * 選取區塊的內容編輯（CR-003-4 第三段）
@@ -159,138 +146,6 @@ function RemoveItemButton({
   );
 }
 
-/**
- * 圖片欄位（CR-003-4）
- *
- * ⚠️ 這是「照著值的形狀產生欄位」唯一的例外，而且理由很硬：
- * **檔案打不進文字框**。圖片欄位的值是網址，但使用者手上的是一個檔案，
- * 中間差了一次上傳。給他一個貼網址的框，他只會貼進別人網站上的圖——
- * 而 schema 會擋下來（只認我們自己的媒體網域），他看到的是
- * 「按了沒反應」。
- */
-function ImageField({
-  images,
-  signedIn,
-  onChange,
-}: {
-  images: string[];
-  signedIn: boolean;
-  onChange: (next: string[]) => void;
-}) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const inputId = useId();
-
-  const upload = async (file: File) => {
-    setBusy(true);
-    setError(null);
-
-    try {
-      const presigned = await createSiteImageUploadUrl({
-        filename: file.name,
-        contentType: file.type,
-        size: file.size,
-      });
-
-      if (!presigned.ok) {
-        setError(presigned.message);
-        return;
-      }
-
-      /*
-       * 檔案直接 PUT 到 R2，不經過我們的伺服器。
-       *
-       * Content-Type 一定要跟簽名時一樣：presigner 把它列進了 signableHeaders，
-       * 不一樣的話 R2 會拒絕——那正是這條規則存在的意義。
-       */
-      const response = await fetch(presigned.uploadUrl, {
-        method: "PUT",
-        headers: { "Content-Type": file.type },
-        body: file,
-      });
-
-      if (!response.ok) {
-        setError("上傳失敗，請再試一次。");
-        return;
-      }
-
-      onChange([...images, presigned.publicUrl]);
-    } catch {
-      setError("上傳失敗，請檢查網路再試一次。");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <fieldset>
-      <legend className="text-body-sm font-bold">圖片</legend>
-
-      {images.length > 0 ? (
-        <ul className="mt-2 flex flex-col gap-2">
-          {images.map((url, index) => (
-            <li key={`${url}-${index}`} className="flex flex-wrap items-center gap-2">
-              {/* 縮圖用原生 img，理由與 GalleryGrid 相同 */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={url} alt="" className="h-12 w-16 rounded-md object-cover" />
-              <span className="text-caption text-brand-muted flex-1">第 {index + 1} 張</span>
-              <button
-                type="button"
-                onClick={() => onChange(images.filter((_, at) => at !== index))}
-                aria-label={`刪除第 ${index + 1} 張圖片`}
-                className="border-brand-line text-caption rounded-pill border px-3 py-1 font-bold"
-              >
-                刪除
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-
-      {signedIn ? (
-        <div className="mt-3">
-          <label htmlFor={inputId} className="text-body-sm block font-bold">
-            {busy ? "上傳中…" : "加一張圖片"}
-          </label>
-          <input
-            id={inputId}
-            type="file"
-            accept={IMAGE_MIME_TYPES.join(",")}
-            disabled={busy}
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              // 清掉 value，否則同一個檔案選第二次不會觸發 change
-              event.target.value = "";
-              if (file) void upload(file);
-            }}
-            className="text-body-sm mt-2 w-full"
-          />
-        </div>
-      ) : (
-        /*
-         * 沒登入時說清楚為什麼，不要放一個按了會失敗的上傳框。
-         *
-         * 這條線與存檔那條不一樣：存檔是定價（免費編輯、存檔才付費），
-         * 上傳是安全——不檢查身分的 presign 端點等於開放公開寫入。
-         */
-        <p className="text-body-sm text-brand-muted mt-3">
-          上傳圖片需要帳號（檔案要放在你名下才算得出用量）——
-          <Link href="/login?next=%2Fedit" className="underline">
-            登入
-          </Link>
-          。其他編輯都不用登入。
-        </p>
-      )}
-
-      {error ? (
-        <p role="status" className="text-body-sm text-brand-accent-strong mt-2 font-bold">
-          {error}
-        </p>
-      ) : null}
-    </fieldset>
-  );
-}
-
 export function ContentPanel({ section, signedIn }: { section: SiteSection; signedIn: boolean }) {
   const { updateContent, setVariant } = useSitePreview();
   const panelId = useId();
@@ -345,7 +200,7 @@ export function ContentPanel({ section, signedIn }: { section: SiteSection; sign
 
           if (key === IMAGE_CONTENT_KEY) {
             return (
-              <ImageField
+              <ImageUploadField
                 key={key}
                 images={isStringArray(value) ? value : []}
                 signedIn={signedIn}
