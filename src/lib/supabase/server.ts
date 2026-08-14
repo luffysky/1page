@@ -34,7 +34,7 @@ export async function createSupabaseServerClient() {
           }
         } catch {
           // 在 Server Component 內呼叫 set() 會拋錯（只有 Route Handler /
-          // Server Action 能寫 cookie）。session 更新由 middleware 負責，
+          // Server Action 能寫 cookie）。session 更新由 proxy 負責，
           // 這裡忽略是安全的。
         }
       },

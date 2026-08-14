@@ -23,7 +23,7 @@ function notFound(request: NextRequest) {
   return NextResponse.rewrite(new URL("/_not-found", request.url));
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (ADMIN_SEGMENT) {
@@ -42,7 +42,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // ── Supabase session 續期 ──────────────────────────────────
-  // Server Component 不能寫 cookie，因此 token 續期必須在 middleware 做，
+  // Server Component 不能寫 cookie，因此 token 續期必須在 proxy（Next 16 之前叫 middleware）做，
   // 否則使用者的登入狀態會在 access token 過期後靜默失效。
   let response = NextResponse.next({ request });
 

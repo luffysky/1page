@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { isAllowedImageUrl } from "@/config/image-sources";
+
 /**
  * SiteConfig Schema（Spec §9 / §10 / §14 / §36）
  *
@@ -76,6 +78,21 @@ const externalUrl = z
       return false;
     }
   }, "連結只接受 https:// 或 mailto:");
+
+/**
+ * 圖片來源（Spec §36 image source validation）
+ *
+ * 比 externalUrl 更嚴：只認我們自己的媒體網域。理由見 config/image-sources.ts。
+ *
+ * ⚠️ 這條規則會讀環境變數（媒體網域是部署設定，不是程式常數）。
+ * 沒設定媒體網域的環境裡**所有圖片都會被拒絕**——那是刻意的失敗方向：
+ * 圖片不顯示看得出來，任意來源全部放行看不出來。
+ */
+const siteImageUrl = z
+  .string()
+  .trim()
+  .max(2048)
+  .refine(isAllowedImageUrl, "圖片只能放在本站的媒體網域上，請先上傳");
 
 /** 站內路徑或外部連結 */
 const linkTarget = z.union([
@@ -203,6 +220,53 @@ const contentValue = z.union([
     .max(MAX_CONTENT_ITEMS),
 ]);
 
+/**
+ * 圖片欄位的名稱。
+ *
+ * ── 為什麼是一個保留的鍵名，不是每種 section 各自宣告 ──────────
+ *
+ * content 是 `Record<string, ContentValue>`，型別上分不出「這個字串陣列
+ * 是圖說還是圖片網址」。而圖片網址有一條字串沒有的限制（只能來自我們的
+ * 媒體網域），漏掉那條的後果是任何人都能叫訪客的瀏覽器去連任意網址。
+ *
+ * 用一個保留的鍵名解決：叫 `images` 的欄位一律走圖片來源檢查。
+ * 各 section 元件也照這個名字讀，所以「schema 檢查的」與「畫面畫的」
+ * 是同一個欄位——不會變成「檢查了一個沒人讀的鍵」。
+ */
+export const IMAGE_CONTENT_KEY = "images";
+
+/**
+ * ⚠️ 檢查掛在 content 這一層，而不是外面包一個 refined 版本的 section schema。
+ *
+ * 包在外面的話會有兩個 schema，而 `siteSectionSchema` 必須維持是 ZodObject
+ * （website-tools 取 `.shape.content` 去產生給模型看的 JSON Schema）。
+ * 兩個並存的結果一定是某個驗證點用到寬鬆的那一個，而且不會有人發現。
+ */
+const sectionContent = z.record(z.string().max(60), contentValue).check((ctx) => {
+  const images = ctx.value[IMAGE_CONTENT_KEY];
+  if (images === undefined) return;
+
+  if (!Array.isArray(images)) {
+    ctx.issues.push({
+      code: "custom",
+      input: images,
+      path: [IMAGE_CONTENT_KEY],
+      message: "images 必須是圖片網址的陣列",
+    });
+    return;
+  }
+
+  images.forEach((url, index) => {
+    if (typeof url === "string" && isAllowedImageUrl(url)) return;
+    ctx.issues.push({
+      code: "custom",
+      input: url,
+      path: [IMAGE_CONTENT_KEY, index],
+      message: "圖片只能放在本站的媒體網域上，請先上傳",
+    });
+  });
+});
+
 export const siteSectionSchema = z.object({
   id: z
     .string()
@@ -215,7 +279,7 @@ export const siteSectionSchema = z.object({
     .min(1)
     .max(40)
     .regex(/^[a-z0-9-]+$/, "variant 只能是小寫英數與連字號"),
-  content: z.record(z.string().max(60), contentValue),
+  content: sectionContent,
   settings: z
     .record(z.string().max(60), z.union([z.string().max(200), z.number(), z.boolean()]))
     .optional(),
@@ -232,8 +296,13 @@ export const siteConfigSchema = z.object({
   brand: z.object({
     name: plainText(80).pipe(z.string().min(1, "品牌名稱不可空白")),
     tagline: plainText(200).optional(),
-    /** logo 走與其他媒體相同的來源限制（Spec §36 image source validation） */
-    logo: externalUrl.optional(),
+    /**
+     * logo 走與其他媒體相同的來源限制（Spec §36 image source validation）。
+     *
+     * ⚠️ 這裡以前是 `externalUrl`，也就是「任何 https 都收」——註解說的
+     * 「與其他媒體相同的來源限制」在程式上從來沒有成立過。
+     */
+    logo: siteImageUrl.optional(),
     industry: plainText(60).optional(),
   }),
   theme: themeConfigSchema,

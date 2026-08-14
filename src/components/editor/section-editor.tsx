@@ -30,7 +30,7 @@ import { SiteRenderer } from "@/features/website-engine/site-renderer";
  * 重寫一次，而 WCAG 2.1 §2.5.7 讓「不補」不是一個選項。
  */
 
-export function SectionEditor() {
+export function SectionEditor({ signedIn }: { signedIn: boolean }) {
   const {
     config,
     sectionsEdited,
@@ -188,7 +188,7 @@ export function SectionEditor() {
         </div>
 
         {selected ? (
-          <ContentPanel key={selected.id} section={selected} />
+          <ContentPanel key={selected.id} section={selected} signedIn={signedIn} />
         ) : (
           <p className="border-brand-line text-body-sm text-brand-muted rounded-lg border border-dashed p-4">
             選一塊來編輯它的文字與排版。

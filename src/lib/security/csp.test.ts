@@ -17,6 +17,8 @@ const ENV = {
   r2DomainUrl: "https://media.example.pet",
   r2PublicUrl: "https://pub-abc.r2.dev",
   analyticsEndpoint: "https://metrics.example.app/collect",
+  r2AccountId: "abc123",
+  r2Bucket: "my-bucket",
 };
 
 /** 取出某個 directive 的來源清單 */
@@ -70,6 +72,25 @@ describe("不能擋到自己", () => {
     expect(connect).toContain("'self'");
     expect(connect).toContain("https://1page-db.example.app");
     expect(connect).toContain("https://metrics.example.app");
+  });
+
+  it("瀏覽器連得到 R2 的上傳端點", () => {
+    /*
+     * ⚠️ 這一條是補的，而它補的是一個已經上線的破洞。
+     *
+     * 媒體上傳是瀏覽器**直接 PUT** 到 `<account>.r2.cloudflarestorage.com`
+     * ——那是 S3 API 的主機，跟公開讀取的媒體網域是兩個不同的名字。
+     * 加 CSP 那天只放了讀取用的網域，於是後台的作品上傳與編輯器的圖片上傳
+     * 全部被瀏覽器擋下。
+     *
+     * 沒有立刻發現是因為那之後沒有人上傳過東西，而 CSP 擋掉請求時
+     * **不會有伺服器錯誤**：畫面只說「上傳失敗，請檢查網路」。
+     */
+    const connect = directive(csp, "connect-src");
+    expect(connect, "上傳會被 CSP 擋掉，而且看起來像網路問題").toContain(
+      "https://my-bucket.abc123.r2.cloudflarestorage.com",
+    );
+    expect(connect).toContain("https://abc123.r2.cloudflarestorage.com");
   });
 
   it("圖片載得到 R2 的兩個網域", () => {

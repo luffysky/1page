@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { findDuplicateSectionIds, validateSiteConfig, type SiteConfig } from "./schema";
 
@@ -152,12 +152,53 @@ describe("Spec §36：URL / image source validation", () => {
     expectRejected({ ...VALID, brand: { ...VALID.brand, logo } }, "logo");
   });
 
-  it("接受 https", () => {
+  /*
+   * ⚠️ 這一條原本是「接受 https」，拿 `https://example.com/logo.png` 當例子。
+   *
+   * 而 schema 的註解寫的是「logo 走與其他媒體相同的來源限制」——
+   * 那句話在程式上從來沒有成立過：它用的是 externalUrl，也就是
+   * **任何 https 都收**。測試釘住了實作，不是釘住宣稱要做的那件事，
+   * 所以那個綠燈證明的是「協定對」，不是「來源對」。
+   *
+   * 現在圖片只認我們自己的媒體網域（見 config/image-sources.ts）。
+   * 媒體網域是部署設定，所以這裡要把它設起來——不設的話下面兩條
+   * 會一起通過，而其中一條是靠「什麼都不准」通過的。
+   */
+  const MEDIA_HOST = "media.example.test";
+
+  beforeEach(() => {
+    vi.stubEnv("NEXT_PUBLIC_R2_PUBLIC_DOMAIN_URL", MEDIA_HOST);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("接受自己媒體網域上的圖片", () => {
     const result = validateSiteConfig({
       ...VALID,
-      brand: { ...VALID.brand, logo: "https://example.com/logo.png" },
+      brand: { ...VALID.brand, logo: `https://${MEDIA_HOST}/sites/x/y.png` },
     });
     expect(result.ok).toBe(true);
+  });
+
+  it("拒絕別人網域上的 https 圖片", () => {
+    /*
+     * 協定對不代表來源對。允許任意 https 的話，對方的伺服器拿得到
+     * 每一位訪客的 IP 與 Referer，而用了 next/image 時去代抓那張圖的
+     * 是**我們的伺服器**。
+     */
+    expectRejected({ ...VALID, brand: { ...VALID.brand, logo: "https://example.com/logo.png" } });
+  });
+
+  it("section 的 images 欄位同樣只認自己的網域", () => {
+    const withImages = (images: string[]) => ({
+      ...VALID,
+      sections: [{ ...VALID.sections[0]!, content: { images } }],
+    });
+
+    expect(validateSiteConfig(withImages([`https://${MEDIA_HOST}/sites/a/b.jpg`])).ok).toBe(true);
+    expect(validateSiteConfig(withImages(["https://example.com/a.jpg"])).ok).toBe(false);
   });
 
   it("section 內的連結同樣受限", () => {

@@ -3,6 +3,8 @@ import "server-only";
 import { DeleteObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
+import { publicMediaBases } from "@/config/image-sources";
+
 /**
  * Cloudflare R2（CR-001，Spec V1.2 §8.9）
  *
@@ -22,35 +24,20 @@ const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
 const bucket = process.env.R2_BUCKET;
 
 /**
- * 公開讀取網域可以有兩個，且**兩個都要認**。
+ * 公開讀取網域從 `config/image-sources` 來，這裡不再自己算一份。
  *
- *   NEXT_PUBLIC_R2_PUBLIC_DOMAIN_URL   自訂網域（優先，新上傳用它）
- *   NEXT_PUBLIC_R2_PUBLIC_URL          r2.dev（保留，既有記錄用它）
+ * ⚠️ 以前這裡有一份、schema 的圖片來源檢查要一份、next.config 的
+ * remotePatterns 也要一份。三份各自讀環境變數的話，換網域時漏改的那一份
+ * 會安靜地擋掉（或安靜地放行）圖片——而三者都不會報錯。
  *
- * ⚠️ 只認新網域會讓所有既有的媒體記錄「查不到 key」而被視為外部網址，
- * 進而在畫面上整批消失。網域搬遷必須是加法，不是替換。
- *
- * 環境變數容許不帶 scheme（設定介面上常常只填主機名），此處補上。
+ * 這個模組是 `server-only` 的，image-sources 刻意不是：
+ * schema 會在瀏覽器端跑（編輯器就地驗證），next.config 也不能引用
+ * server-only 的東西（引用了 `next typegen` 直接失敗）。
  */
-function normalizeBase(value: string | undefined): string | null {
-  const raw = value?.trim().replace(/\/$/, "");
-  if (!raw) return null;
-  return /^https?:\/\//.test(raw) ? raw : `https://${raw}`;
-}
-
-const primaryBase = normalizeBase(process.env.NEXT_PUBLIC_R2_PUBLIC_DOMAIN_URL);
-const legacyBase = normalizeBase(process.env.NEXT_PUBLIC_R2_PUBLIC_URL);
-
-/** 新上傳一律使用第一個；有自訂網域時就是自訂網域 */
-const PUBLIC_BASES = [primaryBase, legacyBase].filter((base): base is string => Boolean(base));
-
 export function hasR2Config(): boolean {
-  return Boolean(accountId && accessKeyId && secretAccessKey && bucket && PUBLIC_BASES.length > 0);
-}
-
-/** 供 next.config 與測試取得所有已知的公開網域主機名 */
-export function publicHostnames(): string[] {
-  return PUBLIC_BASES.map((base) => new URL(base).hostname);
+  return Boolean(
+    accountId && accessKeyId && secretAccessKey && bucket && publicMediaBases().length > 0,
+  );
 }
 
 let cached: S3Client | null = null;
@@ -74,8 +61,19 @@ export function buildObjectKey(projectId: string, extension: string): string {
   return `portfolio/${projectId}/${crypto.randomUUID()}.${extension}`;
 }
 
+/**
+ * 訪客在編輯器裡上傳的圖片（CR-003-4）。
+ *
+ * 路徑用 owner 的 id 分開，與 `portfolio/` 完全不同的前綴：
+ * 兩者的信任層級不一樣（一邊是員工放上去的作品，一邊是任何登入者的檔案），
+ * 混在同一個前綴下，之後想針對其中一邊做保留期或配額都得先分家。
+ */
+export function buildSiteObjectKey(ownerId: string, extension: string): string {
+  return `sites/${ownerId}/${crypto.randomUUID()}.${extension}`;
+}
+
 export function publicUrlFor(key: string): string {
-  const base = PUBLIC_BASES[0];
+  const base = publicMediaBases()[0];
   if (!base) throw new Error("缺少 R2 公開網域設定");
   return `${base}/${key}`;
 }
@@ -130,10 +128,10 @@ export async function deleteObject(key: string): Promise<void> {
  * 網域搬遷後，既有記錄仍存著舊網址。
  */
 export function keyFromPublicUrl(url: string): string | null {
-  const base = PUBLIC_BASES.find((candidate) => url.startsWith(`${candidate}/`));
+  const base = publicMediaBases().find((candidate) => url.startsWith(`${candidate}/`));
   if (!base) return null;
 
   const key = url.slice(base.length + 1);
   // 再確認一次路徑形狀符合我們的慣例，不接受任意 key
-  return /^portfolio\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.[A-Za-z0-9]+$/.test(key) ? key : null;
+  return /^(portfolio|sites)\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.[A-Za-z0-9]+$/.test(key) ? key : null;
 }

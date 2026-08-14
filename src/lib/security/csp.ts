@@ -32,6 +32,32 @@ export interface CspEnv {
   r2DomainUrl?: string;
   r2PublicUrl?: string;
   analyticsEndpoint?: string;
+  /**
+   * R2 的 S3 API 帳號 id。
+   *
+   * ⚠️ 這一項一開始漏了，而漏掉的後果不是「上傳有點怪」，是**所有媒體
+   * 上傳完全不能用**：presigned upload 是瀏覽器直接 PUT 到
+   * `<account>.r2.cloudflarestorage.com`，而那個主機不在 connect-src 裡。
+   *
+   * 沒有立刻發現是因為加 CSP 那天之後沒有人上傳過任何東西，
+   * 而 21 項 security 稽核沒有一項在問「加了 CSP 之後既有功能還能不能用」。
+   * CSP 擋掉東西的時候不會有伺服器錯誤——只有瀏覽器 console 裡一行字。
+   *
+   * 放進標頭沒有洩漏問題：這個 id 本來就出現在送給瀏覽器的簽名網址裡。
+   */
+  r2AccountId?: string;
+  /**
+   * bucket 名稱。
+   *
+   * ⚠️ 需要它是因為 AWS SDK 預設用 virtual-hosted-style 定址，
+   * 也就是把 bucket 放在**主機名的最前面**：
+   *   `https://<bucket>.<account>.r2.cloudflarestorage.com`
+   *
+   * 只放 `<account>.r2.cloudflarestorage.com` 的話 CSP 仍然擋——
+   * 而且 console 的訊息看起來像「已經加了啊」，因為那兩個字串長得很像。
+   * 實測過才發現差一段。
+   */
+  r2Bucket?: string;
 }
 
 /** CR-003-3 白名單嵌入的兩個提供者。要與 embeds.ts 組出來的主機一致 */
@@ -61,7 +87,28 @@ export function buildCsp(env: CspEnv, isDev: boolean): string {
     (origin): origin is string => origin !== null,
   );
 
-  const connect = ["'self'", supabase, analytics].filter(
+  /*
+   * 上傳走的是 S3 API 的主機，不是公開讀取的媒體網域——兩個是不同的名字。
+   * 只放媒體網域的話讀得到圖、上傳不了，而且看起來像網路問題。
+   */
+  const account = env.r2AccountId?.trim();
+  const bucket = env.r2Bucket?.trim();
+
+  /*
+   * 兩種定址都放進去。
+   *
+   * SDK 預設走 virtual-hosted-style（bucket 在主機名前面），但它在某些
+   * bucket 名稱下會退回 path-style。只放其中一種的話，退回的那一刻
+   * 上傳就整個不能用——而那是「有時候壞」，比「一直壞」更難查。
+   */
+  const uploadOrigins = account
+    ? [
+        `https://${account}.r2.cloudflarestorage.com`,
+        ...(bucket ? [`https://${bucket}.${account}.r2.cloudflarestorage.com`] : []),
+      ]
+    : [];
+
+  const connect = ["'self'", supabase, analytics, ...uploadOrigins].filter(
     (source): source is string => source !== null,
   );
 

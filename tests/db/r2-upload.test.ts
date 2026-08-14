@@ -1,7 +1,13 @@
 import { DeleteObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { buildObjectKey, createUploadUrl, keyFromPublicUrl, publicUrlFor } from "@/lib/storage/r2";
+import {
+  buildObjectKey,
+  buildSiteObjectKey,
+  createUploadUrl,
+  keyFromPublicUrl,
+  publicUrlFor,
+} from "@/lib/storage/r2";
 
 /**
  * R2 上傳鏈路的實測（CR-001，Spec §8.9 / §36）。
@@ -61,6 +67,26 @@ describe("物件路徑", () => {
     const a = buildObjectKey(PROJECT_ID, "png");
     const b = buildObjectKey(PROJECT_ID, "png");
     expect(a).not.toBe(b);
+  });
+});
+
+describe("編輯器上傳的圖片（CR-003-4）", () => {
+  const OWNER_ID = "00000000-0000-4000-8000-00000000beef";
+
+  it("放在 sites/<owner>/ 底下，與作品集分開", () => {
+    /*
+     * 兩者的信任層級不一樣：portfolio 是員工放上去的，sites 是任何登入者的。
+     * 混在同一個前綴下的話，之後想針對其中一邊做保留期或配額都得先分家。
+     */
+    const key = buildSiteObjectKey(OWNER_ID, "jpg");
+    expect(key).toMatch(/^sites\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.jpg$/);
+    expect(key.startsWith(`sites/${OWNER_ID}/`)).toBe(true);
+  });
+
+  it("這條路徑的網址也還原得回 key", () => {
+    // 還原不回來的話，之後要刪掉某個人的圖時會被當成外部網址而拒絕刪除
+    const key = buildSiteObjectKey(OWNER_ID, "webp");
+    expect(keyFromPublicUrl(publicUrlFor(key))).toBe(key);
   });
 });
 

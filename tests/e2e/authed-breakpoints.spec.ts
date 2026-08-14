@@ -58,7 +58,7 @@ async function horizontalOverflow(page: Page) {
 }
 
 async function signIn(page: Page) {
-  // 走真實路徑：直接造訪密路徑 → middleware 導向 /login?next=… → 登入後回到原處。
+  // 走真實路徑：直接造訪密路徑 → proxy 導向 /login?next=… → 登入後回到原處。
   // 第一版是 goto("/login") 然後等網址出現 /admin，那是我自己想像的行為；
   // 實際上沒有 next 參數時登入後會回首頁（sanitizeNextPath 的 fallback 是 "/"），
   // 於是 13 條測試全部卡在一個根本不存在的預期上。

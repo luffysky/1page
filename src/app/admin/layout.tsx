@@ -14,7 +14,7 @@ import { signOutAction } from "@/features/admin/session-actions";
  * ⚠️ 但 Server Action 仍必須各自驗證（見 features/admin/actions.ts）：
  * 它們是獨立的端點，不經過這個版面。
  *
- * 網址是 `/<ADMIN_SEGMENT>/admin/*`，middleware 內部改寫到 `/admin/*`。
+ * 網址是 `/<ADMIN_SEGMENT>/admin/*`，proxy 內部改寫到 `/admin/*`。
  * 裸 `/admin` 一律當作不存在。
  */
 

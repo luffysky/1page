@@ -75,6 +75,7 @@ const STUDIO: WebsiteTemplate = {
       content: {
         title: "近期作品",
         captions: ["餐飲品牌重塑", "醫療診所形象網站", "選物店電商改版"],
+        images: [],
       },
     },
     {
@@ -275,6 +276,7 @@ const PERSONAL: WebsiteTemplate = {
       content: {
         title: "作品選輯",
         captions: ["人像・2025", "空間・2024", "紀實・2023"],
+        images: [],
       },
     },
     {
@@ -343,6 +345,7 @@ const PRODUCT: WebsiteTemplate = {
       content: {
         title: "實際畫面",
         captions: ["月結總覽", "例外清單", "匯出設定"],
+        images: [],
       },
     },
     {

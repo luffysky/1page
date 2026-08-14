@@ -102,7 +102,7 @@ export default async function EditPage({ searchParams }: PageProps<"/edit">) {
           <div className="mt-10 flex flex-col gap-6">
             <TemplatePicker templates={templates} />
             <PreviewControls />
-            <SectionEditor />
+            <SectionEditor signedIn={accountEntry !== null} />
             <SaveBar
               signedIn={accountEntry !== null}
               savedName={loaded?.ok ? loaded.name : undefined}

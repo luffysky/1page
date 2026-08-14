@@ -57,11 +57,11 @@ const PRESETS: Partial<Record<SiteSectionType, Preset>> = {
   },
   gallery: {
     variant: "grid",
-    content: { title: "作品", captions: ["作品一", "作品二", "作品三"] },
+    content: { title: "作品", captions: ["作品一", "作品二", "作品三"], images: [] },
   },
   portfolio: {
     variant: "grid",
-    content: { title: "作品集", captions: ["案例一", "案例二", "案例三"] },
+    content: { title: "作品集", captions: ["案例一", "案例二", "案例三"], images: [] },
   },
   pricing: {
     variant: "tiers",
