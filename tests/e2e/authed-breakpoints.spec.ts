@@ -1,3 +1,5 @@
+import { readdirSync } from "node:fs";
+
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
@@ -160,31 +162,94 @@ test.describe("後台", () => {
     });
   }
 
-  // 作品列表與編輯表單是後台最寬的兩個版面（表格 + 多欄表單），
-  // 最容易在窄螢幕撐出橫向捲動。只測最窄與最寬兩端。
+  /*
+   * ⚠️ 後台每一頁都要掃，而且頁面清單**從磁碟算出來**。
+   *
+   * 這裡原本寫死三條路由（總覽、作品列表、新增作品）——那是 2E 當時
+   * 後台的全部。之後加的收件匣、客戶、報價、專案、請款、內容管理
+   * 一條都沒有被掃過，而這支測試的名字說它在檢查「後台」。
+   *
+   * 那是這個專案的第二種毛病：守衛通過不等於守衛有效。清單寫死的守衛
+   * 一定會過期，而過期的方式是安靜的——它照樣全綠。
+   *
+   * 反過來問：磁碟上有哪些後台頁面，就掃哪些。新增一頁時它自己會發現。
+   */
+  const adminRoutes = (() => {
+    const walk = (dir: string, urlPath: string): string[] => {
+      const found: string[] = [];
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const next = `${dir}/${entry.name}`;
+        if (entry.isDirectory()) {
+          const part = /^[(@]/.test(entry.name) ? "" : `/${entry.name}`;
+          found.push(...walk(next, `${urlPath}${part}`));
+        } else if (/^page\.tsx?$/.test(entry.name)) {
+          found.push(urlPath);
+        }
+      }
+      return found;
+    };
+
+    return walk("src/app/admin", "/admin");
+  })();
+
+  /*
+   * 動態路由要有一筆真的資料才進得去。
+   *
+   * 每一條都寫明「誰在掃它」——寫不出來的就是沒人掃。
+   */
+  const DYNAMIC_COVERED_ELSEWHERE: Array<[string, string]> = [
+    ["/admin/portfolio/[id]", "admin-case-study.spec.ts 會開一筆真的作品"],
+    ["/admin/clients/[id]", "admin-crm.spec.ts"],
+    ["/admin/deals/[id]", "admin-deals.spec.ts"],
+    ["/admin/engagements/[id]", "admin-engagements.spec.ts"],
+    ["/admin/invoices/[id]", "admin-invoices.spec.ts"],
+    [
+      "/admin/cms/[key]",
+      "下面的靜態清單直接掃 /admin/cms/home.layout——key 是程式碼登記的常數，不需要任何資料",
+    ],
+  ];
+
+  const excused = new Set(DYNAMIC_COVERED_ELSEWHERE.map(([route]) => route));
+
+  /*
+   * `/admin/cms/[key]` 是動態的，但 key 是程式碼登記的常數，
+   * 不需要任何資料就進得去——所以它掃得到，而且**應該**掃：
+   * 版面編輯器是後台目前最寬的一個版面。
+   */
+  const staticRoutes = adminRoutes
+    .filter((route) => !route.includes("["))
+    .concat("/admin/cms/home.layout");
+
+  const skipped = adminRoutes.filter((route) => route.includes("[") && !excused.has(route));
+
+  test("每一條後台動態路由都說得出是誰在掃它", () => {
+    expect(skipped, `這幾條動態路由沒有任何地方檢查 RWD 與 a11y：${skipped.join("、")}`).toEqual(
+      [],
+    );
+
+    for (const [route, who] of DYNAMIC_COVERED_ELSEWHERE) {
+      expect(who.trim().length, `${route} 沒有寫是誰在掃`).toBeGreaterThan(0);
+    }
+  });
+
+  // 只測最窄與最寬兩端：中間的斷點在總覽那一組已經全掃過，
+  // 而撐出橫向捲動的永遠是這兩端其中之一
   const [narrowest] = VIEWPORTS;
   const widest = VIEWPORTS[VIEWPORTS.length - 1]!;
 
   for (const viewport of [narrowest, widest]) {
-    test(`作品列表 @ ${viewport.name}px`, async ({ page }) => {
-      await page.setViewportSize({ width: viewport.width, height: viewport.height });
-      await page.goto(`/${segment}/admin/portfolio`);
+    for (const route of staticRoutes) {
+      test(`${route} @ ${viewport.name}px`, async ({ page }) => {
+        await page.setViewportSize({ width: viewport.width, height: viewport.height });
+        await page.goto(`/${segment}${route}`);
 
-      expect(await scan(page)).toEqual([]);
-      expect(await horizontalOverflow(page), `${viewport.name}px 出現橫向捲動`).toBeLessThanOrEqual(
-        0,
-      );
-    });
-
-    test(`新增作品表單 @ ${viewport.name}px`, async ({ page }) => {
-      await page.setViewportSize({ width: viewport.width, height: viewport.height });
-      await page.goto(`/${segment}/admin/portfolio/new`);
-
-      expect(await scan(page)).toEqual([]);
-      expect(await horizontalOverflow(page), `${viewport.name}px 出現橫向捲動`).toBeLessThanOrEqual(
-        0,
-      );
-    });
+        expect(await scan(page)).toEqual([]);
+        expect(
+          await horizontalOverflow(page),
+          `${viewport.name}px 出現橫向捲動`,
+        ).toBeLessThanOrEqual(0);
+      });
+    }
   }
 
   test("登出後回到首頁，且不再能進入後台", async ({ page }) => {

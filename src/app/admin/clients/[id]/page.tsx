@@ -9,6 +9,8 @@ import { DEAL_STAGE_LABELS, formatAmount } from "@/features/backoffice/deal-type
 import { listDealsForClient } from "@/features/backoffice/deals";
 import { ENGAGEMENT_STATUS_LABELS } from "@/features/backoffice/engagement-types";
 import { listEngagementsForClient } from "@/features/backoffice/engagements";
+import { INVOICE_STATUS_LABELS, balanceOf, formatMoney } from "@/features/backoffice/invoice-types";
+import { listInvoicesForClient } from "@/features/backoffice/invoices";
 
 import { AddContactForm } from "../client-actions";
 import { ClientForm } from "../client-form";
@@ -33,10 +35,11 @@ const input = "border-brand-line bg-brand-bg text-body-sm w-full rounded-md bord
 
 export default async function AdminClientDetailPage({ params }: PageProps<"/admin/clients/[id]">) {
   const { id } = await params;
-  const [detail, deals, engagements] = await Promise.all([
+  const [detail, deals, engagements, invoices] = await Promise.all([
     getClient(id),
     listDealsForClient(id),
     listEngagementsForClient(id),
+    listInvoicesForClient(id),
   ]);
 
   if (!detail) notFound();
@@ -189,6 +192,42 @@ export default async function AdminClientDetailPage({ params }: PageProps<"/admi
                   <span className="text-caption text-brand-muted">
                     {ENGAGEMENT_STATUS_LABELS[engagement.status]}
                     {engagement.dueOn ? ` · 截止 ${engagement.dueOn}` : ""}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {/* ── 請款 ─────────────────────────────────────────────── */}
+      <section className="border-brand-line mt-10 border-t pt-8">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-heading-2">請款</h2>
+          <Link
+            href={toAdminUrl(`/admin/invoices/new?client=${client.id}`)}
+            className="border-brand-ink text-body-sm rounded-pill border px-5 py-2.5 font-bold"
+          >
+            開一張請款單
+          </Link>
+        </div>
+
+        {invoices.length === 0 ? (
+          <p className="text-body-sm text-brand-muted mt-4">還沒有跟這個客戶請過款。</p>
+        ) : (
+          <ul className="mt-4 flex flex-col gap-2">
+            {invoices.map((invoice) => (
+              <li key={invoice.id}>
+                <Link
+                  href={toAdminUrl(`/admin/invoices/${invoice.id}`)}
+                  className="border-brand-line hover:border-brand-ink flex flex-wrap items-center justify-between gap-3 rounded-md border p-3"
+                >
+                  <span className="text-body-sm font-bold">{invoice.number}</span>
+                  <span className="text-caption text-brand-muted">
+                    {INVOICE_STATUS_LABELS[invoice.status]} · {formatMoney(invoice.total)}
+                    {balanceOf(invoice.total, invoice.paid) > 0
+                      ? ` · 還差 ${formatMoney(balanceOf(invoice.total, invoice.paid))}`
+                      : " · 已收足"}
                   </span>
                 </Link>
               </li>

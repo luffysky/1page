@@ -7,6 +7,7 @@ import { getAdminIdentity } from "@/features/admin/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 import { parseDuration } from "./engagement-types";
+import { invoiceTotals } from "./invoice-types";
 
 /**
  * 後台 CRM 的寫入操作（CR-004 / Phase B BD）
@@ -632,4 +633,297 @@ export async function deleteTimeEntry(formData: FormData): Promise<void> {
   await supabase.from("time_entries").delete().eq("id", id);
 
   revalidatePath(`/admin/engagements/${engagementId}`);
+}
+
+/* ------------------------------------------------------------------ */
+/* 請款與收款（CR-004 / Phase B BG）                                    */
+/* ------------------------------------------------------------------ */
+
+/*
+ * ⚠️ 這一段沒有金流，也不打算有。
+ *
+ * 這裡的每個 action 都是**記帳**：自己開發票、自己對帳，
+ * 系統只把「誰欠多少、收了沒」記下來。
+ * 做成看起來會自動收錢的樣子，比沒有更糟。
+ */
+
+const invoiceSchema = z.object({
+  id: z.uuid().optional(),
+  clientId: z.uuid(),
+  engagementId: z.union([z.uuid(), z.literal("")]),
+  number: z
+    .string()
+    .trim()
+    .min(1, "請款單編號不可空白")
+    .max(40)
+    .regex(/^[A-Za-z0-9\-_/]+$/, "編號只能用英數與 - _ /"),
+  status: z.enum(["draft", "sent", "paid", "void"]),
+  issuedOn: z.union([z.iso.date(), z.literal("")]),
+  dueOn: z.union([z.iso.date(), z.literal("")]),
+  /** 百分比。5 代表 5%——填 0.05 的人比填 5 的人少得多 */
+  taxPercent: z.number().min(0).max(100),
+});
+
+export async function saveInvoice(formData: FormData): Promise<BackofficeResult> {
+  await requireStaff();
+
+  const rawTax = text(formData, "taxPercent");
+  const parsed = invoiceSchema.safeParse({
+    id: text(formData, "id") || undefined,
+    clientId: text(formData, "clientId"),
+    engagementId: text(formData, "engagementId"),
+    number: formData.get("number"),
+    status: formData.get("status"),
+    issuedOn: text(formData, "issuedOn"),
+    dueOn: text(formData, "dueOn"),
+    taxPercent: rawTax === "" ? 0 : Number(rawTax),
+  });
+
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "輸入有誤" };
+  }
+
+  const data = parsed.data;
+
+  /*
+   * 寄出去的單要有開立日期。
+   *
+   * 沒有日期的已寄出，之後回答不了「這筆帳多久了」——
+   * 而那是催款時唯一有用的資訊。
+   */
+  if (data.status !== "draft" && !data.issuedOn) {
+    return { ok: false, message: "草稿以外的狀態要填開立日期，不然之後算不出這筆帳放了多久。" };
+  }
+
+  if (data.issuedOn && data.dueOn && data.issuedOn > data.dueOn) {
+    return { ok: false, message: "開立日期比到期日晚，其中一個應該是打錯了。" };
+  }
+
+  const supabase = await createSupabaseServerClient();
+
+  /*
+   * 總額由明細算出來再存下來，不是每次算。
+   *
+   * ⚠️ 稅率與折扣規則會變，而**已經開出去的請款單金額不能跟著變**。
+   * 每次重算的話，改一次稅率就會讓去年的帳全部對不起來。
+   */
+  const { data: lineRows } = data.id
+    ? await supabase
+        .from("invoice_lines")
+        .select("id, description, quantity, unit_price, sort_order")
+        .eq("invoice_id", data.id)
+    : { data: [] };
+
+  const totals = invoiceTotals(
+    (lineRows ?? []).map((line) => ({
+      id: line.id,
+      description: line.description,
+      quantity: Number(line.quantity),
+      unitPrice: Number(line.unit_price),
+      sortOrder: line.sort_order,
+    })),
+    data.taxPercent / 100,
+  );
+
+  const payload = {
+    client_id: data.clientId,
+    engagement_id: data.engagementId || null,
+    number: data.number,
+    status: data.status,
+    issued_on: data.issuedOn || null,
+    due_on: data.dueOn || null,
+    subtotal: totals.subtotal,
+    tax: totals.tax,
+    total: totals.total,
+  };
+
+  const saved = data.id
+    ? await supabase.from("invoices").update(payload).eq("id", data.id).select("id").single()
+    : await supabase.from("invoices").insert(payload).select("id").single();
+
+  if (saved.error) {
+    /*
+     * 重複的編號要說人話。
+     *
+     * 資料庫回的是 `duplicate key value violates unique constraint
+     * "invoices_number_key"`——看得懂的人不需要這個系統。
+     */
+    if (saved.error.code === "23505") {
+      return { ok: false, message: `編號 ${data.number} 已經用過了。換一個。` };
+    }
+    return { ok: false, message: `儲存失敗：${saved.error.message}` };
+  }
+
+  revalidatePath("/admin/invoices");
+  revalidatePath(`/admin/clients/${data.clientId}`);
+  return { ok: true, id: saved.data.id };
+}
+
+const invoiceLineSchema = z.object({
+  invoiceId: z.uuid(),
+  description: z.string().trim().min(1, "項目說明不可空白").max(300),
+  quantity: z.number().positive().max(9999),
+  unitPrice: z.number().min(0).max(99999999),
+});
+
+/**
+ * 加一筆明細，並**重新算一次總額**。
+ *
+ * ⚠️ 不重算的話，明細加了而總額沒動——而那張單會就這樣寄出去。
+ * 這是「兩份真相」最典型的樣子：一份在 invoice_lines，一份在 invoices.total。
+ */
+export async function addInvoiceLine(formData: FormData): Promise<BackofficeResult> {
+  await requireStaff();
+
+  const parsed = invoiceLineSchema.safeParse({
+    invoiceId: text(formData, "invoiceId"),
+    description: formData.get("description"),
+    quantity: Number(text(formData, "quantity") || "1"),
+    unitPrice: Number(text(formData, "unitPrice") || "0"),
+  });
+
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "輸入有誤" };
+  }
+
+  const supabase = await createSupabaseServerClient();
+
+  const { data: last } = await supabase
+    .from("invoice_lines")
+    .select("sort_order")
+    .eq("invoice_id", parsed.data.invoiceId)
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const { error } = await supabase.from("invoice_lines").insert({
+    invoice_id: parsed.data.invoiceId,
+    description: parsed.data.description,
+    quantity: parsed.data.quantity,
+    unit_price: parsed.data.unitPrice,
+    sort_order: (last?.sort_order ?? -1) + 1,
+  });
+
+  if (error) return { ok: false, message: `儲存失敗：${error.message}` };
+
+  await recalculateInvoice(parsed.data.invoiceId);
+
+  revalidatePath(`/admin/invoices/${parsed.data.invoiceId}`);
+  return { ok: true };
+}
+
+export async function deleteInvoiceLine(formData: FormData): Promise<void> {
+  await requireStaff();
+
+  const id = text(formData, "id");
+  const invoiceId = text(formData, "invoiceId");
+  if (!id) return;
+
+  const supabase = await createSupabaseServerClient();
+  await supabase.from("invoice_lines").delete().eq("id", id);
+
+  await recalculateInvoice(invoiceId);
+
+  revalidatePath(`/admin/invoices/${invoiceId}`);
+}
+
+/**
+ * 依現有明細與**目前存著的稅率**重算總額。
+ *
+ * 稅率沒有自己的欄位（migration 只存結果），所以從 subtotal 與 tax
+ * 反推：這樣改明細時不會順手把當初的稅率改掉。
+ * subtotal 是 0 時反推不出來，那就當作沒有稅——0 元的單沒有稅可言。
+ */
+async function recalculateInvoice(invoiceId: string): Promise<void> {
+  const supabase = await createSupabaseServerClient();
+
+  const [{ data: invoice }, { data: lines }] = await Promise.all([
+    supabase.from("invoices").select("subtotal, tax").eq("id", invoiceId).maybeSingle(),
+    supabase
+      .from("invoice_lines")
+      .select("id, description, quantity, unit_price, sort_order")
+      .eq("invoice_id", invoiceId),
+  ]);
+
+  if (!invoice) return;
+
+  const previousSubtotal = Number(invoice.subtotal);
+  const rate = previousSubtotal > 0 ? Number(invoice.tax) / previousSubtotal : 0;
+
+  const totals = invoiceTotals(
+    (lines ?? []).map((line) => ({
+      id: line.id,
+      description: line.description,
+      quantity: Number(line.quantity),
+      unitPrice: Number(line.unit_price),
+      sortOrder: line.sort_order,
+    })),
+    rate,
+  );
+
+  await supabase
+    .from("invoices")
+    .update({ subtotal: totals.subtotal, tax: totals.tax, total: totals.total })
+    .eq("id", invoiceId);
+}
+
+const paymentSchema = z.object({
+  invoiceId: z.uuid(),
+  paidOn: z.iso.date(),
+  amount: z.number().positive("收款金額要大於 0").max(99999999),
+  method: z.string().trim().max(40),
+  note: z.string().trim().max(500),
+});
+
+/**
+ * 記一筆收款。
+ *
+ * ⚠️ **不會**因此把請款單改成「已收款」。
+ *
+ * 收了一半就翻狀態的話，帳就對不起來了——而「還差多少」
+ * 是這整張表存在的理由。什麼時候算收完是人的判斷
+ * （可能有匯費、可能談了折讓），畫面上會提醒，但不自己改。
+ */
+export async function addPayment(formData: FormData): Promise<BackofficeResult> {
+  await requireStaff();
+
+  const parsed = paymentSchema.safeParse({
+    invoiceId: text(formData, "invoiceId"),
+    paidOn: text(formData, "paidOn"),
+    amount: Number(text(formData, "amount") || "0"),
+    method: text(formData, "method"),
+    note: text(formData, "note"),
+  });
+
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "輸入有誤" };
+  }
+
+  const supabase = await createSupabaseServerClient();
+
+  const { error } = await supabase.from("payments").insert({
+    invoice_id: parsed.data.invoiceId,
+    paid_on: parsed.data.paidOn,
+    amount: parsed.data.amount,
+    method: parsed.data.method || null,
+    note: parsed.data.note || null,
+  });
+
+  if (error) return { ok: false, message: `儲存失敗：${error.message}` };
+
+  revalidatePath(`/admin/invoices/${parsed.data.invoiceId}`);
+  return { ok: true };
+}
+
+export async function deletePayment(formData: FormData): Promise<void> {
+  await requireStaff();
+
+  const id = text(formData, "id");
+  const invoiceId = text(formData, "invoiceId");
+  if (!id) return;
+
+  const supabase = await createSupabaseServerClient();
+  await supabase.from("payments").delete().eq("id", id);
+
+  revalidatePath(`/admin/invoices/${invoiceId}`);
 }

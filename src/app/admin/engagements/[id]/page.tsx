@@ -75,6 +75,23 @@ export default async function AdminEngagementDetailPage({
         </Link>
       </div>
 
+      {/*
+       * 做完了要收錢。
+       *
+       * 沒有這個入口的話，`invoices.engagement_id` 就是一個沒有人寫的
+       * 欄位——而「這個案子收了多少」是專案結束時第一個要問的問題。
+       */}
+      <p className="text-body-sm mt-6">
+        <Link
+          href={toAdminUrl(
+            `/admin/invoices/new?client=${engagement.clientId}&engagement=${engagement.id}`,
+          )}
+          className="border-brand-ink rounded-pill inline-flex border px-5 py-2.5 font-bold"
+        >
+          替這個案子開一張請款單
+        </Link>
+      </p>
+
       {engagement.dealId ? (
         <p className="text-body-sm mt-6">
           <Link href={toAdminUrl(`/admin/deals/${engagement.dealId}`)} className="underline">

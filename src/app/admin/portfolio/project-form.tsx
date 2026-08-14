@@ -244,7 +244,7 @@ export function ProjectForm({
         <div className="mt-4">
           <span className="text-body-sm block font-bold">分類</span>
           <span className="text-caption text-brand-muted mt-1 block">
-            /work 的篩選器用這個。**一個都沒選的話，這件作品在任何分類下都找不到。**
+            /work 的篩選器用這個。<strong>一個都沒選的話，這件作品在任何分類下都找不到。</strong>
           </span>
           <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
             {allCategories.map((category) => (

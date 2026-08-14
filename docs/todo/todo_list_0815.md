@@ -289,19 +289,53 @@ reduced-motion 不用 CSS 藏  純 CSS 只能藏：影片仍然會下載、會�
 
 ---
 
+### ~~BG — 請款與收款（invoices / invoice_lines / payments）~~ ✅
+
+後台「請款」：列表（還沒收回來的金額、逾期標示、依狀態篩選）、
+詳細頁（明細、收款、對不上時的提醒）。客戶頁與專案頁都有入口。
+
+⚠️ **沒有金流，也不打算有。** 畫面上寫著「這裡只是記帳，不會真的去收錢」，
+而且那句話有一條 e2e 盯著。
+
+```text
+明細改了就重算總額並存回去   兩份真相最典型的樣子：一份在 invoice_lines，
+                             一份在 invoices.total。不同步的話，
+                             客戶收到的金額與系統裡的不一樣
+收款不會自動翻狀態           收了一半就標成已收款，「還差多少」就再也
+                             算不出來——而那是這整張表存在的理由
+重複編號由資料庫擋           會計事故，不是 UI 問題。應用層負責說人話
+稅率不存欄位                 只存結果（subtotal/tax/total）。已開出去的單
+                             不能因為之後改稅率而變。編輯時從比例反推
+```
+
+---
+
 ## 🔴 真正還沒做（純程式、沒被外部卡）
-
-### BG — 帳務（invoices / invoice_lines / payments）
-
-migration 已經跑了（`20260815000013`），沒有 repository、action 與頁面。
-
-⚠️ 這一塊沒有金流串接，也不做。invoices 是**記帳**不是收錢：
-自己開發票、自己對帳，系統只把「誰欠多少、收了沒」記下來。
-做成看起來會自動收錢的樣子，比沒有更糟。
 
 ### CR-003-5 — 前台的 CRM 設計器
 
 jsonb 存 `crm_definitions` / `crm_records`，不做使用者自定義 DDL。
+
+### 後台仍然編不了作品的分類與標籤
+
+`portfolio_project_categories` / `portfolio_project_tags` 是 join 表，
+要多選介面加上 delete/insert。
+
+⚠️ 分類篩選改讀資料庫之後，**在後台新建的作品沒有任何分類，
+於是它在任何分類篩選下都找不到**。表單上已經有一句警告，但那只是提醒，
+不是解法。
+
+### 時間軸不顯示「誰做的」
+
+`activities.actor_id` 由 trigger 以 `auth.uid()` 寫入，但沒有任何地方讀它。
+目前只有一位員工，顯示「誰做的」沒有資訊量——**多人之後要顯示**，
+不然那一欄就白存了。已列在 `audit-wiring` 的具名例外裡並寫了理由。
+
+### `portfolio_media.thumbnail_url` 沒有產生縮圖的路徑
+
+欄位在、讀取端也在（`supabase-repository.ts`），但**沒有任何地方寫它**。
+上傳流程不產生縮圖，R2 也沒有影像轉換。要用得先有一條產生縮圖的路徑
+（上傳後在瀏覽器端縮圖再傳第二份，或接 Cloudflare Images）。
 
 ### 直接改資料庫，前台不會跟著變
 
@@ -312,18 +346,11 @@ CMS 的讀取端有快取，而快取由 tag 失效，**tag 只在 action 存檔
 `tests/e2e/admin-layout.spec.ts` 的註解裡。之後若真的需要「從外部
 讓內容立刻生效」，那是一條要另外設計的路徑（帶密鑰的 revalidate 端點）。
 
-### 後台仍然編不了分類與標籤（0815 註：仍未做）
+### CR-004 剩下的部分
 
-`portfolio_project_categories` / `portfolio_project_tags` 是 join 表，
-要多選介面加上 delete/insert，與這次做的單列欄位不同性質。
-
-⚠️ 這件事現在比之前重要：分類篩選改讀資料庫之後，
-**在後台新建的作品沒有任何分類，於是它在任何分類篩選下都找不到**。
-
-### CR-004（Luffy 0814 追加）
-
-兩個 dashboard、CRM、ERP、CMS、前台的 CRM 設計器。
-草案在 `docs/cr-004-draft.md`，裡面有五個要裁決的問題。
+Phase B 的 BA–BJ 都做完了（兩個 dashboard、CMS、CRM、ERP、版面與背景）。
+**只剩前台的 CRM 設計器（CR-003-5）**，列在上面。
+草案在 `docs/cr-004-draft.md`。
 
 ### 「畫面上進不去」的守衛只覆蓋連結
 
@@ -336,6 +363,17 @@ CMS 的讀取端有快取，而快取由 tag 失效，**tag 只在 action 存檔
 ```
 
 需要登入才看得到的入口那一項已由 `authed-reachability.spec.ts` 補上。
+
+0815 補了兩條相關的：
+
+```text
+audit:wiring【3】改成表級      from("table") 從來沒出現過 = migration 跑了
+                               但功能沒做。原本是整份原始碼的子字串比對，
+                               而 invoices.number 會被 typeof x === "number"
+                               裡的 number 命中——三張孤兒表全部漏掉
+authed-breakpoints 從磁碟列舉   後台的 RWD/a11y 清單原本寫死三條路由，
+                               之後加的六個頁面一條都沒掃過
+```
 
 ---
 
@@ -688,6 +726,108 @@ crm_records       owner_id + definition_id + entity + data jsonb
 **不是重寫一個編輯器，是換一組 widget**。
 
 定價與網站編輯器一致（免費設計、存檔要帳號），筆數上限用 DB trigger 擋。
+
+---
+
+
+---
+
+## 🌐 跨專案：upgrade.md 與 SnowRealm-Platform（Luffy 0815 交辦，尚未開工）
+
+> 這一節是**還沒做**的事，寫在這裡是為了不要靠記憶。
+> 交辦原文見 0815 的對話：「其他專案的整個專案，如果有想到可以升級
+> 優化的地方，放到他們各自的 docs 資料夾，取名 upgrade.md」。
+
+### 為什麼還沒開工
+
+Luffy 明確排過順序：「等現在這個 1page 專案你可以做的待辦都做完，
+再做我剛剛提到的」。1page 這邊的 CR-004 Phase B 到 BJ 為止已經收尾，
+所以這一節現在是**下一個可以開工的東西**。
+
+### 一、各專案的 `docs/upgrade.md`
+
+八個專案，每一個都要**先讀懂它在做什麼再出手**——
+不讀就寫的升級建議會變成一份通用的最佳實踐清單，那種東西沒有人會看。
+
+```text
+D:\SnowRealmRebirth\GLACERA
+D:\SnowRealmRebirth\AI\ai_island_v3
+D:\SnowRealmRebirth\md2deck
+D:\SnowRealmRebirth\snowrealm-insight-engine\insight-engine
+D:\SnowRealmRebirth\snowrealm-pet\MaoTravelBlog
+D:\SnowRealmRebirth\SnowRealmSpace
+D:\SnowRealmRebirth\SnowRealmYukiBoard
+D:\SnowRealmRebirth\tammon_crawler_project
+```
+
+每一份 `upgrade.md` 至少要能回答：
+
+```text
+1. 這個專案在做什麼、現在到哪裡      不是複述 README，是讀完程式碼之後的判斷
+2. 最該先修的三件事，附理由          「最該先」要說得出為什麼是它而不是別的
+3. 可以從 1page 搬過去的東西         已經驗證過的做法，不是想法
+4. 不建議做的事                      同樣重要。省下的時間才是最實在的升級
+```
+
+**已經知道可以搬過去的（1page 這邊實際驗證過的）**：
+
+```text
+presign 直傳 + XHR 進度          ai_island 的 /api/upload 讓檔案經過自己的
+                                 伺服器，大檔會佔滿 serverless 的記憶體與時間
+「反過來問」型的守衛             不要列「faq 要有元件」，要問「清單裡有沒有
+                                 哪一個沒人實作」。前者每次新增都要記得補
+故意改壞驗守衛                   每加一個守衛就把程式改壞一次。這次又抓到
+                                 兩個我自己寫的假守衛
+稽核腳本要先去掉註解             同一個原因造成過一次假通過、一次假失敗
+表級的接線稽核                   `from("table")` 從來沒出現過 = migration 跑了
+                                 但功能沒做。1page 靠它抓到三張孤兒表
+```
+
+**特別要處理的兩件事**：
+
+- `ai_island_v3` 的後台密路徑 `Ak83QDhUOVqx` 曾經出現在對話裡，要換掉。
+  這件事寫進它的 `upgrade.md`，但**換的動作要 Luffy 自己做**。
+- `MaoTravelBlog` 沒有 GitHub remote，只有本地的 `gitsafe-backup`。
+  其餘七個都有 remote，寫完各自 commit + push。
+
+### 二、`SnowRealm-Platform/docs` 的總體想法
+
+> 「我們是叫 SnowRealm 的品牌，公司名稱叫斯諾瑞姆企業社，
+> SnowRealm-Platform 是我們企業社所有產品入口」
+
+要先讀完 `SnowRealm-Platform` 現有的那幾份文件再寫，不然會變成
+一份與既有規劃打架的第二套方案。
+
+要寫的東西：
+
+```text
+1. SnowRealm 是什麼          一個品牌下的多個產品，還是一個平台上的多個模組？
+                             這個答案決定後面每一件事，包含要不要抽 SDK
+2. 每個專案的定位與關係       哪些是產品、哪些是內部工具、哪些該收掉
+3. 共用入口                  SSO 是第一個，因為它決定「同一個人」怎麼定義。
+                             1page 的 profiles 已經預留 snowrealm_id 欄位
+                             （目前恆為 null，audit 有具名例外）
+4. 該抽成 SDK 的東西          ⚠️ 抽 SDK 的判準是「已經在兩個以上專案裡
+                             各寫過一次、而且寫法一樣」。只寫過一次的東西
+                             抽出來只會變成一個沒有人敢改的套件
+5. 各專案的升級路線與順序     哪些互相依賴、哪些可以並行
+```
+
+**已經看得出來的共用候選**（都在兩個以上專案出現過）：
+
+```text
+自架 GoTrue 的接法            1page 與 SnowRealmSpace 是同一套
+presign 直傳 R2 + 進度        1page / SnowRealmSpace / ai_island 各寫過一次
+設計 token 與 no-hardcoded 守衛  1page 的 tokens.css + 三條測試
+「反過來問」的接線稽核         目前只有 1page 有，但每個專案都需要
+```
+
+⚠️ **SSO 的 cookie 範圍有一個已知的限制**：R2 自訂網域
+（`1page-r2.snowrealm.pet`）與站台（`1page.snowrealm.pet`）同註冊網域。
+若把 auth cookie 設在 `.snowrealm.pet` 範圍，一個惡意 SVG 被直接開啟時
+就讀得到它。目前 Supabase 的 cookie 是 host-only 所以還安全——
+**做 SSO 時這件事會第一個撞上來**，不是之後再說。
+（見 `src/config/media.ts` 的 `SVG_INTENTIONALLY_EXCLUDED` 說明。）
 
 ---
 

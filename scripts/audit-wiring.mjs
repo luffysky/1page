@@ -168,14 +168,107 @@ const IGNORED_COLUMNS = [
   ["category_id", "join 表的欄位，PostgREST 的巢狀語法不會寫出它的名字"],
   ["tag_id", "同上"],
   ["snowrealm_id", "為未來的 SnowRealm SSO 預留，目前恆為 null（CR-002 明列）"],
+  [
+    "actor_id",
+    "由資料庫的 trigger 以 auth.uid() 寫入，TypeScript 裡看不到。目前只有一位員工，時間軸顯示「誰做的」沒有資訊量；多人之後要顯示（見 todo）",
+  ],
 ];
 
 const ignored = new Set(IGNORED_COLUMNS.map(([name]) => name));
 
 const allSource = sources.map((path) => readFileSync(path, "utf8")).join("\n");
-const neverUsed = [...columnNames].filter(
-  (name) => !ignored.has(name) && !allSource.includes(name),
+/*
+ * ⚠️ 這一段原本是 `!allSource.includes(name)`——一個**整份原始碼的
+ * 子字串比對**，而那是一個假通過。
+ *
+ * `invoices.number` 會被 `typeof value === "number"` 裡的 number 命中；
+ * `total`、`status`、`amount`、`method`、`note` 也全部一樣。
+ * 結果是 invoices / invoice_lines / payments 三張表**一行程式碼都沒有**，
+ * 而這條稽核回報「沒有未接線的欄位」。
+ *
+ * 現在改成兩層：
+ *   3a. 有沒有哪一張表，`from("…")` 從來沒有出現過
+ *   3b. 欄位只在「真的碰那張表的檔案」裡找，而且要整字比對
+ *
+ * 3a 才是真正重要的那一條：整張表沒接線是「migration 跑了但功能沒做」，
+ * 而那正是這個專案反覆踩到的第一種毛病。
+ */
+const tableNames = [...new Set(columns.map((row) => row.table_name))];
+
+/*
+ * 每張表被哪些檔案碰到。
+ *
+ * ⚠️ 兩個判準，用途不同：
+ *
+ *   touchedBy   `from("…")`。很準，用來回答「這張表有沒有被用過」。
+ *   mentionedIn 檔案裡出現過表名就算。用來**縮小欄位比對的範圍**。
+ *
+ * 為什麼欄位那邊要寬一點：`portfolio_media` 的欄位是寫在
+ * `from("portfolio_projects")` 的巢狀 select 裡的，那個檔案永遠不會出現
+ * `from("portfolio_media")`。用嚴格判準的話，那張表的每一個欄位
+ * 都會被誤報成沒接線——第一版就是這樣，三個警告裡兩個是假的。
+ */
+const scanned = [
+  ...sources,
+  ...collectSourceFiles("scripts").filter((path) => path.endsWith(".mjs")),
+];
+
+const touchedBy = new Map(
+  tableNames.map((table) => [
+    table,
+    scanned.filter((path) => readFileSync(path, "utf8").includes(`from("${table}")`)),
+  ]),
 );
+
+const mentionedIn = new Map(
+  tableNames.map((table) => [
+    table,
+    scanned.filter((path) => readFileSync(path, "utf8").includes(table)),
+  ]),
+);
+
+/*
+ * 刻意還沒接線的表。每一條都要寫理由與預計什麼時候接。
+ *
+ * ⚠️ 寫不出理由的就是漏做——那正是這條稽核存在的原因。
+ */
+const UNWIRED_TABLES = [];
+
+const unwiredExcuses = new Set(UNWIRED_TABLES.map(([name]) => name));
+
+const orphanTables = tableNames.filter(
+  (table) => touchedBy.get(table).length === 0 && !unwiredExcuses.has(table),
+);
+
+if (orphanTables.length === 0) {
+  pass(`${tableNames.length} 張表都至少有一處 from("…")`);
+} else {
+  fail(
+    "以下的表在資料庫裡，但沒有任何程式碼碰它（migration 跑了，功能沒做）",
+    orphanTables.join(", "),
+  );
+}
+
+/*
+ * 欄位：只在碰那張表的檔案裡找，而且整字比對。
+ *
+ * 沒有任何檔案碰那張表時就跳過——那件事 3a 已經報過了，
+ * 在這裡再報一次只會把訊息淹掉。
+ */
+const neverUsed = [];
+
+for (const row of columns) {
+  if (ignored.has(row.column_name)) continue;
+
+  const files = mentionedIn.get(row.table_name);
+  if (files.length === 0) continue;
+
+  // 整字比對。子字串比對正是這一段原本假通過的原因
+  const pattern = new RegExp(`\\b${row.column_name}\\b`);
+  const used = files.some((path) => pattern.test(readFileSync(path, "utf8")));
+
+  if (!used) neverUsed.push(`${row.table_name}.${row.column_name}`);
+}
 
 if (neverUsed.length === 0) {
   pass(`沒有未接線的欄位（掃了 ${sources.length} 個檔案，另有 ${ignored.size} 個具名例外）`);

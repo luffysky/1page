@@ -77,7 +77,10 @@ export const ADMIN_NAV: NavGroup[] = [
   },
   {
     title: "接案",
-    items: [{ label: "專案", href: "/admin/engagements", hint: "進度、里程碑與工時" }],
+    items: [
+      { label: "專案", href: "/admin/engagements", hint: "進度、里程碑與工時" },
+      { label: "請款", href: "/admin/invoices", hint: "還有多少錢沒收回來" },
+    ],
   },
 ];
 

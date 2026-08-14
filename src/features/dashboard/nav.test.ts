@@ -54,6 +54,7 @@ const NOT_IN_NAV: Array<[string, string]> = [
   ["/admin/clients/new", "同上，從「客戶」列表的『新增客戶』按鈕進入"],
   ["/admin/deals/new", "從「報價」列表、以及客戶詳細頁的『新增報價』按鈕進入"],
   ["/admin/engagements/new", "同上；成交的報價也可以直接按『開成專案』"],
+  ["/admin/invoices/new", "從「請款」列表、客戶頁與專案頁的『開一張請款單』按鈕進入"],
 ];
 
 function missingFromNav(routes: string[], nav: NavGroup[]): string[] {
