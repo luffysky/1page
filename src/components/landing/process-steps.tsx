@@ -1,5 +1,3 @@
-import { PROCESS_STEPS } from "@/config/home-copy";
-
 /**
  * Process（Spec §4 IA）
  *
@@ -7,10 +5,15 @@ import { PROCESS_STEPS } from "@/config/home-copy";
  * 這是首頁倒數第二個 Section，前面已有 Goal / Work / Services 三處網格，
  * 再來一排圓角卡就會踩到 §3.1 的卡片文法紅線。
  */
-export function ProcessSteps() {
+export function ProcessSteps({
+  steps,
+}: {
+  /** 從 CMS 讀進來（CR-004 / BI）。以前是直接 import 常數 */
+  steps: readonly { step: string; title: string; summary: string }[];
+}) {
   return (
     <ol className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-      {PROCESS_STEPS.map((item) => (
+      {steps.map((item) => (
         <li key={item.step} className="border-brand-ink border-t-2 pt-5">
           <p className="text-caption text-brand-accent-strong font-black">{item.step}</p>
           <h3 className="text-heading-2 mt-3">{item.title}</h3>

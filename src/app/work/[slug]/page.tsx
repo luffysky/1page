@@ -10,7 +10,7 @@ import { DarkCtaBlock } from "@/components/shared/dark-cta-block";
 import { Navbar, type NavLink } from "@/components/shared/navbar";
 import { getAdminEntry } from "@/features/admin/auth";
 import { SiteFooter } from "@/components/shared/site-footer";
-import { FINAL_CTA_COPY } from "@/config/home-copy";
+import { readCmsDocument } from "@/features/cms/read";
 import { getCategoryName } from "@/config/portfolio-categories";
 import { SERVICE_LINES } from "@/config/services";
 import { absoluteUrl, SITE_NAME } from "@/config/site";
@@ -244,7 +244,7 @@ export default async function WorkDetailPage({ params }: PageProps<"/work/[slug]
           </section>
         ) : null}
 
-        <DarkCtaBlock {...FINAL_CTA_COPY} />
+        <DarkCtaBlock {...await readCmsDocument("home.final-cta")} />
       </main>
 
       <SiteFooter />

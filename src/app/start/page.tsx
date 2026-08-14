@@ -5,6 +5,7 @@ import { SiteFooter } from "@/components/shared/site-footer";
 import { absoluteUrl } from "@/config/site";
 import { getAccountEntry } from "@/features/account/auth";
 import { getAdminEntry } from "@/features/admin/auth";
+import { readCmsDocument } from "@/features/cms/read";
 
 import { ProjectBuilder } from "./project-builder";
 
@@ -30,7 +31,11 @@ const NAV_LINKS: NavLink[] = [
 
 export default async function StartPage({ searchParams }: PageProps<"/start">) {
   const params = await searchParams;
-  const [adminEntry, accountEntry] = await Promise.all([getAdminEntry(), getAccountEntry()]);
+  const [adminEntry, accountEntry, intro] = await Promise.all([
+    getAdminEntry(),
+    getAccountEntry(),
+    readCmsDocument("start.intro"),
+  ]);
 
   // 從作品頁過來時帶著參考作品（Spec §30 Selected Portfolio Reference）。
   const raw = Array.isArray(params.ref) ? params.ref[0] : params.ref;
@@ -48,18 +53,11 @@ export default async function StartPage({ searchParams }: PageProps<"/start">) {
       />
 
       <main className="max-w-page px-gutter lg:px-gutter-lg mx-auto w-full py-16">
-        <p className="text-kicker text-brand-accent-strong uppercase">Project Builder</p>
+        <p className="text-kicker text-brand-accent-strong uppercase">{intro.section.kicker}</p>
 
-        <h1 className="text-display-1 mt-3 max-w-[14em]">
-          你不需要
-          <br />
-          先知道怎麼做。
-        </h1>
+        <h1 className="text-display-1 mt-3 max-w-[14em]">{intro.section.title}</h1>
 
-        <p className="text-lead text-brand-muted mt-5 max-w-prose">
-          只需要告訴我們，你想完成什麼。空著的欄位不影響送出——
-          我們寧可先接到一份不完整的需求，也不要你為了填完而放棄。
-        </p>
+        <p className="text-lead text-brand-muted mt-5 max-w-prose">{intro.section.lead}</p>
 
         <div className="mt-12 max-w-2xl">
           <ProjectBuilder reference={reference} />

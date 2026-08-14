@@ -72,6 +72,50 @@ export const PROCESS_STEPS = [
   { step: "04", title: "上線", summary: "正式交付，後續需要再進維護。" },
 ] as const;
 
+/**
+ * `/work` 的頁首（CR-004 / BI）
+ *
+ * ⚠️ 這三句原本直接寫在 `app/work/page.tsx` 裡，而且與
+ * `SECTION_COPY.work` **一字不差**——也就是同一句話有兩份。
+ * 改了其中一份的人不會知道另一份還在，於是首頁與作品頁開始講不同的話。
+ *
+ * 搬出來之後兩邊各自可編輯：它們本來就可能想講不同的話，
+ * 只是不該「以為改了一個就等於改了兩個」。
+ */
+export const WORK_COPY = {
+  kicker: "Selected Work",
+  title: "不只說我們會做，直接給你看。",
+  lead: "Demo、內部產品與真實客戶案會明確標示，不混在一起。",
+} as const;
+
+/** `/start` 的頁首。標題原本寫死在頁面裡，斷行用 `<br />` */
+export const START_COPY = {
+  kicker: "Project Builder",
+  title: "你不需要先知道怎麼做。",
+  lead: "只需要告訴我們，你想完成什麼。空著的欄位不影響送出——我們寧可先接到一份不完整的需求，也不要你為了填完而放棄。",
+} as const;
+
+/**
+ * 登入頁。
+ *
+ * ⚠️ 原本寫的是「此頁供工作人員使用。」——CR-002 之後那句話不成立了：
+ * 這是**所有人**的登入頁，一般會員也從這裡進會員中心。
+ * 一句過期的說明會讓真的想登入的人以為自己走錯地方。
+ */
+export const LOGIN_COPY = {
+  kicker: "一頁起家",
+  title: "登入",
+  lead: "會員從這裡進入自己的後台，管理存下來的網站與送出的需求。",
+} as const;
+
+/** 頁尾。版權歸 SnowRealm——一頁起家是斯諾瑞姆企業社旗下的產品 */
+export const FOOTER_COPY = {
+  wordmark: "一頁起家",
+  disclosure:
+    "我們會合理使用 AI 協助研究、內容整理、設計探索與程式開發。AI 是生產工具，正式交付成果仍經人工判斷、測試與品質確認。",
+  copyright: "SnowRealm 斯諾瑞姆企業社",
+} as const;
+
 export const FINAL_CTA_COPY = {
   /** 轉換前最後一句話，斷點依句意而非依剩餘寬度 */
   titleLines: ["你不需要", "先知道怎麼做。"],

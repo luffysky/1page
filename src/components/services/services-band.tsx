@@ -1,6 +1,5 @@
 "use client";
 
-import { SERVICE_LINES } from "@/config/services";
 import { useHomeGoal } from "@/features/home/goal-context";
 
 /**
@@ -8,13 +7,21 @@ import { useHomeGoal } from "@/features/home/goal-context";
  *
  * 四條產品線。選定 goal 後 highlight 對應的那一條——
  * 這是 Goal Selector 必須同步的四處之一。
+ *
+ * ⚠️ 內容從 CMS 讀，但**哪一條要 highlight 仍由程式碼決定**
+ * （`HOME_GOALS[].serviceId`）。後台改了某條產品線的 id，
+ * 效果是它不再被任何 goal 推薦——不會壞，只是不再亮起來。
  */
-export function ServicesBand() {
+export function ServicesBand({
+  lines,
+}: {
+  lines: readonly { id: string; name: string; summary: string }[];
+}) {
   const { definition } = useHomeGoal();
 
   return (
     <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      {SERVICE_LINES.map((service) => {
+      {lines.map((service) => {
         const highlighted = service.id === definition.serviceId;
         return (
           <li

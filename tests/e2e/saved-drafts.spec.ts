@@ -123,10 +123,15 @@ test.describe("存下來的草稿", () => {
      * 刻意繞去會員中心再點回來，而不是直接 goto /edit?draft=…。
      *
      * 直接打網址只證明那條路由能用；使用者實際會走的是
-     * 「會員中心 → 編輯」。少了那顆按鈕，功能一樣是進不去的
+     * 「會員中心 → 我的網站 → 編輯」。少了那顆按鈕，功能一樣是進不去的
      * ——那正是這個專案反覆踩到的同一種毛病。
+     *
+     * ⚠️ 清單在 `/account/sites`，不是 `/account`。
+     * BA/BB 把會員中心改成 dashboard 之後，總覽只留數字與入口，
+     * 而這幾條測試沒有跟著改——它們紅了一段時間，因為 dashboard 那一段
+     * 完成時沒有回頭跑這一支。這正是「守衛會過期」的一個實例。
      */
-    await page.goto("/account");
+    await page.goto("/account/sites");
     await expect(page.getByText("回來看看")).toBeVisible();
     await page.getByRole("link", { name: "編輯" }).click();
 
@@ -150,7 +155,7 @@ test.describe("存下來的草稿", () => {
     await update.click();
     await expect(page.getByRole("status")).toContainText("更新好了");
 
-    await page.goto("/account");
+    await page.goto("/account/sites");
     expect(
       await page.getByRole("link", { name: "編輯" }).count(),
       "按兩次存檔就多出一份，二十份的上限會被自己的修改記錄塞滿",
@@ -175,7 +180,7 @@ test.describe("存下來的草稿", () => {
     await page.getByRole("button", { name: "另存新的一份" }).click();
     await expect(page.getByRole("status")).toContainText("另存了一份新的");
 
-    await page.goto("/account");
+    await page.goto("/account/sites");
     expect(await page.getByRole("link", { name: "編輯" }).count()).toBe(2);
     await expect(page.getByText("第一份")).toBeVisible();
     await expect(page.getByText("第二份")).toBeVisible();

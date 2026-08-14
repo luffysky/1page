@@ -9,7 +9,7 @@ import { Navbar, type NavLink } from "@/components/shared/navbar";
 import { getAccountEntry } from "@/features/account/auth";
 import { getAdminEntry } from "@/features/admin/auth";
 import { SiteFooter } from "@/components/shared/site-footer";
-import { FINAL_CTA_COPY } from "@/config/home-copy";
+import { readCmsDocument } from "@/features/cms/read";
 import {
   ALL_CATEGORIES,
   ALL_PROJECT_TYPES,
@@ -75,7 +75,12 @@ export default async function WorkPage({ searchParams }: PageProps<"/work">) {
   const items = await repository.listPublished({ category, projectType, tag, service });
   // 後台入口只渲染給已驗證的後台人員；其他人拿到 null，
   // 密路徑因此完全不會出現在送給瀏覽器的 HTML 裡。
-  const [adminEntry, accountEntry] = await Promise.all([getAdminEntry(), getAccountEntry()]);
+  const [adminEntry, accountEntry, intro, finalCta] = await Promise.all([
+    getAdminEntry(),
+    getAccountEntry(),
+    readCmsDocument("work.intro"),
+    readCmsDocument("home.final-cta"),
+  ]);
 
   const isFiltered =
     category !== ALL_CATEGORIES ||
@@ -106,11 +111,9 @@ export default async function WorkPage({ searchParams }: PageProps<"/work">) {
 
       <main>
         <section className="mx-auto w-full max-w-page px-gutter pt-section pb-10 lg:px-gutter-lg lg:pt-section-lg">
-          <p className="text-kicker text-brand-accent-strong uppercase">Selected Work</p>
-          <h1 className="text-display-2 mt-3 max-w-[14em]">不只說我們會做，直接給你看。</h1>
-          <p className="text-lead text-brand-muted mt-6 max-w-prose">
-            Demo、內部產品與真實客戶案會明確標示，不混在一起。
-          </p>
+          <p className="text-kicker text-brand-accent-strong uppercase">{intro.section.kicker}</p>
+          <h1 className="text-display-2 mt-3 max-w-[14em]">{intro.section.title}</h1>
+          <p className="text-lead text-brand-muted mt-6 max-w-prose">{intro.section.lead}</p>
         </section>
 
         <section className="mx-auto w-full max-w-page px-gutter pb-10 lg:px-gutter-lg">
@@ -150,7 +153,7 @@ export default async function WorkPage({ searchParams }: PageProps<"/work">) {
           )}
         </section>
 
-        <DarkCtaBlock {...FINAL_CTA_COPY} />
+        <DarkCtaBlock {...finalCta} />
       </main>
 
       <SiteFooter />

@@ -1,13 +1,26 @@
 import Link from "next/link";
 
+import { readCmsDocument } from "@/features/cms/read";
+
 /**
  * Footer（Spec §28 AI Disclosure）
  *
  * > AI-assisted · Human-reviewed
  *
  * 揭露不是免責聲明，是承諾：AI 是生產工具，正式交付仍經人工判斷與品質確認。
+ *
+ * ── 為什麼自己讀 CMS，而不是由呼叫端傳進來 ────────────────────
+ *
+ * 頁尾出現在六個頁面上。改成收 props 的話，那六個頁面每一個都要
+ * 記得讀一次再傳進來——而**忘記傳的那一頁不會報錯**，它只是繼續
+ * 顯示舊的字。那正是這個專案一直在避開的壞法。
+ *
+ * 這個元件是 server component，讀取端有快取，所以自己讀的代價
+ * 就只是多一次快取命中。
  */
-export function SiteFooter() {
+export async function SiteFooter() {
+  const footer = await readCmsDocument("shared.footer");
+
   return (
     <footer className="mx-auto w-full max-w-page px-gutter pt-10 pb-20 lg:px-gutter-lg">
       <div className="border-brand-line flex flex-wrap items-start justify-between gap-6 border-t pt-8">
@@ -15,14 +28,13 @@ export function SiteFooter() {
           <span className="bg-brand-ink text-brand-on-ink grid h-10 w-10 place-items-center rounded-md text-xl font-black">
             1
           </span>
-          <span className="text-heading-2">一頁起家</span>
+          <span className="text-heading-2">{footer.wordmark}</span>
         </div>
 
         <p className="text-body-sm text-brand-muted max-w-prose">
           AI-assisted · Human-reviewed
           <br />
-          我們會合理使用 AI 協助研究、內容整理、設計探索與程式開發。AI
-          是生產工具，正式交付成果仍經人工判斷、測試與品質確認。
+          {footer.disclosure}
         </p>
       </div>
 
@@ -38,9 +50,9 @@ export function SiteFooter() {
        */}
       <div className="text-caption text-brand-muted mt-8 flex flex-wrap items-center justify-between gap-3">
         <p>
-          © {new Date().getFullYear()} SnowRealm 斯諾瑞姆企業社
+          © {new Date().getFullYear()} {footer.copyright}
           <span className="mx-2">·</span>
-          一頁起家
+          {footer.wordmark}
         </p>
 
         {/*
