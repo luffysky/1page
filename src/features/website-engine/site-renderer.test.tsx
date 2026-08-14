@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   implementedSectionTypes,
@@ -10,6 +10,7 @@ import {
   variantsFor,
 } from "./registry";
 import { SITE_SECTION_TYPES, type SiteConfig, type SiteSection } from "./schema";
+import { newSection } from "./section-presets";
 import { SiteRenderer } from "./site-renderer";
 
 /**
@@ -184,6 +185,66 @@ describe("無效設定不崩潰（Spec §36）", () => {
     expect(container.querySelector("img")).toBeNull();
     expect(screen.getByText(/無法呈現/)).toBeInTheDocument();
   });
+});
+
+describe("兩個同名的項目", () => {
+  /*
+   * 編輯器可以「新增一項」，而新增出來的那一項 label 一開始是空字串——
+   * 所以「兩個 label 完全一樣的項目」是使用者連按兩下就會做出來的東西，
+   * 不是想像中的邊界情況。
+   *
+   * 各 section 元件原本一律用 `key={item.label}`，於是那兩項的 key 相同。
+   *
+   * ⚠️ 第一版這條測試斷言「兩項都要畫得出來」，而它**驗不到東西**：
+   * React 在首次渲染時本來就會把重複 key 的兩個孩子都畫出來，
+   * 把 key 改回 `item.label` 照樣綠。重複 key 真正壞掉的地方是**更新**——
+   * 改了第二項卻動到第一項、或該重畫的那項沒重畫，而那是
+   * 編輯器每打一個字都會走的路徑。
+   *
+   * 所以這裡驗的是 React 自己的警告。它是唯一一個不管後果怎麼表現
+   * 都一定會出現的訊號。
+   */
+  function duplicateFirstItem(section: SiteSection) {
+    for (const [key, value] of Object.entries(section.content)) {
+      if (!Array.isArray(value) || value.length === 0) continue;
+
+      const first = value[0];
+      if (typeof first === "string") {
+        return { section: { ...section, content: { ...section.content, [key]: [first, first] } } };
+      }
+      if (typeof first === "object" && first !== null && "label" in first) {
+        return {
+          section: {
+            ...section,
+            content: { ...section.content, [key]: [first, { ...first }] },
+          },
+          label: first.label,
+        };
+      }
+    }
+    return null;
+  }
+
+  for (const type of implementedSectionTypes()) {
+    const duplicated = duplicateFirstItem(newSection(type, []));
+    if (!duplicated) continue;
+
+    it(`${type} 的兩個同名項目不會撞到同一個 key`, () => {
+      const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      try {
+        render(<SiteRenderer config={makeConfig([duplicated.section])} />);
+
+        const complaints = spy.mock.calls
+          .map((args) => args.join(" "))
+          .filter((message) => /same key|duplicate key/i.test(message));
+
+        expect(complaints, `${type} 用了會重複的 key，更新時會改到錯的那一項`).toEqual([]);
+      } finally {
+        spy.mockRestore();
+      }
+    });
+  }
 });
 
 describe("Registry", () => {

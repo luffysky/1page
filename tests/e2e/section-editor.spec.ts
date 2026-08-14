@@ -227,6 +227,56 @@ test.describe("區塊編輯器", () => {
     expect(buttons).toBe(3);
   });
 
+  test("加得了第四個服務，也刪得掉多餘的", async ({ page }) => {
+    /*
+     * 內容面板原本只能改**既有**項目的文字。
+     * 模板給三個服務，使用者有四個，那第四個永遠加不上去——
+     * 一個「幾乎可以用」的編輯器比明顯不能用的更氣人。
+     */
+    const before = await order(page);
+    await page.getByText("新增區塊").click();
+    await page.getByRole("button", { name: "＋ 服務" }).click();
+
+    /*
+     * 找出新加的那一塊，不要寫死 id。
+     *
+     * Studio 模板本來就有一塊 services，新加的會是 services-2——
+     * 寫死 "services" 的話這條測試會對著模板原本那塊做斷言，
+     * 然後告訴你「加不進去」，而其實是找錯了對象。
+     */
+    const after = await order(page);
+    const added = after.find((id) => !before.includes(id))!;
+    const services = page.locator(`[data-section-widget="${added}"]`);
+
+    // 加完會自動選取新的那一塊，所以內容面板已經在了
+    await expect(page.getByRole("button", { name: "新增一個項目" })).toBeVisible();
+
+    await page.getByRole("button", { name: "新增一個項目" }).click();
+    await page.getByLabel("標題", { exact: true }).last().fill("第四個服務");
+
+    // 驗的是**預覽真的多了那一項**，不是表單上多了一個欄位
+    await expect(services).toContainText("第四個服務");
+
+    // 刪掉再確認它真的從畫面上走了
+    await page.getByRole("button", { name: /刪除第 4 項/ }).click();
+    await expect(services).not.toContainText("第四個服務");
+  });
+
+  test("刪到剩一項就停手", async ({ page }) => {
+    /*
+     * 不是為了「至少留一點內容」，是因為欄位的形狀是從現在的值認出來的：
+     * 空陣列既是空的字串陣列也是空的項目陣列，分不出來。
+     * 刪光之後「新增一項」加出來的會是錯的形狀，那一塊直接不見。
+     */
+    await page.getByText("新增區塊").click();
+    await page.getByRole("button", { name: "＋ 服務" }).click();
+
+    await page.getByRole("button", { name: /刪除第 3 項/ }).click();
+    await page.getByRole("button", { name: /刪除第 2 項/ }).click();
+
+    await expect(page.getByRole("button", { name: /刪除第 1 項/ })).toBeDisabled();
+  });
+
   test("axe 沒有 critical/serious，選取後也一樣", async ({ page }) => {
     const scan = async () => {
       const results = await new AxeBuilder({ page })

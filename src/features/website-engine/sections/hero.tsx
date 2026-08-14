@@ -16,8 +16,8 @@ function Actions({ section }: SectionProps) {
 
   return (
     <div className="mt-10 flex flex-wrap gap-3">
-      {actions.map((action) => (
-        <ActionButton key={action.label} action={action} />
+      {actions.map((action, index) => (
+        <ActionButton key={`${action.label}-${index}`} action={action} />
       ))}
     </div>
   );

@@ -19,8 +19,8 @@ export function CtaBanner({ section }: SectionProps) {
 
       {actions.length > 0 ? (
         <div className="mt-8 flex flex-wrap justify-center gap-3">
-          {actions.map((action) => (
-            <ActionButton key={action.label} action={action} />
+          {actions.map((action, index) => (
+            <ActionButton key={`${action.label}-${index}`} action={action} />
           ))}
         </div>
       ) : null}
@@ -37,8 +37,8 @@ export function ContactSimple({ section }: SectionProps) {
         <h2 className={`${site.heading} text-2xl`}>{text(section, "title", "聯絡")}</h2>
 
         <dl className="mt-6 grid gap-4 @2xl:grid-cols-2">
-          {entries.map((item) => (
-            <div key={item.label}>
+          {entries.map((item, index) => (
+            <div key={`${item.label}-${index}`}>
               <dt className={`${site.muted} ${site.body} text-sm`}>{item.label}</dt>
               <dd className={`${site.body} mt-1`}>
                 {item.href ? (

@@ -106,7 +106,14 @@ type PreviewAction =
   | { type: "apply-patch"; patch: Record<string, unknown> }
   | { type: "move-section"; id: string; direction: "up" | "down" }
   | { type: "remove-section"; id: string }
-  | { type: "add-section"; sectionType: SiteSection["type"]; afterId: string | null }
+  /*
+   * 新區塊由呼叫端產生好再送進來，不是在 reducer 裡生。
+   *
+   * 這樣 addSection 才回得出「加出來的是哪一塊」，介面才能立刻選取它。
+   * 少了那個 id，使用者按完「＋ 常見問題」還得自己去畫面上找那一塊
+   * 點一下才改得到字——加了東西卻不知道加在哪，跟沒加差不多。
+   */
+  | { type: "add-section"; section: SiteSection; afterId: string | null }
   | { type: "reset-sections" }
   | { type: "update-content"; id: string; content: SiteSection["content"] }
   | { type: "set-variant"; id: string; variant: string }
@@ -276,10 +283,7 @@ function baseReducer(state: PreviewState, action: PreviewAction): PreviewState {
 
     case "add-section": {
       const current = sectionsOf(state);
-      const section = newSection(
-        action.sectionType,
-        current.map((item) => item.id),
-      );
+      const { section } = action;
 
       /*
        * 加在選取那一塊的後面，不是永遠加在最下面。
@@ -529,7 +533,8 @@ export interface SitePreviewValue extends PreviewState {
   /* 區塊編輯（CR-003-4）。拖曳與鍵盤按鈕呼叫的是同一組函式 */
   moveSection: (id: string, direction: "up" | "down") => void;
   removeSection: (id: string) => void;
-  addSection: (type: SiteSection["type"], afterId: string | null) => void;
+  /** 回傳新區塊的 id，讓呼叫端可以立刻選取它 */
+  addSection: (type: SiteSection["type"], afterId: string | null) => string;
   undo: () => void;
   redo: () => void;
   canUndo: boolean;
@@ -634,7 +639,14 @@ export function SitePreviewProvider({
       applyPatch: (patch) => dispatch({ type: "apply-patch", patch }),
       moveSection: (id, direction) => dispatch({ type: "move-section", id, direction }),
       removeSection: (id) => dispatch({ type: "remove-section", id }),
-      addSection: (sectionType, afterId) => dispatch({ type: "add-section", sectionType, afterId }),
+      addSection: (sectionType, afterId) => {
+        const section = newSection(
+          sectionType,
+          sectionsOf(state).map((item) => item.id),
+        );
+        dispatch({ type: "add-section", section, afterId });
+        return section.id;
+      },
       updateContent: (id, content) => dispatch({ type: "update-content", id, content }),
       setVariant: (id, variant) => dispatch({ type: "set-variant", id, variant }),
       resetSections: () => dispatch({ type: "reset-sections" }),

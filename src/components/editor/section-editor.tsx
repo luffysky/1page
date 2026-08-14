@@ -131,7 +131,9 @@ export function SectionEditor() {
             <button
               key={type}
               type="button"
-              onClick={() => addSection(type, selectedId)}
+              // 加完就選取它。不選的話使用者得自己在畫面上找那一塊
+              // 再點一下才改得到字——加了東西卻不知道加在哪。
+              onClick={() => setSelectedId(addSection(type, selectedId))}
               className="border-brand-line text-body-sm rounded-pill border px-4 py-2 font-bold"
             >
               ＋ {SECTION_LABELS[type] ?? type}

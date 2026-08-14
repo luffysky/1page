@@ -178,11 +178,20 @@ export type SiteSectionType = z.infer<typeof siteSectionTypeSchema>;
  * 每個元件都得自己防禦性解構，而漏掉的那個就是渲染時的例外。
  * 各 section 的精確 schema 在 3C 的 registry 中定義，此處是共同下限。
  */
+/**
+ * 一個欄位裡最多幾項。
+ *
+ * 匯出而不是寫死兩次：編輯器的「新增一項」要在同一個數字上停手。
+ * 兩邊各寫一個數字的話，UI 那邊比較大就變成「按了沒反應」
+ * （schema 擋下來，畫面不變，沒有任何訊息）。
+ */
+export const MAX_CONTENT_ITEMS = 50;
+
 const contentValue = z.union([
   plainText(2000),
   z.number().finite(),
   z.boolean(),
-  z.array(plainText(500)).max(50),
+  z.array(plainText(500)).max(MAX_CONTENT_ITEMS),
   z
     .array(
       z.object({
@@ -191,7 +200,7 @@ const contentValue = z.union([
         text: plainText(1000).optional(),
       }),
     )
-    .max(50),
+    .max(MAX_CONTENT_ITEMS),
 ]);
 
 export const siteSectionSchema = z.object({

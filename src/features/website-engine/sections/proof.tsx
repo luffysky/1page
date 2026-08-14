@@ -30,8 +30,11 @@ export function TestimonialsQuotes({ section }: SectionProps) {
         <h2 className={`${site.heading} text-2xl`}>{text(section, "title", "客戶怎麼說")}</h2>
 
         <ul className="mt-8 grid gap-4 @3xl:grid-cols-2">
-          {entries.map((item) => (
-            <li key={item.label} className={`${site.surface} ${site.radius} ${site.cardPad}`}>
+          {entries.map((item, index) => (
+            <li
+              key={`${item.label}-${index}`}
+              className={`${site.surface} ${site.radius} ${site.cardPad}`}
+            >
               {/*
                * 用 blockquote + cite 而不是兩個 p。
                * 見證的重點是「這是別人說的」，那是語意，不是排版——
@@ -67,8 +70,8 @@ export function StatsRow({ section }: SectionProps) {
          * DOM 順序仍然是 dt 先——瀏覽器與輔助技術讀的是 DOM。
          */}
         <dl className="mt-8 grid gap-8 @2xl:grid-cols-2 @5xl:grid-cols-4">
-          {entries.map((item) => (
-            <div key={item.label} className="flex flex-col-reverse gap-1">
+          {entries.map((item, index) => (
+            <div key={`${item.label}-${index}`} className="flex flex-col-reverse gap-1">
               <dt className={`${site.muted} ${site.body} text-sm`}>{item.text}</dt>
               <dd className={`${site.heading} ${site.accent} text-4xl`}>{item.label}</dd>
             </div>
@@ -88,8 +91,8 @@ export function TeamGrid({ section }: SectionProps) {
         <h2 className={`${site.heading} text-2xl`}>{text(section, "title", "團隊")}</h2>
 
         <ul className="mt-8 grid gap-6 @2xl:grid-cols-2 @5xl:grid-cols-4">
-          {entries.map((item) => (
-            <li key={item.label}>
+          {entries.map((item, index) => (
+            <li key={`${item.label}-${index}`}>
               {/*
                * 頭像用色塊佔位，理由與 GalleryGrid 相同：
                * Spec §36 不允許任意圖片來源，而「先放張示意圖」

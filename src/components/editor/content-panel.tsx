@@ -4,7 +4,7 @@ import { useId } from "react";
 
 import { useSitePreview } from "@/features/website-engine/preview-context";
 import { variantsFor } from "@/features/website-engine/registry";
-import type { SiteSection } from "@/features/website-engine/schema";
+import { MAX_CONTENT_ITEMS, type SiteSection } from "@/features/website-engine/schema";
 import { SECTION_LABELS } from "@/features/website-engine/section-presets";
 
 /**
@@ -56,6 +56,90 @@ const isItemArray = (value: unknown): value is ItemValue[] =>
 
 const isStringArray = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every((item) => typeof item === "string");
+
+/**
+ * 刪到剩一項就不能再刪了。
+ *
+ * ⚠️ 這不是為了「至少留一點內容」，是因為欄位的形狀是**從現在的值認出來的**
+ * （見上面那段說明）。空陣列既是空的字串陣列也是空的項目陣列，
+ * 認不出來——刪光「服務」的三個項目之後，這個面板會把它當成字串清單，
+ * 於是「新增一項」加出來的東西是錯的形狀，畫面上那一塊直接不見。
+ *
+ * 要真的清空的話，該做的是移除整個區塊，那顆按鈕在工具列上。
+ */
+const MIN_ITEMS = 1;
+
+/** 陣列欄位共用的加／減按鈕 */
+function ListControls({
+  label,
+  count,
+  onAdd,
+}: {
+  label: string;
+  count: number;
+  onAdd: () => void;
+}) {
+  const full = count >= MAX_CONTENT_ITEMS;
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-3">
+      <button
+        type="button"
+        onClick={onAdd}
+        disabled={full}
+        className="border-brand-line text-body-sm rounded-pill border px-4 py-2 font-bold disabled:opacity-50"
+      >
+        新增一個{label}
+      </button>
+
+      {/*
+       * 上限到了就說出來。
+       *
+       * 不說的話，schema 會拒絕、狀態不變、畫面沒有任何反應——
+       * 使用者只會覺得這顆按鈕壞了。
+       */}
+      {full ? (
+        <span className="text-caption text-brand-muted">
+          最多 {MAX_CONTENT_ITEMS} 項，已經滿了。
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function RemoveItemButton({
+  label,
+  index,
+  count,
+  onRemove,
+}: {
+  label: string;
+  index: number;
+  count: number;
+  onRemove: () => void;
+}) {
+  const last = count <= MIN_ITEMS;
+
+  return (
+    <button
+      type="button"
+      onClick={onRemove}
+      disabled={last}
+      /*
+       * 「刪除」，不是「移除」。
+       *
+       * 區塊工具列那顆叫「移除」，指的是整塊拿掉。兩顆按鈕都寫「移除」的話，
+       * 使用者按下去之前分不出會少一項還是少一整塊——而那兩件事的
+       * 後果差很多。動詞分開比任何提示文字都有效。
+       */
+      aria-label={`刪除第 ${index + 1} 項${label}`}
+      title={last ? "只剩一項了。要整塊拿掉請用區塊工具列的「移除」" : undefined}
+      className="border-brand-line text-caption rounded-pill border px-3 py-1 font-bold disabled:opacity-50"
+    >
+      刪除
+    </button>
+  );
+}
 
 export function ContentPanel({ section }: { section: SiteSection }) {
   const { updateContent, setVariant } = useSitePreview();
@@ -144,7 +228,7 @@ export function ContentPanel({ section }: { section: SiteSection }) {
                 <legend className="text-body-sm font-bold">{fieldLabel(key)}</legend>
                 <div className="mt-2 flex flex-col gap-2">
                   {value.map((item, index) => (
-                    <div key={index}>
+                    <div key={index} className="flex flex-wrap items-center gap-2">
                       <label htmlFor={`${id}-${index}`} className="sr-only">
                         {fieldLabel(key)}第 {index + 1} 項
                       </label>
@@ -157,11 +241,30 @@ export function ContentPanel({ section }: { section: SiteSection }) {
                           next[index] = event.target.value;
                           patch(key, next);
                         }}
-                        className="border-brand-line bg-brand-paper text-body-sm w-full rounded-md border px-3 py-2"
+                        className="border-brand-line bg-brand-paper text-body-sm min-w-[10rem] flex-1 rounded-md border px-3 py-2"
+                      />
+                      <RemoveItemButton
+                        label={fieldLabel(key)}
+                        index={index}
+                        count={value.length}
+                        onRemove={() =>
+                          patch(
+                            key,
+                            value.filter((_, at) => at !== index),
+                          )
+                        }
                       />
                     </div>
                   ))}
                 </div>
+
+                <ListControls
+                  label={fieldLabel(key)}
+                  count={value.length}
+                  // 加一個空字串，不是「新項目」之類的預設文字：
+                  // 那種字會被原封不動地留在畫面上，而使用者以為自己已經改過了
+                  onAdd={() => patch(key, [...value, ""])}
+                />
               </fieldset>
             );
           }
@@ -174,7 +277,22 @@ export function ContentPanel({ section }: { section: SiteSection }) {
                 <div className="mt-2 flex flex-col gap-3">
                   {value.map((item, index) => (
                     <div key={index} className="border-brand-line rounded-md border p-3">
-                      <label htmlFor={`${id}-${index}-label`} className="text-caption block">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-caption text-brand-muted">第 {index + 1} 項</span>
+                        <RemoveItemButton
+                          label={fieldLabel(key)}
+                          index={index}
+                          count={value.length}
+                          onRemove={() =>
+                            patch(
+                              key,
+                              value.filter((_, at) => at !== index),
+                            )
+                          }
+                        />
+                      </div>
+
+                      <label htmlFor={`${id}-${index}-label`} className="text-caption mt-2 block">
                         標題
                       </label>
                       <input
@@ -212,6 +330,18 @@ export function ContentPanel({ section }: { section: SiteSection }) {
                     </div>
                   ))}
                 </div>
+
+                {/*
+                 * 新的一項只給 label，不給 text。
+                 *
+                 * 給了空的 text 之後，沒有填的那些區塊會多渲染一行空白；
+                 * 需要說明文字的話下面那個欄位本來就在，打了字才會存進去。
+                 */}
+                <ListControls
+                  label={fieldLabel(key)}
+                  count={value.length}
+                  onAdd={() => patch(key, [...value, { label: "" }])}
+                />
               </fieldset>
             );
           }

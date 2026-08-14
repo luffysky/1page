@@ -17,7 +17,7 @@ export function FaqList({ section }: SectionProps) {
         <h2 className={`${site.heading} text-2xl`}>{text(section, "title", "常見問題")}</h2>
 
         <div className="mt-8 flex flex-col gap-2">
-          {entries.map((item) => (
+          {entries.map((item, index) => (
             /*
              * 用原生 details/summary，不自己做展開收合。
              *
@@ -26,7 +26,10 @@ export function FaqList({ section }: SectionProps) {
              * 原生元素這些全部免費，而且鍵盤與螢幕閱讀器的行為
              * 是瀏覽器保證的，不是我們保證的。
              */
-            <details key={item.label} className={`${site.surface} ${site.radius} ${site.cardPad}`}>
+            <details
+              key={`${item.label}-${index}`}
+              className={`${site.surface} ${site.radius} ${site.cardPad}`}
+            >
               <summary className={`${site.heading} cursor-pointer`}>{item.label}</summary>
               {item.text ? (
                 <p className={`${site.muted} ${site.body} mt-3 leading-relaxed`}>{item.text}</p>
@@ -54,7 +57,7 @@ export function ProcessSteps({ section }: SectionProps) {
          */}
         <ol className="mt-8 grid gap-6 @2xl:grid-cols-2 @5xl:grid-cols-4">
           {entries.map((item, index) => (
-            <li key={item.label}>
+            <li key={`${item.label}-${index}`}>
               <span className={`${site.heading} ${site.accent} text-3xl`} aria-hidden="true">
                 {String(index + 1).padStart(2, "0")}
               </span>
@@ -81,9 +84,9 @@ export function PricingTiers({ section }: SectionProps) {
         <h2 className={`${site.heading} text-2xl`}>{text(section, "title", "方案")}</h2>
 
         <ul className="mt-8 grid gap-4 @3xl:grid-cols-3">
-          {entries.map((item) => (
+          {entries.map((item, index) => (
             <li
-              key={item.label}
+              key={`${item.label}-${index}`}
               className={`${site.surface} ${site.radius} ${site.cardPad} flex flex-col`}
             >
               <h3 className={`${site.heading} text-lg`}>{item.label}</h3>
@@ -149,8 +152,8 @@ export function FormSimple({ section }: SectionProps) {
          * 所以做成純視覺，語意由上面那句 sr-only 負責。
          */}
         <div className="mt-8 flex flex-col gap-4" aria-hidden="true">
-          {fields.map((field) => (
-            <div key={field.label} className="flex flex-col gap-1.5">
+          {fields.map((field, index) => (
+            <div key={`${field.label}-${index}`} className="flex flex-col gap-1.5">
               <span className={`${site.body} text-sm`}>{field.label}</span>
               <span
                 className={`${site.surface} ${site.radius} ${site.muted} ${site.body} px-3 py-2`}

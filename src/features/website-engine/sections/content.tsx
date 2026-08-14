@@ -24,8 +24,11 @@ export function ServicesList({ section }: SectionProps) {
         <h2 className={`${site.heading} text-2xl`}>{text(section, "title", "服務")}</h2>
 
         <ul className="mt-8 grid gap-4 @2xl:grid-cols-2 @5xl:grid-cols-3">
-          {entries.map((item) => (
-            <li key={item.label} className={`${site.surface} ${site.radius} ${site.cardPad}`}>
+          {entries.map((item, index) => (
+            <li
+              key={`${item.label}-${index}`}
+              className={`${site.surface} ${site.radius} ${site.cardPad}`}
+            >
               <h3 className={`${site.heading} text-lg`}>{item.label}</h3>
               {item.text ? <p className={`${site.muted} ${site.body} mt-2`}>{item.text}</p> : null}
             </li>
