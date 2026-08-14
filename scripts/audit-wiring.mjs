@@ -85,13 +85,30 @@ if (missingInTypes.length === 0) {
 console.log("\n【2】程式碼 select 的欄位 ↔ 資料庫");
 
 const columnNames = new Set(columns.map((row) => row.column_name));
-const sources = [
-  "src/features/portfolio/supabase-repository.ts",
-  "src/features/admin/portfolio-repository.ts",
-  "src/features/admin/media-actions.ts",
-  "src/features/admin/actions.ts",
-  "src/features/admin/auth.ts",
-];
+/*
+ * 掃整個 src，不是一份寫死的檔案清單。
+ *
+ * ⚠️ 這裡原本列著五個檔案，是 2D 當時所有會碰資料庫的地方。
+ * 之後新增的 leads、profiles、saved_sites、會員中心的 actions
+ * **全部不在清單上**，於是它們用到的欄位一律被【3】報成
+ * 「沒有任何程式碼取用」——owner_id、display_name、contact_email
+ * 都是這樣來的。
+ *
+ * 一份大半是誤報的警告比沒有這條警告更糟：下次真的有一個欄位沒接線時，
+ * 沒有人會多看一眼。這正是「守衛通過不等於守衛有效」的另一面——
+ * 守衛在叫，但叫的內容是假的。
+ */
+function collectSourceFiles(dir) {
+  const found = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const next = `${dir}/${entry.name}`;
+    if (entry.isDirectory()) found.push(...collectSourceFiles(next));
+    else if (/\.tsx?$/.test(entry.name)) found.push(next);
+  }
+  return found;
+}
+
+const sources = collectSourceFiles("src");
 
 const referenced = new Set();
 for (const path of sources) {
@@ -141,11 +158,27 @@ if (unknownRefs.length === 0) {
 // ── 3. 有欄位但沒人用（做了沒接） ──────────────────────────────
 console.log("\n【3】資料庫有、程式碼從未取用的欄位");
 
+/*
+ * 有些欄位本來就不會以字面字串出現在 TypeScript 裡，列出來只是噪音。
+ * 每一條都要寫理由——寫不出理由的就是真的沒接線。
+ */
+const IGNORED_COLUMNS = [
+  ["created_at", "建立時間由資料庫填；沒有讀取端不代表壞了"],
+  ["updated_at", "同上，由 trigger 維護"],
+  ["category_id", "join 表的欄位，PostgREST 的巢狀語法不會寫出它的名字"],
+  ["tag_id", "同上"],
+  ["snowrealm_id", "為未來的 SnowRealm SSO 預留，目前恆為 null（CR-002 明列）"],
+];
+
+const ignored = new Set(IGNORED_COLUMNS.map(([name]) => name));
+
 const allSource = sources.map((path) => readFileSync(path, "utf8")).join("\n");
-const neverUsed = [...columnNames].filter((name) => !allSource.includes(name));
+const neverUsed = [...columnNames].filter(
+  (name) => !ignored.has(name) && !allSource.includes(name),
+);
 
 if (neverUsed.length === 0) {
-  pass("沒有未接線的欄位");
+  pass(`沒有未接線的欄位（掃了 ${sources.length} 個檔案，另有 ${ignored.size} 個具名例外）`);
 } else {
   warn("以下欄位存在但目前沒有任何程式碼取用", neverUsed.join(", "));
 }
@@ -262,7 +295,14 @@ console.log("\n【8】路由可達性（畫面上真的進得去嗎）");
 
 // 例外＝刻意不連的，每一條都要有理由。理由寫不出來就是漏接。
 const UNLINKED_BY_DESIGN = [
-  [/^\/admin(\/|$)/, "後台走密路徑改寫，公開頁面不得出現任何入口（見 admin-security.spec.ts）"],
+  /*
+   * 後台走密路徑改寫，公開頁面不得出現任何入口（見 admin-security.spec.ts）。
+   *
+   * ⚠️ 這條例外只免除「公開頁面要不要有入口」，**不免除**「後台自己
+   * 有沒有連得到每一頁」。後者由 authed-reachability.spec.ts 帶著
+   * 已登入的 session 從後台首頁爬一次——那才是後台頁面的可達性。
+   */
+  [/^\/admin(\/|$)/, "後台走密路徑；後台內部的可達性由 authed-reachability.spec.ts 驗"],
   [/^\/_dev(\/|$)/, "開發用頁面，Guardrail 1 規定不得混入產品訊號"],
   [/^\/icon-maskable$/, "由 manifest.webmanifest 引用，不是給人點的"],
   /*
@@ -277,7 +317,10 @@ const UNLINKED_BY_DESIGN = [
    * 那條路徑才是一般人真正的入口。它有沒有出現在畫面上，
    * 由 account-entry.spec.ts 盯著——這個縫剛剛才真的發生過一次。
    */
-  [/^\/account(\/|$)/, "入口只顯示給已登入者；未登入者走 /login，由 account-entry.spec.ts 驗"],
+  [
+    /^\/account(\/|$)/,
+    "入口只顯示給已登入者；由 authed-reachability.spec.ts 帶 session 爬一次驗證",
+  ],
   // API 端點由前端 fetch 呼叫，本來就不會是一條 <a href>。
   // 「有沒有人在用」這件事對它們仍然要驗，只是判準不同——
   // 見下方【9】：每個 /api/* 都必須有程式碼在呼叫它。
