@@ -6,6 +6,8 @@ import { z } from "zod";
 import { getAdminIdentity } from "@/features/admin/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+import { parseDuration } from "./engagement-types";
+
 /**
  * 後台 CRM 的寫入操作（CR-004 / Phase B BD）
  *
@@ -363,4 +365,271 @@ export async function deleteDealItem(formData: FormData): Promise<void> {
   await supabase.from("deal_items").delete().eq("id", id);
 
   revalidatePath(`/admin/deals/${dealId}`);
+}
+
+/* ------------------------------------------------------------------ */
+/* 專案與工時（CR-004 / Phase B BF）                                    */
+/* ------------------------------------------------------------------ */
+
+const engagementSchema = z.object({
+  id: z.uuid().optional(),
+  clientId: z.uuid(),
+  dealId: z.union([z.uuid(), z.literal("")]),
+  title: z.string().trim().min(1, "專案名稱不可空白").max(200),
+  status: z.enum(["planning", "active", "paused", "delivered", "closed"]),
+  startedOn: z.union([z.iso.date(), z.literal("")]),
+  dueOn: z.union([z.iso.date(), z.literal("")]),
+  deliveredOn: z.union([z.iso.date(), z.literal("")]),
+  portfolioProjectId: z.union([z.uuid(), z.literal("")]),
+});
+
+export async function saveEngagement(formData: FormData): Promise<BackofficeResult> {
+  await requireStaff();
+
+  const parsed = engagementSchema.safeParse({
+    id: text(formData, "id") || undefined,
+    clientId: text(formData, "clientId"),
+    dealId: text(formData, "dealId"),
+    title: formData.get("title"),
+    status: formData.get("status"),
+    startedOn: text(formData, "startedOn"),
+    dueOn: text(formData, "dueOn"),
+    deliveredOn: text(formData, "deliveredOn"),
+    portfolioProjectId: text(formData, "portfolioProjectId"),
+  });
+
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "輸入有誤" };
+  }
+
+  const data = parsed.data;
+
+  /*
+   * 「已交付」要有交付日期。
+   *
+   * 沒有日期的已交付，之後回答不了「這個案子做了多久」——
+   * 而那是估下一個案子時唯一有用的資料。
+   */
+  if ((data.status === "delivered" || data.status === "closed") && !data.deliveredOn) {
+    return { ok: false, message: "標成已交付／已結案要填交付日期，不然之後算不出這案做了多久。" };
+  }
+
+  /*
+   * 開始日不能晚於截止日。
+   *
+   * 這種顛倒多半是打字打錯（月份選錯），而錯了之後排程整個歪掉，
+   * 畫面上卻只是兩個看起來都正常的日期。
+   */
+  if (data.startedOn && data.dueOn && data.startedOn > data.dueOn) {
+    return { ok: false, message: "開始日期比截止日期晚，其中一個應該是打錯了。" };
+  }
+
+  const payload = {
+    client_id: data.clientId,
+    deal_id: data.dealId || null,
+    title: data.title,
+    status: data.status,
+    started_on: data.startedOn || null,
+    due_on: data.dueOn || null,
+    delivered_on: data.deliveredOn || null,
+    portfolio_project_id: data.portfolioProjectId || null,
+  };
+
+  const supabase = await createSupabaseServerClient();
+
+  const saved = data.id
+    ? await supabase.from("engagements").update(payload).eq("id", data.id).select("id").single()
+    : await supabase.from("engagements").insert(payload).select("id").single();
+
+  if (saved.error) return { ok: false, message: `儲存失敗：${saved.error.message}` };
+
+  revalidatePath("/admin/engagements");
+  revalidatePath(`/admin/clients/${data.clientId}`);
+  return { ok: true, id: saved.data.id };
+}
+
+/**
+ * 成交的報價開成專案。
+ *
+ * 與 `convertLeadToClient` 同一個模式：報價不會被改成專案，
+ * 只是新的專案指回它。談的過程與做的過程是兩件事，
+ * 而請款時「當初報多少」必須還查得到。
+ */
+export async function startEngagementFromDeal(formData: FormData): Promise<BackofficeResult> {
+  await requireStaff();
+
+  const dealId = text(formData, "dealId");
+  if (!z.uuid().safeParse(dealId).success) return { ok: false, message: "報價不存在" };
+
+  const supabase = await createSupabaseServerClient();
+
+  const { data: deal } = await supabase
+    .from("deals")
+    .select("id, client_id, title, stage")
+    .eq("id", dealId)
+    .maybeSingle();
+
+  if (!deal) return { ok: false, message: "找不到這筆報價" };
+
+  // 已經開過就不要再開一個。第二次按下去會多一個一模一樣的專案
+  const { data: existing } = await supabase
+    .from("engagements")
+    .select("id")
+    .eq("deal_id", dealId)
+    .maybeSingle();
+
+  if (existing) return { ok: true, id: existing.id };
+
+  const { data: created, error } = await supabase
+    .from("engagements")
+    .insert({
+      client_id: deal.client_id,
+      deal_id: deal.id,
+      title: deal.title,
+      status: "planning",
+    })
+    .select("id")
+    .single();
+
+  if (error) return { ok: false, message: `開案失敗：${error.message}` };
+
+  revalidatePath("/admin/engagements");
+  revalidatePath(`/admin/deals/${dealId}`);
+  return { ok: true, id: created.id };
+}
+
+const milestoneSchema = z.object({
+  engagementId: z.uuid(),
+  title: z.string().trim().min(1, "里程碑名稱不可空白").max(200),
+  dueOn: z.union([z.iso.date(), z.literal("")]),
+  paymentRatio: z.number().min(0).max(100).nullable(),
+});
+
+export async function addMilestone(formData: FormData): Promise<BackofficeResult> {
+  await requireStaff();
+
+  const rawRatio = text(formData, "paymentRatio");
+  const parsed = milestoneSchema.safeParse({
+    engagementId: text(formData, "engagementId"),
+    title: formData.get("title"),
+    dueOn: text(formData, "dueOn"),
+    paymentRatio: rawRatio === "" ? null : Number(rawRatio),
+  });
+
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "輸入有誤" };
+  }
+
+  const supabase = await createSupabaseServerClient();
+
+  const { data: last } = await supabase
+    .from("milestones")
+    .select("sort_order")
+    .eq("engagement_id", parsed.data.engagementId)
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const { error } = await supabase.from("milestones").insert({
+    engagement_id: parsed.data.engagementId,
+    title: parsed.data.title,
+    due_on: parsed.data.dueOn || null,
+    payment_ratio: parsed.data.paymentRatio,
+    sort_order: (last?.sort_order ?? -1) + 1,
+  });
+
+  if (error) return { ok: false, message: `儲存失敗：${error.message}` };
+
+  revalidatePath(`/admin/engagements/${parsed.data.engagementId}`);
+  return { ok: true };
+}
+
+/**
+ * 里程碑打勾／取消打勾。
+ *
+ * 用同一個 action 來回切，不是兩個：兩個的話「已完成又退回」
+ * 這條路很容易只做一半，而那正是真的會發生的事。
+ */
+export async function toggleMilestone(formData: FormData): Promise<void> {
+  await requireStaff();
+
+  const id = text(formData, "id");
+  const engagementId = text(formData, "engagementId");
+  const done = text(formData, "done") === "true";
+  if (!id) return;
+
+  const supabase = await createSupabaseServerClient();
+
+  await supabase
+    .from("milestones")
+    // 打勾記今天；取消就清掉，不留一個舊日期
+    .update({ done_on: done ? new Date().toISOString().slice(0, 10) : null })
+    .eq("id", id);
+
+  revalidatePath(`/admin/engagements/${engagementId}`);
+}
+
+export async function deleteMilestone(formData: FormData): Promise<void> {
+  await requireStaff();
+
+  const id = text(formData, "id");
+  const engagementId = text(formData, "engagementId");
+  if (!id) return;
+
+  const supabase = await createSupabaseServerClient();
+  await supabase.from("milestones").delete().eq("id", id);
+
+  revalidatePath(`/admin/engagements/${engagementId}`);
+}
+
+export async function addTimeEntry(formData: FormData): Promise<BackofficeResult> {
+  const identity = await requireStaff();
+
+  const engagementId = text(formData, "engagementId");
+  if (!z.uuid().safeParse(engagementId).success) return { ok: false, message: "專案不存在" };
+
+  /*
+   * 長度收「90」「1:30」「1.5h」幾種寫法。
+   *
+   * 要求每次心算成分鐘的話，實際發生的事是他不記——
+   * 而沒記下來的工時等於沒發生過。
+   */
+  const minutes = parseDuration(text(formData, "duration"));
+  if (minutes === null) {
+    return { ok: false, message: "看不懂這個長度。可以寫 90、1:30、或 1.5h。" };
+  }
+  if (minutes > 1440) {
+    return { ok: false, message: "一筆超過 24 小時，應該是打錯了——分成幾天記。" };
+  }
+
+  const workedOn = text(formData, "workedOn") || new Date().toISOString().slice(0, 10);
+  if (!z.iso.date().safeParse(workedOn).success) return { ok: false, message: "日期看不懂" };
+
+  const supabase = await createSupabaseServerClient();
+
+  const { error } = await supabase.from("time_entries").insert({
+    engagement_id: engagementId,
+    worked_on: workedOn,
+    minutes,
+    note: text(formData, "note").slice(0, 500) || null,
+    actor_id: identity.userId,
+  });
+
+  if (error) return { ok: false, message: `儲存失敗：${error.message}` };
+
+  revalidatePath(`/admin/engagements/${engagementId}`);
+  return { ok: true };
+}
+
+export async function deleteTimeEntry(formData: FormData): Promise<void> {
+  await requireStaff();
+
+  const id = text(formData, "id");
+  const engagementId = text(formData, "engagementId");
+  if (!id) return;
+
+  const supabase = await createSupabaseServerClient();
+  await supabase.from("time_entries").delete().eq("id", id);
+
+  revalidatePath(`/admin/engagements/${engagementId}`);
 }

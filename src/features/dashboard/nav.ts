@@ -75,6 +75,10 @@ export const ADMIN_NAV: NavGroup[] = [
       { label: "報價", href: "/admin/deals", hint: "手上還有多少沒收的錢" },
     ],
   },
+  {
+    title: "接案",
+    items: [{ label: "專案", href: "/admin/engagements", hint: "進度、里程碑與工時" }],
+  },
 ];
 
 export const navItems = (groups: NavGroup[]): NavItem[] => groups.flatMap((group) => group.items);

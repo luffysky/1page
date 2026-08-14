@@ -6,7 +6,9 @@ import { addNote, deleteDealItem } from "@/features/backoffice/actions";
 import { DEAL_STAGE_LABELS, dealItemsTotal, formatAmount } from "@/features/backoffice/deal-types";
 import { listClients } from "@/features/backoffice/clients";
 import { getDeal } from "@/features/backoffice/deals";
+import { getEngagementForDeal } from "@/features/backoffice/engagements";
 
+import { StartEngagementButton } from "../../engagements/engagement-actions";
 import { AddDealItemForm } from "../deal-actions";
 import { DealForm } from "../deal-form";
 
@@ -25,7 +27,11 @@ const input = "border-brand-line bg-brand-bg text-body-sm w-full rounded-md bord
 export default async function AdminDealDetailPage({ params }: PageProps<"/admin/deals/[id]">) {
   const { id } = await params;
 
-  const [detail, clients] = await Promise.all([getDeal(id), listClients()]);
+  const [detail, clients, engagement] = await Promise.all([
+    getDeal(id),
+    listClients(),
+    getEngagementForDeal(id),
+  ]);
   if (!detail) notFound();
 
   const { deal, items, notes, activities } = detail;
@@ -61,6 +67,35 @@ export default async function AdminDealDetailPage({ params }: PageProps<"/admin/
           回報價列表
         </Link>
       </div>
+
+      {/*
+       * 成交之後下一件事是開案。
+       *
+       * 沒有這個入口的話，「談完了要開始做」這一步就得自己記得
+       * 到另一頁重打一次名稱與客戶——而重打的那些欄位一定會有一次打錯。
+       */}
+      {deal.stage === "won" ? (
+        <section className="border-brand-line mt-6 rounded-lg border p-5">
+          <h2 className="text-heading-2">開始做</h2>
+          {engagement ? (
+            <p className="text-body-sm mt-2">
+              已經開成專案：
+              <Link
+                href={toAdminUrl(`/admin/engagements/${engagement.id}`)}
+                className="ml-1 underline"
+              >
+                {engagement.title}
+              </Link>
+            </p>
+          ) : (
+            <p className="text-body-sm text-brand-muted mt-2">
+              名稱與客戶會一起帶過去。這筆報價不會被改動——請款時「當初報多少」必須還查得到。
+            </p>
+          )}
+
+          <StartEngagementButton dealId={deal.id} started={Boolean(engagement)} />
+        </section>
+      ) : null}
 
       {deal.stage === "lost" && deal.lostReason ? (
         <p className="border-brand-line text-body-sm mt-6 rounded-lg border border-dashed p-4">

@@ -7,6 +7,8 @@ import { CLIENT_STATUS_LABELS } from "@/features/backoffice/client-types";
 import { getClient } from "@/features/backoffice/clients";
 import { DEAL_STAGE_LABELS, formatAmount } from "@/features/backoffice/deal-types";
 import { listDealsForClient } from "@/features/backoffice/deals";
+import { ENGAGEMENT_STATUS_LABELS } from "@/features/backoffice/engagement-types";
+import { listEngagementsForClient } from "@/features/backoffice/engagements";
 
 import { AddContactForm } from "../client-actions";
 import { ClientForm } from "../client-form";
@@ -31,7 +33,11 @@ const input = "border-brand-line bg-brand-bg text-body-sm w-full rounded-md bord
 
 export default async function AdminClientDetailPage({ params }: PageProps<"/admin/clients/[id]">) {
   const { id } = await params;
-  const [detail, deals] = await Promise.all([getClient(id), listDealsForClient(id)]);
+  const [detail, deals, engagements] = await Promise.all([
+    getClient(id),
+    listDealsForClient(id),
+    listEngagementsForClient(id),
+  ]);
 
   if (!detail) notFound();
 
@@ -149,6 +155,40 @@ export default async function AdminClientDetailPage({ params }: PageProps<"/admi
                   <span className="text-body-sm font-bold">{deal.title}</span>
                   <span className="text-caption text-brand-muted">
                     {DEAL_STAGE_LABELS[deal.stage]} · {formatAmount(deal.amount, deal.currency)}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {/* ── 專案 ─────────────────────────────────────────────── */}
+      <section className="border-brand-line mt-10 border-t pt-8">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-heading-2">專案</h2>
+          <Link
+            href={toAdminUrl(`/admin/engagements/new?client=${client.id}`)}
+            className="border-brand-ink text-body-sm rounded-pill border px-5 py-2.5 font-bold"
+          >
+            新增專案
+          </Link>
+        </div>
+
+        {engagements.length === 0 ? (
+          <p className="text-body-sm text-brand-muted mt-4">還沒有替這個客戶做過任何案子。</p>
+        ) : (
+          <ul className="mt-4 flex flex-col gap-2">
+            {engagements.map((engagement) => (
+              <li key={engagement.id}>
+                <Link
+                  href={toAdminUrl(`/admin/engagements/${engagement.id}`)}
+                  className="border-brand-line hover:border-brand-ink flex flex-wrap items-center justify-between gap-3 rounded-md border p-3"
+                >
+                  <span className="text-body-sm font-bold">{engagement.title}</span>
+                  <span className="text-caption text-brand-muted">
+                    {ENGAGEMENT_STATUS_LABELS[engagement.status]}
+                    {engagement.dueOn ? ` · 截止 ${engagement.dueOn}` : ""}
                   </span>
                 </Link>
               </li>
