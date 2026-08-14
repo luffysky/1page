@@ -5,6 +5,7 @@ import {
   ALL_CATEGORIES,
   ALL_PROJECT_TYPES,
   type CategoryFilter,
+  type PortfolioCategory,
   type ProjectTypeFilter,
 } from "@/config/portfolio-categories";
 
@@ -34,6 +35,17 @@ export interface PortfolioListFilter {
 }
 
 export interface PortfolioRepository {
+  /**
+   * 目前啟用的分類（Spec §8.1「分類不可寫死在 UI」）。
+   *
+   * ⚠️ 這個方法補的是一個從 2D 起就存在的分岔：`portfolio_categories`
+   * 有 11 筆種子資料，而畫面上的篩選器讀的是 `config/portfolio-categories.ts`
+   * 的硬編清單。兩份內容剛好一樣，但**沒有任何機制保證它們維持一樣**——
+   * 而且那張表從建立起就沒有任何讀取端（`active` 欄位也一樣）。
+   *
+   * 現在畫面讀資料庫，程式碼那份退成「沒有資料庫時的種子」。
+   */
+  listCategories(): Promise<PortfolioCategory[]>;
   /** 首頁只顯示 Featured Projects（Spec §8.11），建議 3～6 件 */
   listFeatured(): Promise<PortfolioListItem[]>;
   /** 依 Home Goal 篩選（Spec §6.1 對應表） */

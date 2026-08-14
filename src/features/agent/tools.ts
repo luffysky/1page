@@ -75,6 +75,18 @@ function toPortfolioPayload(items: PortfolioListItem[]) {
 /* 知識                                                                */
 /* ------------------------------------------------------------------ */
 
+/**
+ * 給模型看的分類選項。
+ *
+ * ⚠️ 這裡刻意用程式碼裡那份種子，**不是**從資料庫讀。
+ *
+ * 工具的 JSON Schema 是在模組載入時算好的（`z.toJSONSchema`），
+ * 改成每次請求都查資料庫的話，整個 tool registry 都要變成非同步——
+ * 而它現在是「schema 就是驗證器本身」那條保證的基礎。
+ *
+ * 這樣安全的前提是**種子與資料庫不會分岔**，而那件事有 `test:db`
+ * 的一條測試在盯（`portfolio-categories.test.ts`）。分岔就會紅。
+ */
 const categorySlugs = PORTFOLIO_CATEGORIES.map((category) => category.slug);
 
 const searchPortfolio = defineTool({

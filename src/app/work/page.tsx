@@ -46,17 +46,27 @@ const NAV_LINKS: NavLink[] = [
 
 export default async function WorkPage({ searchParams }: PageProps<"/work">) {
   const params = await searchParams;
-  const category = parseCategoryFilter(params.category);
+
+  /*
+   * 分類先讀出來，篩選才有辦法判斷網址參數合不合法。
+   *
+   * 順序不能反：先 parse 再讀分類的話，parse 只能拿程式碼裡那份種子當依據，
+   * 而那正是這次要修掉的分岔。
+   */
+  const repository = getPortfolioRepository();
+  const categories = await repository.listCategories();
+
+  const category = parseCategoryFilter(params.category, categories);
   const projectType = parseProjectTypeFilter(params.type);
 
-  const items = await getPortfolioRepository().listPublished({ category, projectType });
+  const items = await repository.listPublished({ category, projectType });
   // 後台入口只渲染給已驗證的後台人員；其他人拿到 null，
   // 密路徑因此完全不會出現在送給瀏覽器的 HTML 裡。
   const [adminEntry, accountEntry] = await Promise.all([getAdminEntry(), getAccountEntry()]);
 
   const isFiltered = category !== ALL_CATEGORIES || projectType !== ALL_PROJECT_TYPES;
   const activeLabels = [
-    category !== ALL_CATEGORIES ? getCategoryName(category) : null,
+    category !== ALL_CATEGORIES ? getCategoryName(category, categories) : null,
     projectType !== ALL_PROJECT_TYPES ? PROJECT_TYPE_LABELS[projectType] : null,
   ].filter(Boolean);
 
@@ -85,6 +95,7 @@ export default async function WorkPage({ searchParams }: PageProps<"/work">) {
             category={category}
             projectType={projectType}
             resultCount={items.length}
+            categories={categories}
           />
         </section>
 

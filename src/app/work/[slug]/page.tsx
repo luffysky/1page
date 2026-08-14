@@ -76,6 +76,8 @@ export default async function WorkDetailPage({ params }: PageProps<"/work/[slug]
   if (!project) notFound();
 
   const related = await getPortfolioRepository().listRelated(slug, 3);
+  // 分類名稱從資料庫來，與 /work 的篩選器同一份
+  const categories = await getPortfolioRepository().listCategories();
   // 後台入口只渲染給已驗證的後台人員；其他人拿到 null，
   // 密路徑因此完全不會出現在送給瀏覽器的 HTML 裡。
   const adminEntry = await getAdminEntry();
@@ -138,7 +140,7 @@ export default async function WorkDetailPage({ params }: PageProps<"/work/[slug]
           <dl className="grid gap-x-8 sm:grid-cols-2 lg:grid-cols-4">
             <MetaRow
               label="分類"
-              value={project.categories.map((slug) => getCategoryName(slug)).join("、")}
+              value={project.categories.map((slug) => getCategoryName(slug, categories)).join("、")}
             />
             {project.industry ? <MetaRow label="產業" value={project.industry} /> : null}
             {project.year ? <MetaRow label="年份" value={String(project.year)} /> : null}

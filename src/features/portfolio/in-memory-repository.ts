@@ -1,4 +1,5 @@
 import type { HomeGoal } from "@/config/home-goals";
+import { PORTFOLIO_CATEGORIES } from "@/config/portfolio-categories";
 
 import { DETAIL_BY_SLUG } from "./in-memory-detail";
 import {
@@ -78,6 +79,17 @@ const SEED: PortfolioListItem[] = [
 const FEATURED_IDS = new Set(["interior-studio", "yipage-identity", "ai-website-workshop"]);
 
 export const inMemoryPortfolioRepository: PortfolioRepository = {
+  /*
+   * 沒有資料庫時就用程式碼裡那份。
+   *
+   * ⚠️ 這不是「兩份真相」——它是**同一份種子**：`supabase/seed.sql` 灌進
+   * `portfolio_categories` 的內容就是這個常數，而 `test:db` 有一條在比對兩者。
+   * 真的分岔的話那條會紅，不會安靜地各走各的。
+   */
+  async listCategories() {
+    return [...PORTFOLIO_CATEGORIES];
+  },
+
   async listFeatured() {
     return SEED.filter((project) => FEATURED_IDS.has(project.id));
   },

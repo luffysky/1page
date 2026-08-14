@@ -110,6 +110,34 @@ function pickString(source: Record<string, unknown>, key: string): string | unde
 }
 
 export const supabasePortfolioRepository: PortfolioRepository = {
+  async listCategories() {
+    /*
+     * 這裡**不**寫 `.eq("active", true)`。
+     *
+     * ⚠️ 我原本加了那一行，理由是「`active` 欄位沒有任何讀取端」。
+     * 那是錯的——RLS policy 就是它的讀取端：
+     *
+     *   portfolio_categories_public_read  using (active or is_admin())
+     *
+     * 而這支查詢走的是**沒有 session 的 anon client**，所以停用的分類
+     * 在資料庫那一層就已經看不到了。多寫的那一行不會擋掉任何東西，
+     * 只會讓下一個人以為是應用層在擋——然後在別的地方忘記寫它。
+     *
+     * 發現方式：把那一行拿掉，測試照樣綠。刻意改壞才問得出來
+     * 「到底是誰在擋」。
+     *
+     * （順帶：`audit:wiring`【3】把 `portfolio_categories.active` 列為
+     *  「未接線欄位」，那是誤報——它只掃 TypeScript，看不到 SQL policy。）
+     */
+    const { data, error } = await getSupabasePublicClient()
+      .from("portfolio_categories")
+      .select("slug, name")
+      .order("sort_order", { ascending: true });
+
+    if (error) throw new Error(`listCategories 失敗：${error.message}`);
+    return (data ?? []).map((row) => ({ slug: row.slug, name: row.name }));
+  },
+
   async listFeatured() {
     const { data, error } = await getSupabasePublicClient()
       .from("portfolio_projects")

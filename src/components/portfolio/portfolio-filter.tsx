@@ -6,8 +6,8 @@ import { useCallback, useState } from "react";
 import {
   ALL_CATEGORIES,
   ALL_PROJECT_TYPES,
-  PORTFOLIO_CATEGORIES,
   type CategoryFilter,
+  type PortfolioCategory,
   type ProjectTypeFilter,
 } from "@/config/portfolio-categories";
 import { PROJECT_TYPE_LABELS, type PortfolioProjectType } from "@/features/portfolio/project-type";
@@ -27,13 +27,21 @@ import { track } from "@/lib/analytics/track";
 interface Props {
   category: CategoryFilter;
   projectType: ProjectTypeFilter;
+  /**
+   * 可選的分類，由 server 從資料庫讀來。
+   *
+   * ⚠️ 不在這裡直接讀 PORTFOLIO_CATEGORIES 常數：那份是種子，
+   * 資料庫才是現在啟用哪幾個分類的真相。讀常數的話，
+   * 停用一個分類之後它還會出現在篩選器上，按下去就是零筆結果。
+   */
+  categories: readonly PortfolioCategory[];
   /** 目前篩選結果數量，顯示於篩選列旁 */
   resultCount: number;
 }
 
 const PROJECT_TYPES = Object.keys(PROJECT_TYPE_LABELS) as PortfolioProjectType[];
 
-export function PortfolioFilter({ category, projectType, resultCount }: Props) {
+export function PortfolioFilter({ category, projectType, resultCount, categories }: Props) {
   const router = useRouter();
   const pathname = usePathname();
 
@@ -93,7 +101,7 @@ export function PortfolioFilter({ category, projectType, resultCount }: Props) {
          * -mx + px 讓 chips 可捲到螢幕邊緣，同時保留內容區的左右留白。
          */}
         <ul className="-mx-gutter flex gap-2 overflow-x-auto px-gutter pb-1 lg:-mx-gutter-lg lg:flex-wrap lg:px-gutter-lg lg:overflow-visible">
-          {[{ slug: ALL_CATEGORIES, name: "All" }, ...PORTFOLIO_CATEGORIES].map((item) => {
+          {[{ slug: ALL_CATEGORIES, name: "All" }, ...categories].map((item) => {
             const active = item.slug === activeCategory;
             return (
               <li key={item.slug} className="shrink-0">

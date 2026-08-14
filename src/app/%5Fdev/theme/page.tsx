@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
-import { validateSiteConfig } from "@/features/website-engine/schema";
+import { SECTION_REGISTRY } from "@/features/website-engine/registry";
+import { SITE_SECTION_TYPES, validateSiteConfig } from "@/features/website-engine/schema";
 import { SiteScope } from "@/features/website-engine/site-scope";
 import { SiteRenderer } from "@/features/website-engine/site-renderer";
 import { SITE_VARS } from "@/features/website-engine/theme";
@@ -111,9 +112,20 @@ function ThemedCard({ title }: { title: string }) {
 
 /**
  * 走完整條 SiteRenderer 鏈路的示範設定。
- * 最後一個 section 的 type 刻意是尚未實作的 pricing——
+ *
+ * 最後一個 section 刻意是**目前還沒有元件的那一個 type**，
  * 用來確認降級行為在真實渲染中也成立，而不只在單元測試裡。
+ *
+ * ⚠️ 那個 type 是**算出來的**，不是寫死的。
+ *
+ * 原本這裡寫死 "pricing" 並註明「尚未實作」。CR-003-2 把 pricing 做出來之後，
+ * 這一頁畫的是一張正常的定價表——它不再示範任何降級行為，而註解仍然
+ * 說它有。這裡不是測試，沒有任何東西會紅，所以那句謊話待了兩天。
+ *
+ * 同一個錯誤在 section-ops 與 site-renderer 的測試裡各犯過一次
+ * （見 CLAUDE.md 第二節）。這是第三次，也是最安靜的一次。
  */
+const UNIMPLEMENTED = SITE_SECTION_TYPES.find((type) => !SECTION_REGISTRY[type]);
 const DEMO = validateSiteConfig({
   ...BASE,
   theme: WARM.ok ? WARM.config.theme : undefined,
@@ -143,7 +155,13 @@ const DEMO = validateSiteConfig({
       },
     },
     { id: "cta", type: "cta", variant: "banner", content: { title: "今天想吃點什麼甜的？" } },
-    { id: "pricing", type: "pricing", variant: "table", content: { title: "方案" } },
+    /*
+     * 全部都實作完的時候這裡就沒有東西可以放了——那是好事，
+     * 不是「示範壞了」。留一個空位比留一個假的示範好。
+     */
+    ...(UNIMPLEMENTED
+      ? [{ id: "unimplemented", type: UNIMPLEMENTED, variant: "table", content: { title: "示範" } }]
+      : []),
   ],
 });
 
@@ -195,7 +213,15 @@ export default function ThemePage() {
         <h2 className="text-heading-1">SiteRenderer（3D）</h2>
         <p className="text-body-sm text-brand-muted mt-2 max-w-prose">
           同一份 SiteConfig 走完整條鏈路：驗證 → 主題 → Section 解析 → 元件。
-          最後一個區塊是刻意寫錯的 type，應顯示佔位而非讓整頁崩潰。
+          {UNIMPLEMENTED ? (
+            <>
+              最後一個區塊的 type 是 <code className="font-mono">{UNIMPLEMENTED}</code>
+              （目前還沒有元件），應顯示佔位而非讓整頁崩潰。
+            </>
+          ) : (
+            // 全部實作完了就誠實說。留著上面那句話會變成畫面上的一句謊
+            <>目前每一種 type 都有元件，所以這裡沒有降級的示範可以放。</>
+          )}
         </p>
         <div className="border-brand-line mt-6 overflow-hidden rounded-lg border">
           <SiteRenderer config={DEMO.config} />
