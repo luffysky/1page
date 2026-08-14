@@ -11,6 +11,16 @@ export const metadata: Metadata = {
   title: "一頁起家｜AI 輔助數位工作室",
   description: "網站、品牌、內容、設計與 AI 自動化。從想法、設計到真正可以使用的產品。",
   metadataBase: new URL(SITE_URL),
+  /*
+   * 歸屬 SnowRealm。
+   *
+   * 一頁起家是斯諾瑞姆企業社（SnowRealm）旗下的產品，不是獨立品牌。
+   * `authors` / `creator` / `publisher` 是搜尋引擎與分享卡片會讀的欄位——
+   * 少了它們，這個站在機器眼裡與 SnowRealm 其他產品沒有任何關聯。
+   */
+  authors: [{ name: "SnowRealm 斯諾瑞姆企業社" }],
+  creator: "SnowRealm 斯諾瑞姆企業社",
+  publisher: "SnowRealm 斯諾瑞姆企業社",
   // iOS 不讀 manifest 的部分設定，需要各自宣告
   appleWebApp: { capable: true, title: "一頁起家", statusBarStyle: "default" },
 };

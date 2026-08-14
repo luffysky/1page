@@ -5,6 +5,9 @@ import { toAdminUrl } from "@/config/admin";
 import {
   asStringRecord,
   getProjectById,
+  getProjectTaxonomy,
+  listAllCategories,
+  listAllTags,
   listProjectMedia,
 } from "@/features/admin/portfolio-repository";
 
@@ -17,7 +20,12 @@ export default async function EditProjectPage({ params }: PageProps<"/admin/port
 
   if (!project) notFound();
 
-  const media = await listProjectMedia(project.id);
+  const [media, taxonomy, allCategories, allTags] = await Promise.all([
+    listProjectMedia(project.id),
+    getProjectTaxonomy(project.id),
+    listAllCategories(),
+    listAllTags(),
+  ]);
 
   return (
     <>
@@ -41,6 +49,8 @@ export default async function EditProjectPage({ params }: PageProps<"/admin/port
 
       <ProjectForm
         listHref={toAdminUrl("/admin/portfolio")}
+        allCategories={allCategories}
+        allTags={allTags}
         initial={{
           id: project.id,
           slug: project.slug,
@@ -55,6 +65,8 @@ export default async function EditProjectPage({ params }: PageProps<"/admin/port
           // 表單欄位是字串；`0` 與空白要分得出來，所以不能用 `?? ""` 之外的簡寫
           year: project.year === null ? "" : String(project.year),
           services: project.services ?? [],
+          categories: taxonomy.categories,
+          tags: taxonomy.tags,
           caseStudy: asStringRecord(project.case_study_json),
           links: asStringRecord(project.links_json),
           aiUsed:

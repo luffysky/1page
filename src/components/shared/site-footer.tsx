@@ -27,20 +27,36 @@ export function SiteFooter() {
       </div>
 
       {/*
-       * 工作人員入口放頁尾而非主選單，是刻意的。
+       * 版權歸屬 SnowRealm。
        *
-       * 這個站沒有一般使用者帳號（Spec §37 訪客全程匿名、§40 非目標明列
-       * Client Portal）。主選單出現「登入」會讓訪客以為需要註冊才能用，
-       * 那正好違反 Spec §0 funnel「降低第一步門檻」的目的。
+       * 一頁起家是斯諾瑞姆企業社（SnowRealm）旗下的產品，不是一個獨立品牌——
+       * 這一行是它與其他 SnowRealm 產品之間唯一的可見連結，
+       * 也是訪客判斷「這是誰做的」時會看的地方。
        *
-       * 頁尾是放這類連結的慣例位置：訪客不會注意，工作人員找得到，
-       * 而且不必背網址。密路徑仍然沒有出現在任何地方。
+       * 年份用當下的年，不寫死：寫死的版權年會在跨年的那一天過期，
+       * 而那是一種「看起來沒人在維護」的訊號。
        */}
-      <p className="text-caption text-brand-muted mt-8 text-right">
+      <div className="text-caption text-brand-muted mt-8 flex flex-wrap items-center justify-between gap-3">
+        <p>
+          © {new Date().getFullYear()} SnowRealm 斯諾瑞姆企業社
+          <span className="mx-2">·</span>
+          一頁起家
+        </p>
+
+        {/*
+         * 工作人員入口放頁尾而非主選單，是刻意的。
+         *
+         * ⚠️ 原本的理由是「這個站沒有一般使用者帳號」——CR-002 之後那句話
+         * 不成立了：現在有會員，導覽列上也有「登入／會員中心」。
+         *
+         * 但這條連結仍然留著，理由換了：它連到的是**同一個** /login，
+         * 而工作人員的習慣是從頁尾進去。多一個入口不會洩漏密路徑
+         * （密路徑從來不出現在任何地方），少一個則要靠人背網址。
+         */}
         <Link href="/login" className="hover:text-brand-ink underline underline-offset-4">
           工作人員登入
         </Link>
-      </p>
+      </div>
     </footer>
   );
 }

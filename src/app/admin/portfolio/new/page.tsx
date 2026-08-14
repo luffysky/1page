@@ -1,8 +1,11 @@
 import { toAdminUrl } from "@/config/admin";
+import { listAllCategories, listAllTags } from "@/features/admin/portfolio-repository";
 
 import { ProjectForm } from "../project-form";
 
-export default function NewProjectPage() {
+export default async function NewProjectPage() {
+  const [allCategories, allTags] = await Promise.all([listAllCategories(), listAllTags()]);
+
   return (
     <>
       <h1 className="text-display-2">新增作品</h1>
@@ -10,6 +13,8 @@ export default function NewProjectPage() {
 
       <ProjectForm
         listHref={toAdminUrl("/admin/portfolio")}
+        allCategories={allCategories}
+        allTags={allTags}
         initial={{
           slug: "",
           title: "",
@@ -25,6 +30,8 @@ export default function NewProjectPage() {
           industry: "",
           year: "",
           services: [],
+          categories: [],
+          tags: [],
           caseStudy: {},
           links: {},
           aiUsed: false,

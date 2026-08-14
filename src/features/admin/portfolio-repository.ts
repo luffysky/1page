@@ -141,3 +141,65 @@ export async function listProjectMedia(projectId: string): Promise<AdminMediaRow
   if (error) throw new Error(`媒體讀取失敗：${error.message}`);
   return data ?? [];
 }
+
+/* ------------------------------------------------------------------ */
+/* 分類與標籤（join 表）                                                */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 一件作品目前掛了哪些分類與標籤。
+ *
+ * ⚠️ 這兩張是 join 表，與 case study 那幾個 jsonb 欄位不同性質：
+ * 它們不能跟著 `portfolio_projects` 一起 update，要各自刪掉再寫回。
+ * 這也是為什麼它們比 case study 晚一輪才做。
+ *
+ * 沒有它們的後果很具體：**在後台新建的作品沒有任何分類，
+ * 於是它在 /work 的任何分類篩選下都找不到**——而作品列表看起來一切正常。
+ */
+export async function getProjectTaxonomy(
+  projectId: string,
+): Promise<{ categories: string[]; tags: string[] }> {
+  const supabase = await createSupabaseServerClient();
+
+  const [categories, tags] = await Promise.all([
+    supabase
+      .from("portfolio_project_categories")
+      .select("portfolio_categories ( slug )")
+      .eq("project_id", projectId)
+      .returns<{ portfolio_categories: { slug: string } | null }[]>(),
+    supabase
+      .from("portfolio_project_tags")
+      .select("portfolio_tags ( name )")
+      .eq("project_id", projectId)
+      .returns<{ portfolio_tags: { name: string } | null }[]>(),
+  ]);
+
+  return {
+    categories: (categories.data ?? [])
+      .map((row) => row.portfolio_categories?.slug)
+      .filter((slug): slug is string => Boolean(slug)),
+    tags: (tags.data ?? [])
+      .map((row) => row.portfolio_tags?.name)
+      .filter((name): name is string => Boolean(name)),
+  };
+}
+
+/** 後台表單的分類選項。與公開端不同：這裡連停用的也要列（否則改不掉） */
+export async function listAllCategories(): Promise<{ slug: string; name: string }[]> {
+  const supabase = await createSupabaseServerClient();
+
+  const { data } = await supabase
+    .from("portfolio_categories")
+    .select("slug, name")
+    .order("sort_order", { ascending: true });
+
+  return data ?? [];
+}
+
+/** 既有標籤，給輸入框當建議清單。打錯字會長出一堆近似的標籤 */
+export async function listAllTags(): Promise<string[]> {
+  const supabase = await createSupabaseServerClient();
+
+  const { data } = await supabase.from("portfolio_tags").select("name").order("name");
+  return (data ?? []).map((row) => row.name);
+}

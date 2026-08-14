@@ -29,6 +29,14 @@ export interface ProjectFormValues {
   industry: string;
   year: string;
   services: string[];
+  /*
+   * 分類與標籤是 join 表，比 case study 那幾個欄位晚一輪才接上。
+   *
+   * 沒有它們的後果很具體：在後台新建的作品沒有任何分類，
+   * 於是它在 /work 的任何分類篩選下都找不到——而作品列表看起來一切正常。
+   */
+  categories: string[];
+  tags: string[];
   caseStudy: Record<string, string>;
   links: Record<string, string>;
   aiUsed: boolean;
@@ -67,9 +75,15 @@ const input = "border-brand-line bg-brand-bg text-body w-full rounded-md border 
 export function ProjectForm({
   initial,
   listHref,
+  allCategories,
+  allTags,
 }: {
   initial: ProjectFormValues;
   listHref: string;
+  /** 分類是固定清單，由後台選 */
+  allCategories: { slug: string; name: string }[];
+  /** 既有標籤，給輸入框當建議。沒有它會長出一堆打錯字的近似標籤 */
+  allTags: string[];
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -224,6 +238,54 @@ export function ProjectForm({
        * 各寫一份的話，改了順序就會出現「後台第三格填的東西
        * 在前台是第四段」這種沒人查得出來的錯位。
        */}
+      <fieldset className="border-brand-line border-t pt-6">
+        <legend className="text-body-sm font-bold">分類與標籤</legend>
+
+        <div className="mt-4">
+          <span className="text-body-sm block font-bold">分類</span>
+          <span className="text-caption text-brand-muted mt-1 block">
+            /work 的篩選器用這個。**一個都沒選的話，這件作品在任何分類下都找不到。**
+          </span>
+          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
+            {allCategories.map((category) => (
+              <label key={category.slug} className="flex items-center gap-2">
+                <input
+                  name="categories"
+                  type="checkbox"
+                  value={category.slug}
+                  defaultChecked={initial.categories.includes(category.slug)}
+                  className="h-5 w-5"
+                />
+                <span className="text-body-sm">{category.name}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/*
+         * 標籤用文字欄位而不是多選清單。
+         *
+         * 標籤會長到幾十個，而一件作品只掛兩三個——捲一份長清單比打字慢。
+         * datalist 提供既有標籤當建議，避免打錯字長出「Logo」與「logo」兩個。
+         */}
+        <div className="mt-6">
+          <Field label="標籤" hint="用逗號或頓號分隔。打新的就會建立，選既有的請照原樣打。">
+            <input
+              name="tags"
+              list="portfolio-tag-suggestions"
+              defaultValue={initial.tags.join("、")}
+              maxLength={400}
+              className={input}
+            />
+          </Field>
+          <datalist id="portfolio-tag-suggestions">
+            {allTags.map((tag) => (
+              <option key={tag} value={tag} />
+            ))}
+          </datalist>
+        </div>
+      </fieldset>
+
       <fieldset className="border-brand-line border-t pt-6">
         <legend className="text-body-sm font-bold">Case Study</legend>
         <p className="text-caption text-brand-muted mt-1">

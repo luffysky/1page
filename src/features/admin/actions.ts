@@ -92,6 +92,15 @@ const projectSchema = z.object({
    */
   year: z.number().int().min(1900).max(2100).nullable().catch(null),
   services: z.array(z.string().max(40)).max(10),
+  /*
+   * 分類是 slug 清單；標籤是使用者打的名字。
+   *
+   * 兩者刻意不同型別：分類是一份固定的清單（後台選），
+   * 標籤是自由文字（打了就長出來）。用同一種輸入法會讓人以為
+   * 分類也能隨手新增，而那會讓篩選器長出一堆一次性的分類。
+   */
+  categories: z.array(z.string().max(64)).max(10),
+  tags: z.array(z.string().trim().min(1).max(40)).max(20),
 
   // Spec §8.10 的五段。全部選填
   case_study: z.object({
@@ -138,6 +147,17 @@ function readForm(formData: FormData) {
     // 而使用者只是想把年份留白
     year: year === "" ? null : Number(year),
     services: formData.getAll("services").map(String),
+    categories: formData.getAll("categories").map(String),
+    /*
+     * 標籤是一個文字欄位，用逗號或頓號分隔。
+     *
+     * 多選清單在這裡不好用：標籤會長到幾十個，而一件作品只掛兩三個。
+     * 打字 + 既有標籤的建議清單（datalist）比捲一份長清單快得多。
+     */
+    tags: text(formData, "tags")
+      .split(/[,、]/)
+      .map((tag) => tag.trim())
+      .filter(Boolean),
 
     case_study: {
       problem: text(formData, "case_study.problem"),
@@ -178,7 +198,18 @@ export async function saveProject(formData: FormData): Promise<ActionResult> {
     return { ok: false, message: parsed.error.issues[0]?.message ?? "輸入有誤" };
   }
 
-  const { id, kicker, summary, industry, case_study, links, ai_disclosure, ...rest } = parsed.data;
+  const {
+    id,
+    kicker,
+    summary,
+    industry,
+    case_study,
+    links,
+    ai_disclosure,
+    categories,
+    tags,
+    ...rest
+  } = parsed.data;
 
   /*
    * 三個 jsonb 欄位一律整份覆寫，而且把空的鍵拿掉。
@@ -212,18 +243,120 @@ export async function saveProject(formData: FormData): Promise<ActionResult> {
 
   const supabase = await createSupabaseServerClient();
 
-  const { error } = id
-    ? await supabase.from("portfolio_projects").update(payload).eq("id", id)
-    : await supabase.from("portfolio_projects").insert({ ...payload, status: "draft" });
+  /*
+   * 新增時要把 id 拿回來——分類與標籤是 join 表，沒有 id 就寫不進去。
+   *
+   * RLS 的 `portfolio_projects_admin_all` 允許後台人員讀，所以這裡回得來。
+   * （Phase 5 的 leads 踩過相反的情況：insert 成功但 select 被擋，
+   *  看起來像新增失敗。這裡不會，因為權限是全開的。）
+   */
+  const saved = id
+    ? await supabase.from("portfolio_projects").update(payload).eq("id", id).select("id").single()
+    : await supabase
+        .from("portfolio_projects")
+        .insert({ ...payload, status: "draft" })
+        .select("id")
+        .single();
 
-  if (error) {
+  if (saved.error) {
     // 唯一鍵衝突給出可讀訊息，而不是把資料庫錯誤原文丟給使用者
-    if (error.code === "23505") return { ok: false, message: "這個網址代稱已經有人用了" };
-    return { ok: false, message: `儲存失敗：${error.message}` };
+    if (saved.error.code === "23505") return { ok: false, message: "這個網址代稱已經有人用了" };
+    return { ok: false, message: `儲存失敗：${saved.error.message}` };
   }
+
+  const taxonomyError = await saveTaxonomy(saved.data.id, categories, tags);
+  if (taxonomyError) return { ok: false, message: taxonomyError };
 
   revalidateAll(payload.slug);
   return { ok: true };
+}
+
+/** 標籤名 → slug。與種子資料同一種形式（小寫、連字號） */
+function toTagSlug(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9一-鿿-]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+/**
+ * 寫回分類與標籤。
+ *
+ * ── 為什麼是「整組刪掉再寫回」 ────────────────────────────────
+ *
+ * 算差集（哪些要加、哪些要刪）在這個規模下只是多一份會寫錯的邏輯。
+ * 一件作品最多十個分類，刪掉重寫的成本可以忽略，而且它天然是冪等的——
+ * 存兩次的結果一定一樣。
+ *
+ * ⚠️ 順序是先刪後寫。反過來的話中間會有一瞬間出現重複，
+ * 而 join 表若有唯一鍵就會直接失敗。
+ */
+async function saveTaxonomy(
+  projectId: string,
+  categorySlugs: string[],
+  tagNames: string[],
+): Promise<string | null> {
+  const supabase = await createSupabaseServerClient();
+
+  // ── 分類 ──
+  const { data: categoryRows } = await supabase
+    .from("portfolio_categories")
+    .select("id, slug")
+    .in("slug", categorySlugs.length > 0 ? categorySlugs : ["__none__"]);
+
+  await supabase.from("portfolio_project_categories").delete().eq("project_id", projectId);
+
+  if ((categoryRows ?? []).length > 0) {
+    const { error } = await supabase
+      .from("portfolio_project_categories")
+      .insert((categoryRows ?? []).map((row) => ({ project_id: projectId, category_id: row.id })));
+
+    if (error) return `分類儲存失敗：${error.message}`;
+  }
+
+  // ── 標籤：不存在的先建立 ──
+  const wanted = [
+    ...new Set(
+      tagNames.map((name) => ({ name, slug: toTagSlug(name) })).map((t) => JSON.stringify(t)),
+    ),
+  ]
+    .map((json) => JSON.parse(json) as { name: string; slug: string })
+    .filter((tag) => tag.slug.length > 0);
+
+  await supabase.from("portfolio_project_tags").delete().eq("project_id", projectId);
+
+  if (wanted.length === 0) return null;
+
+  /*
+   * upsert 而不是「先查再決定要不要插」：兩個人同時存檔時，
+   * 「查到沒有 → 插入」中間會撞在一起。onConflict 交給資料庫判斷。
+   */
+  const { error: tagError } = await supabase
+    .from("portfolio_tags")
+    .upsert(wanted, { onConflict: "slug" });
+
+  if (tagError) return `標籤儲存失敗：${tagError.message}`;
+
+  const { data: tagRows } = await supabase
+    .from("portfolio_tags")
+    .select("id")
+    .in(
+      "slug",
+      wanted.map((tag) => tag.slug),
+    );
+
+  if ((tagRows ?? []).length > 0) {
+    const { error } = await supabase
+      .from("portfolio_project_tags")
+      .insert((tagRows ?? []).map((row) => ({ project_id: projectId, tag_id: row.id })));
+
+    if (error) return `標籤儲存失敗：${error.message}`;
+  }
+
+  return null;
 }
 
 /**

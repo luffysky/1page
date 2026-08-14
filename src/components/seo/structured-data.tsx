@@ -31,7 +31,16 @@ function JsonLd({ data }: { data: Record<string, unknown> }) {
   );
 }
 
-/** 首頁：這是誰、叫什麼、網址是什麼 */
+/**
+ * 首頁：這是誰、叫什麼、網址是什麼、屬於誰。
+ *
+ * ⚠️ `parentOrganization` 是後補的。原本這裡只說「一頁起家是一個組織」，
+ * 而它其實是**斯諾瑞姆企業社（SnowRealm）旗下的產品**。
+ *
+ * 對機器來說那是兩件不同的事：少了 parentOrganization，
+ * 搜尋引擎不會把這個站與 SnowRealm 其他產品視為同一個實體的一部分，
+ * 品牌累積的信任也就不會互相加成。
+ */
 export function OrganizationJsonLd() {
   return (
     <JsonLd
@@ -42,6 +51,11 @@ export function OrganizationJsonLd() {
         alternateName: "1page",
         url: SITE_URL,
         description: "AI 輔助的數位工作室。網站、品牌、內容、設計與 AI 自動化。",
+        parentOrganization: {
+          "@type": "Organization",
+          name: "斯諾瑞姆企業社",
+          alternateName: "SnowRealm",
+        },
       }}
     />
   );
