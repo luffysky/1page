@@ -1,4 +1,4 @@
-import { PRICING_GROUPS, PRICING_TIERS } from "@/config/pricing";
+import type { PricingGroup, PricingTier } from "@/config/pricing";
 import { SERVICE_LINES } from "@/config/services";
 
 /**
@@ -34,20 +34,39 @@ export function renderServiceLines(): string {
 ${lines}`;
 }
 
-export function renderPricingLadder(): string {
-  const groups = PRICING_GROUPS.map((group) => {
-    const tiers = PRICING_TIERS.filter((tier) => tier.group === group.id)
-      .map((tier) => `- **${tier.name}**　${tier.price}${tier.priceSuffix ?? ""}　${tier.summary}`)
-      .join("\n");
+/**
+ * ⚠️ 價格由呼叫端傳進來，不在這裡讀常數。
+ *
+ * 價格的真相是 CMS。讀常數的話，後台改了價格、首頁顯示新的、
+ * **而 AI 顧問講的還是舊的**——那正是 5B 那個「模型自己編價格」的翻版，
+ * 只是這次編的人是我們自己，而且沒有任何地方會報錯。
+ *
+ * `cms/registry.test.ts` 有一條在盯這件事：餵一份改過的價格進來，
+ * 提示裡必須出現新數字，而且**舊數字不能還在**。
+ * 只驗新數字有出現是不夠的——兩份都在的話那條也會綠。
+ */
+export function renderPricingLadder(
+  groups: readonly PricingGroup[],
+  tiers: readonly PricingTier[],
+): string {
+  const rendered = groups
+    .map((group) => {
+      const lines = tiers
+        .filter((tier) => tier.group === group.id)
+        .map(
+          (tier) => `- **${tier.name}**　${tier.price}${tier.priceSuffix ?? ""}　${tier.summary}`,
+        )
+        .join("\n");
 
-    return `### ${group.label}（${group.description}）\n\n${tiers}`;
-  }).join("\n\n");
+      return `### ${group.label}（${group.description}）\n\n${lines}`;
+    })
+    .join("\n\n");
 
   return `## 價格階梯
 
 以下是**實際**的六級價格。談到錢的時候只能用這裡的數字，不可以自己估、自己換算、自己給區間。
 
-${groups}
+${rendered}
 
 價格依**責任範圍**而定，不依頁數（Spec §27）。影響落點的是：要做到多深、內容誰提供、有沒有既有品牌可延用、要不要後台自己更新。
 

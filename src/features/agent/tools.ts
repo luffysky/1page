@@ -3,6 +3,7 @@ import "server-only";
 import { z } from "zod";
 
 import { searchFaq } from "@/config/faq";
+import { readCmsDocument } from "@/features/cms/read";
 import { HOME_GOAL_IDS, homeGoalSchema } from "@/config/home-goals";
 import { ALL_CATEGORIES, PORTFOLIO_CATEGORIES } from "@/config/portfolio-categories";
 import { createLead } from "@/features/leads/repository";
@@ -159,8 +160,15 @@ const searchFaqTool = defineTool({
   input: z.object({
     query: z.string().min(1).max(200).describe("對方問題的關鍵詞"),
   }),
-  run({ query }) {
-    const entries = searchFaq(query);
+  async run({ query }) {
+    /*
+     * FAQ 從 CMS 讀，不是從程式碼的常數。
+     *
+     * 後台改了 FAQ、網站上顯示新的、而 AI 顧問還在用舊的回答——
+     * 那件事沒有任何地方會報錯，只有問到那一題的人會發現。
+     */
+    const document = await readCmsDocument("faq.list");
+    const entries = searchFaq(document.entries, query);
 
     return toolResult({
       entries: entries.map((entry) => ({ question: entry.question, answer: entry.answer })),

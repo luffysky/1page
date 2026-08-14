@@ -1,4 +1,4 @@
-import { getPricingTiersByGroup, PRICING_GROUPS, type PricingTier } from "@/config/pricing";
+import { getPricingTiersByGroup, type PricingGroup, type PricingTier } from "@/config/pricing";
 
 /**
  * Pricing Ladder（Spec §26.2）
@@ -43,16 +43,28 @@ function TierRow({ tier, index }: { tier: PricingTier; index: number }) {
   );
 }
 
-export function PricingLadder() {
+/**
+ * 價格階梯（Spec §26.2）
+ *
+ * ⚠️ 內容由呼叫端傳進來，不在這裡讀常數。
+ * 價格的真相是 CMS，而這個元件是純呈現——它不該知道資料從哪來。
+ */
+export function PricingLadder({
+  groups,
+  tiers,
+}: {
+  groups: readonly PricingGroup[];
+  tiers: readonly PricingTier[];
+}) {
   return (
     <div className="flex flex-col gap-16">
-      {PRICING_GROUPS.map((group) => (
+      {groups.map((group) => (
         <section key={group.id}>
           <p className="text-kicker text-brand-accent-strong uppercase">{group.label}</p>
           <p className="text-body-sm text-brand-muted mt-2 max-w-prose">{group.description}</p>
 
           <ul className="mt-6">
-            {getPricingTiersByGroup(group.id).map((tier, index) => (
+            {getPricingTiersByGroup(tiers, group.id).map((tier, index) => (
               <TierRow key={tier.id} tier={tier} index={index} />
             ))}
           </ul>

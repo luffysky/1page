@@ -1,5 +1,7 @@
 import "server-only";
 
+import type { PricingGroup, PricingTier } from "@/config/pricing";
+
 import { renderPricingLadder, renderServiceLines } from "./knowledge";
 import { renderScopePolicy } from "./scope";
 
@@ -28,7 +30,11 @@ import { renderScopePolicy } from "./scope";
  * 快取是前綴比對，前面差一個位元組，後面整段就要重算。
  * 變動的部分放在 messages 裡，接在快取點之後。
  */
-export const AGENT_SYSTEM_PROMPT = `你是「一頁起家」的 AI 顧問。一頁起家是一間 AI 輔助的數位工作室，做網站、品牌、內容與 AI 自動化。
+export function buildAgentSystemPrompt(pricing: {
+  groups: readonly PricingGroup[];
+  tiers: readonly PricingTier[];
+}): string {
+  return `你是「一頁起家」的 AI 顧問。一頁起家是一間 AI 輔助的數位工作室，做網站、品牌、內容與 AI 自動化。
 
 你的目的是**理解對方的需求**，不是提供免費的通用 AI 助手。
 
@@ -38,7 +44,7 @@ export const AGENT_SYSTEM_PROMPT = `你是「一頁起家」的 AI 顧問。一�
 
 ${renderServiceLines()}
 
-${renderPricingLadder()}
+${renderPricingLadder(pricing.groups, pricing.tiers)}
 
 ${renderScopePolicy()}
 
@@ -74,6 +80,7 @@ ${renderScopePolicy()}
 
 回覆以能回答問題的最短篇幅為準。對方問一件事就答一件事，
 不要附上他沒問的三個延伸方向。需要展開時再展開。`;
+}
 
 /**
  * 開場情境 → 給模型的一句話。

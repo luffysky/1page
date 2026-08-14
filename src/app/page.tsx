@@ -7,6 +7,7 @@ import { ProcessSteps } from "@/components/landing/process-steps";
 import { SelectedWork } from "@/components/landing/selected-work";
 import { TemplateExperienceSection } from "@/components/landing/template-experience-section";
 import { PricingLadder } from "@/components/pricing/pricing-ladder";
+import { readCmsDocument } from "@/features/cms/read";
 import { ServicesBand } from "@/components/services/services-band";
 import { DarkCtaBlock } from "@/components/shared/dark-cta-block";
 import { EditorialSection } from "@/components/shared/editorial-section";
@@ -52,6 +53,9 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   const params = await searchParams;
   const goal = parseHomeGoal(params.goal);
   const featured = await getPortfolioRepository().listFeatured();
+  // 價格從 CMS 讀（有快取，tag 由後台存檔時打掉）。資料庫沒有那一列時
+  // 退回 config/pricing.ts 的預設值——行為與搬進 CMS 之前完全一樣
+  const pricing = await readCmsDocument("pricing.tiers");
   // 後台入口只渲染給已驗證的後台人員；其他人拿到 null，
   // 密路徑因此完全不會出現在送給瀏覽器的 HTML 裡。
   const [adminEntry, accountEntry] = await Promise.all([getAdminEntry(), getAccountEntry()]);
@@ -111,7 +115,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
               {/* Spec §31 */}
               <TrackPageView event="pricing_viewed" />
               <EditorialSection {...SECTION_COPY.pricing}>
-                <PricingLadder />
+                <PricingLadder groups={pricing.groups} tiers={pricing.tiers} />
               </EditorialSection>
             </div>
 

@@ -62,7 +62,10 @@ export const ADMIN_NAV: NavGroup[] = [
   },
   {
     title: "內容",
-    items: [{ label: "作品", href: "/admin/portfolio", hint: "建立、編輯、發布作品" }],
+    items: [
+      { label: "作品", href: "/admin/portfolio", hint: "建立、編輯、發布作品" },
+      { label: "內容管理", href: "/admin/cms", hint: "網站文案，改完立刻生效" },
+    ],
   },
   {
     title: "客戶",

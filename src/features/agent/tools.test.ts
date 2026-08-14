@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { FAQ_ENTRIES, searchFaq } from "@/config/faq";
-import { PRICING_TIERS } from "@/config/pricing";
+import { PRICING_GROUPS, PRICING_TIERS } from "@/config/pricing";
 import { SERVICE_LINES } from "@/config/services";
 
 import { renderPricingLadder, renderServiceLines } from "./knowledge";
@@ -132,7 +132,7 @@ describe("search_faq", () => {
   it("關鍵詞查得到每一條 FAQ", () => {
     // 有條目但查不到，等於沒有那條目。
     for (const entry of FAQ_ENTRIES) {
-      const found = searchFaq(entry.keywords[0]!);
+      const found = searchFaq(FAQ_ENTRIES, entry.keywords[0]!);
       expect(
         found.map((item) => item.id),
         `${entry.id} 用自己的關鍵詞查不到`,
@@ -145,7 +145,7 @@ describe("知識段落由 config 產生", () => {
   it("六級價格全部出現，數字與 config 一致", () => {
     // 5B 實測到模型自己編了「幾萬元起」——因為它讀不到真的價格。
     // 這條確認真的價格有進提示詞，而且是從 config 來的不是手抄的。
-    const ladder = renderPricingLadder();
+    const ladder = renderPricingLadder(PRICING_GROUPS, PRICING_TIERS);
 
     for (const tier of PRICING_TIERS) {
       expect(ladder, `${tier.name} 沒有出現`).toContain(tier.name);
@@ -154,7 +154,7 @@ describe("知識段落由 config 產生", () => {
   });
 
   it("價格段落明說只能用這裡的數字", () => {
-    expect(renderPricingLadder()).toContain("不可以自己估");
+    expect(renderPricingLadder(PRICING_GROUPS, PRICING_TIERS)).toContain("不可以自己估");
   });
 
   it("四條產品線全部出現", () => {

@@ -4,6 +4,8 @@ import { AgentChat } from "@/components/agent/agent-chat";
 import { Hero } from "@/components/landing/hero";
 import { PortfolioLayout, type PortfolioCard } from "@/components/portfolio/portfolio-layout";
 import { PricingLadder } from "@/components/pricing/pricing-ladder";
+// dev 頁刻意用程式碼裡的預設值：這一頁展示的是元件本身，不是目前的內容
+import { PRICING_GROUPS, PRICING_TIERS } from "@/config/pricing";
 import { DarkCtaBlock } from "@/components/shared/dark-cta-block";
 import { EditorialSection } from "@/components/shared/editorial-section";
 import { Navbar, type NavLink } from "@/components/shared/navbar";
@@ -164,7 +166,7 @@ export default function PrimitivesPage() {
           note="完整六級，縱向階梯而非六欄卡片（Spec §26.1 / §26.2）。"
         >
           <div className="mx-auto w-full max-w-page px-gutter lg:px-gutter-lg">
-            <PricingLadder />
+            <PricingLadder groups={PRICING_GROUPS} tiers={PRICING_TIERS} />
           </div>
         </Specimen>
 

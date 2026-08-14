@@ -12,7 +12,8 @@ import { classifyAgentError } from "@/features/agent/errors";
 import { checkRateLimit, requestIdentifier } from "@/features/agent/rate-limit";
 import { agentRequestSchema, encodeStreamEvent } from "@/features/agent/schema";
 import { buildDemoSystemPrompt } from "@/features/agent/demo-prompt";
-import { AGENT_SYSTEM_PROMPT, initialIntentHint } from "@/features/agent/system-prompt";
+import { buildAgentSystemPrompt, initialIntentHint } from "@/features/agent/system-prompt";
+import { readCmsDocument } from "@/features/cms/read";
 import { buildSiteConfig } from "@/features/website-engine/templates";
 import { AGENT_TOOLS } from "@/features/agent/tools";
 import { getAnthropicClient } from "@/lib/ai/anthropic";
@@ -192,7 +193,9 @@ export async function POST(request: Request): Promise<Response> {
               system: [
                 {
                   type: "text",
-                  text: demoConfig ? buildDemoSystemPrompt(demoConfig) : AGENT_SYSTEM_PROMPT,
+                  text: demoConfig
+                    ? buildDemoSystemPrompt(demoConfig)
+                    : await buildAgentSystemPrompt(await readCmsDocument("pricing.tiers")),
                   // 系統提示每一次請求都一樣，快取它。
                   // 讀取只要約一成的價格，而這段會出現在每一則訊息上。
                   cache_control: { type: "ephemeral" },

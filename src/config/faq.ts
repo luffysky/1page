@@ -84,20 +84,32 @@ export const FAQ_ENTRIES: readonly FaqEntry[] = [
  * 而且會多一層看不見的失敗（embedding 服務掛掉時整個 FAQ 靜靜地變空）。
  * 條目多到需要語意檢索時再換，那時它會是一個真的問題而不是想像的問題。
  */
-export function searchFaq(query: string, limit = 3): FaqEntry[] {
+/**
+ * 檢索 FAQ。
+ *
+ * ⚠️ 條目由呼叫端傳進來，不在這裡讀 `FAQ_ENTRIES`。
+ *
+ * FAQ 現在的真相是 CMS（`cms_documents` 的 `faq.list`），
+ * 而這個常數退成「資料庫沒有那一列時的預設值」。
+ * 若這裡直接讀常數，後台改了 FAQ、網站上顯示新的、**AI 顧問卻還在
+ * 用舊的回答**——而那件事沒有任何地方會報錯。
+ */
+export function searchFaq(entries: readonly FaqEntry[], query: string, limit = 3): FaqEntry[] {
   const needle = query.toLowerCase().trim();
   if (!needle) return [];
 
-  const scored = FAQ_ENTRIES.map((entry) => {
-    const haystack = [entry.question, ...entry.keywords].join(" ").toLowerCase();
-    // 雙向包含：使用者可能問「流程」，也可能整句「你們的合作流程是什麼」。
-    const score = entry.keywords.reduce(
-      (total, keyword) =>
-        total + (needle.includes(keyword.toLowerCase()) || haystack.includes(needle) ? 1 : 0),
-      0,
-    );
-    return { entry, score };
-  }).filter((item) => item.score > 0);
+  const scored = entries
+    .map((entry) => {
+      const haystack = [entry.question, ...entry.keywords].join(" ").toLowerCase();
+      // 雙向包含：使用者可能問「流程」，也可能整句「你們的合作流程是什麼」。
+      const score = entry.keywords.reduce(
+        (total, keyword) =>
+          total + (needle.includes(keyword.toLowerCase()) || haystack.includes(needle) ? 1 : 0),
+        0,
+      );
+      return { entry, score };
+    })
+    .filter((item) => item.score > 0);
 
   return scored
     .sort((a, b) => b.score - a.score)

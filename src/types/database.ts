@@ -23,6 +23,21 @@ export interface AdminUsersRow {
   role: AdminRole;
 }
 
+export interface CmsDocumentsRow {
+  key: string;
+  content: Json;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+export interface CmsRevisionsRow {
+  id: string;
+  document_key: string;
+  content: Json;
+  saved_at: string;
+  saved_by: string | null;
+}
+
 export interface LeadsRow {
   id: string;
   profile_id: string | null;

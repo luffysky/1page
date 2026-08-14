@@ -1,9 +1,19 @@
 import { describe, expect, it } from "vitest";
 
-import { PRICING_TIERS } from "@/config/pricing";
+import { PRICING_GROUPS, PRICING_TIERS } from "@/config/pricing";
 
 import { AGENT_INTENTS } from "./scope";
-import { AGENT_SYSTEM_PROMPT, initialIntentHint } from "./system-prompt";
+import { buildAgentSystemPrompt, initialIntentHint } from "./system-prompt";
+
+/*
+ * 系統提示現在是一個函式，因為價格從 CMS 來（Phase B BH）。
+ * 這裡用程式碼裡的預設值建一份——測的是提示的**組成規則**，
+ * 不是「今天資料庫裡的價格是多少」那種會變的事實。
+ */
+const AGENT_SYSTEM_PROMPT = buildAgentSystemPrompt({
+  groups: PRICING_GROUPS,
+  tiers: PRICING_TIERS,
+});
 
 /**
  * 系統提示是由好幾個模組拼起來的（scope、knowledge、格式與界線）。

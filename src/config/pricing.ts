@@ -95,6 +95,19 @@ export const PRICING_TIERS: readonly PricingTier[] = [
   },
 ];
 
-export function getPricingTiersByGroup(group: PricingGroupId): PricingTier[] {
-  return PRICING_TIERS.filter((tier) => tier.group === group);
+/**
+ * 依組別取出價格級距。
+ *
+ * ⚠️ 級距由呼叫端傳進來，不在這裡讀 `PRICING_TIERS`。
+ *
+ * 價格現在的真相是 CMS（`cms_documents` 的 `pricing.tiers`），
+ * 而這個常數退成預設值。讀常數的話，後台改了價格、首頁顯示新的、
+ * **AI 顧問的系統提示卻還是舊的**——那正是 Phase 5「模型自己編價格」
+ * 那個 bug 的翻版，只是這次編的人是我們自己。
+ */
+export function getPricingTiersByGroup(
+  tiers: readonly PricingTier[],
+  group: PricingGroupId,
+): PricingTier[] {
+  return tiers.filter((tier) => tier.group === group);
 }
