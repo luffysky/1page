@@ -113,7 +113,7 @@ export interface SavedSitesRow {
   id: string;
   owner_id: string;
   name: string;
-  config: Json;
   created_at: string;
   updated_at: string;
+  draft: Json;
 }

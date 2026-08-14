@@ -1,7 +1,6 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useReducer, useRef } from "react";
-import { z } from "zod";
 
 import {
   ACCENT_IDS,
@@ -23,7 +22,8 @@ import {
   updateSectionContent,
 } from "./section-ops";
 import { newSection } from "./section-presets";
-import { siteSectionSchema, type SiteSection } from "./schema";
+import { type EditorState, type StoredEditorState, storedEditorStateSchema } from "./editor-state";
+import type { SiteSection } from "./schema";
 import type { Device, SiteConfig } from "./types";
 
 /**
@@ -45,7 +45,7 @@ import type { Device, SiteConfig } from "./types";
  * 「換了主題但按鈕還是舊顏色」。draft 是五個純量，算得出唯一的 config。
  */
 
-interface PreviewState {
+export interface PreviewState {
   draft: SiteDraft;
   device: Device;
   /**
@@ -85,6 +85,14 @@ interface PreviewState {
    * 「這一步復原不了」——沒有任何徵兆。
    */
   history: { past: (SiteSection[] | null)[]; future: (SiteSection[] | null)[] };
+  /**
+   * 正在編輯哪一份存檔（`null` ＝ 還沒存過）。
+   *
+   * 沒有這個欄位的話，「存到我的帳號」永遠是新增一列：載入自己存的草稿、
+   * 改一個字、再按存檔，帳號裡就多一份幾乎一樣的東西，二十份的上限
+   * 會被自己的修改記錄塞滿。
+   */
+  savedSiteId: string | null;
 }
 
 type PreviewAction =
@@ -103,7 +111,8 @@ type PreviewAction =
   | { type: "update-content"; id: string; content: SiteSection["content"] }
   | { type: "set-variant"; id: string; variant: string }
   | { type: "undo" }
-  | { type: "redo" };
+  | { type: "redo" }
+  | { type: "set-saved-site"; id: string | null };
 
 /** 會改到 sections、因此要進歷史的動作 */
 const SECTION_ACTIONS = new Set([
@@ -308,6 +317,15 @@ function baseReducer(state: PreviewState, action: PreviewAction): PreviewState {
     case "reset-sections":
       return { ...state, sections: null };
 
+    /*
+     * 存檔成功之後回報「這份現在是哪一列」。
+     *
+     * 第一次存檔完不記下來的話，第二次按存檔又會新增一列——
+     * 使用者按兩次存檔就得到兩份，而畫面上完全看不出為什麼。
+     */
+    case "set-saved-site":
+      return state.savedSiteId === action.id ? state : { ...state, savedSiteId: action.id };
+
     case "apply-patch": {
       const { patch } = action;
 
@@ -405,34 +423,42 @@ const isAccentId = (value: unknown): value is AccentId =>
 const STORAGE_KEY = "1page:preview-draft";
 
 /**
- * 存 draft，不存 SiteConfig。
+ * 存輸入，不存 SiteConfig。
  *
  * config 是 draft 的函數，存 config 等於存了一份可能與程式碼分歧的快照：
  * 模板文案改過之後，回來的訪客會看到舊版的內容，而且沒有任何跡象。
- * draft 是六個純量，重新算一次就是最新的。
  *
- * ⚠️ sessionStorage 的內容是**不可信輸入**——使用者可以直接編輯它。
- * 因此讀回來一律過 schema，而不是 `JSON.parse` 之後就當成 SiteDraft。
+ * ⚠️ 形狀定義在 `editor-state.ts`，與資料庫那一份共用同一個 schema。
+ * 分成兩份的時候，這裡存輸入、資料庫存成品，結果是「存得進去、載不回來」。
  */
-const storedStateSchema = z.object({
-  templateId: z.string().min(1).max(64),
-  themeId: z.enum(THEME_IDS),
-  accentId: z.enum(ACCENT_IDS),
-  brandName: z.string().max(200),
-  industry: z.string().max(200),
-  edited: z.object({ brandName: z.boolean(), industry: z.boolean() }),
+
+/**
+ * 把持久化的文件變回 state。
+ *
+ * device 不還原：那是「現在想怎麼看」，不是訪客累積的設定。
+ * history 也不存——存的是**結果**，不是過程。存歷史的話回訪時可以
+ * 「復原」到上一次瀏覽的中間狀態，那對使用者沒有意義，
+ * 而且儲存量會隨著編輯次數無上限成長。
+ */
+export function stateFromStored(stored: StoredEditorState): PreviewState {
   /*
-   * 排好的區塊要存。
+   * ⚠️ 明確一個一個取，不要用 `const { edited, ...draft } = stored`。
    *
-   * 上面說「存 draft 不存 config」，但那條規則真正的內容是
-   * **存輸入、不存衍生物**。使用者搬過的區塊順序沒有任何純量算得出來，
-   * 它是輸入。不存的話，Spec §8.15 的「訪客累積的設定不會在跳轉時消失」
-   * 對整個編輯器都不成立——他排了十分鐘，點一下作品頁就全沒了。
-   *
-   * 一樣過 schema：sessionStorage 是使用者改得動的不可信輸入。
+   * 那種寫法在 schema 只有 draft 欄位時是對的，但每加一個非 draft 欄位
+   * （目前是 sections 與 savedSiteId）就會被 rest 掃進 draft 裡，
+   * 變成 draft 上一個不該存在的欄位。它不會報錯，
+   * 只會讓 buildSiteConfig 收到多餘的東西。
    */
-  sections: z.array(siteSectionSchema).max(30).nullable().default(null),
-});
+  const { edited, sections, savedSiteId, ...draft } = stored;
+  return {
+    draft,
+    edited,
+    sections,
+    savedSiteId,
+    device: "desktop",
+    history: { past: [], future: [] },
+  };
+}
 
 function readStoredState(): PreviewState | null {
   let raw: string | null = null;
@@ -454,34 +480,33 @@ function readStoredState(): PreviewState | null {
     return null;
   }
 
-  const result = storedStateSchema.safeParse(parsed);
+  const result = storedEditorStateSchema.safeParse(parsed);
   if (!result.success) return null;
 
   // 模板可能在這次瀏覽之後被移除。指向不存在的模板就當作沒存過。
   if (!getTemplate(result.data.templateId)) return null;
 
-  /*
-   * ⚠️ 明確一個一個取，不要用 `const { edited, ...draft } = result.data`。
-   *
-   * 那種寫法在 schema 只有 draft 欄位時是對的，但每加一個非 draft 欄位
-   * （這次是 sections）就會被 rest 掃進 draft 裡，變成 draft 上一個
-   * 不該存在的欄位。它不會報錯，只會讓 buildSiteConfig 收到多餘的東西。
-   */
-  const { edited, sections, ...draft } = result.data;
-  /*
-   * 歷史不存進 sessionStorage：存的是**結果**，不是過程。
-   * 存歷史的話回訪時可以「復原」到上一次瀏覽的中間狀態，
-   * 那對使用者來說沒有意義，而且會讓儲存量隨著編輯次數無上限成長。
-   */
-  return { draft, edited, sections, device: "desktop", history: { past: [], future: [] } };
+  return stateFromStored(result.data);
+}
+
+/**
+ * state → 可持久化的文件。
+ *
+ * `savedSiteId` 不在裡面：那是「這份東西存在哪一列」，不是這份東西的一部分。
+ * 資料庫存的就是這個形狀（那一列自己的 id 已經是答案），
+ * sessionStorage 才需要多帶一個。
+ */
+export function editorStateOf(state: PreviewState): EditorState {
+  return { ...state.draft, edited: state.edited, sections: state.sections };
+}
+
+function storedFromState(state: PreviewState): StoredEditorState {
+  return { ...editorStateOf(state), savedSiteId: state.savedSiteId };
 }
 
 function writeStoredState(state: PreviewState): void {
   try {
-    window.sessionStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({ ...state.draft, edited: state.edited, sections: state.sections }),
-    );
+    window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(storedFromState(state)));
   } catch {
     // 同上：存不進去就算了，不影響當下的操作。
   }
@@ -490,6 +515,8 @@ function writeStoredState(state: PreviewState): void {
 export interface SitePreviewValue extends PreviewState {
   /** draft 的唯一衍生物。Preview 顯示的就是這一份 */
   config: SiteConfig;
+  /** 要存起來的那一份（存檔與 sessionStorage 共用同一個形狀） */
+  editorState: EditorState;
   template: WebsiteTemplate;
   selectTemplate: (templateId: string) => void;
   setTheme: (themeId: ThemeId) => void;
@@ -512,6 +539,8 @@ export interface SitePreviewValue extends PreviewState {
   resetSections: () => void;
   /** 有沒有動過區塊結構。用來決定要不要顯示「回到模板原樣」 */
   sectionsEdited: boolean;
+  /** 存檔成功後回報這份是哪一列；「另存新的一份」則傳 null */
+  setSavedSite: (id: string | null) => void;
 }
 
 const SitePreviewContext = createContext<SitePreviewValue | null>(null);
@@ -519,21 +548,35 @@ const SitePreviewContext = createContext<SitePreviewValue | null>(null);
 /**
  * `initialTemplateId` 由 server 依 `?goal=` 決定，
  * 首次輸出就是對的那一套，不需要等 client 再校正一次。
+ *
+ * `initialState` 是 server 從 `saved_sites` 載回來的那一份（`/edit?draft=<id>`）。
+ * 它比 sessionStorage 優先——使用者剛剛在會員中心點的是「編輯這一份」，
+ * 拿別的東西給他看是最糟的一種結果。
  */
 export function SitePreviewProvider({
   initialTemplateId,
+  initialState: loaded,
   children,
 }: {
   initialTemplateId?: string;
+  initialState?: StoredEditorState;
   children: React.ReactNode;
 }) {
-  const [state, dispatch] = useReducer(reducer, initialTemplateId, (id) => ({
-    draft: draftFromTemplate(getTemplate(id ?? "") ?? TEMPLATES[0]!),
-    device: "desktop" as Device,
-    edited: { brandName: false, industry: false },
-    sections: null,
-    history: { past: [], future: [] },
-  }));
+  const [state, dispatch] = useReducer(
+    reducer,
+    { initialTemplateId, loaded },
+    ({ initialTemplateId: id, loaded: fromServer }): PreviewState =>
+      fromServer
+        ? stateFromStored(fromServer)
+        : {
+            draft: draftFromTemplate(getTemplate(id ?? "") ?? TEMPLATES[0]!),
+            device: "desktop" as Device,
+            edited: { brandName: false, industry: false },
+            sections: null,
+            history: { past: [], future: [] },
+            savedSiteId: null,
+          },
+  );
 
   /*
    * 還原只在掛載時做一次。
@@ -542,11 +585,18 @@ export function SitePreviewProvider({
    * server 沒有 sessionStorage，首次渲染的輸出會與 client 不一致，
    * 那是 hydration mismatch。代價是回訪時會有一瞬間顯示 server 那一版——
    * 只影響「改過設定又離開再回來」的人，而讓首頁 hydration 出錯影響的是所有人。
+   *
+   * ⚠️ server 已經給了一份指定的草稿就不要還原。載入 A 卻看到 B，
+   * 而且 B 會在下一次存檔時把 A 蓋掉——那是會弄丟東西的錯，不只是看錯。
+   * `loaded` 來自 server props，同一次掛載內不會變，所以這個 effect
+   * 仍然只跑一次。
    */
+  const fromServer = loaded !== undefined;
   useEffect(() => {
+    if (fromServer) return;
     const stored = readStoredState();
     if (stored) dispatch({ type: "restore", state: stored });
-  }, []);
+  }, [fromServer]);
 
   /*
    * ⚠️ 初始狀態**不寫回** storage。
@@ -558,17 +608,22 @@ export function SitePreviewProvider({
    *
    * 實際撞到過：e2e 的「離開首頁再回來」一直拿到預設的品牌名稱。
    * 以物件識別判斷「有沒有任何變更（含還原）」，沒有變更就不動 storage。
+   *
+   * 例外是 server 指定的草稿：那不是「預設值」，是使用者明確點開的那一份，
+   * 要立刻蓋掉 sessionStorage。不蓋的話，載入 A 之後沒改任何東西就離開，
+   * 再回到 /edit 會看到上次那份未存的東西——而他以為自己在編輯 A。
    */
   const initialState = useRef(state);
   useEffect(() => {
-    if (state === initialState.current) return;
+    if (state === initialState.current && !fromServer) return;
     writeStoredState(state);
-  }, [state]);
+  }, [state, fromServer]);
 
   const value = useMemo<SitePreviewValue>(
     () => ({
       ...state,
       config: configOf(state),
+      editorState: editorStateOf(state),
       template: getTemplate(state.draft.templateId) ?? TEMPLATES[0]!,
       selectTemplate: (templateId) => dispatch({ type: "select-template", templateId }),
       setTheme: (themeId) => dispatch({ type: "set-theme", themeId }),
@@ -588,6 +643,7 @@ export function SitePreviewProvider({
       canUndo: state.history.past.length > 0,
       canRedo: state.history.future.length > 0,
       sectionsEdited: state.sections !== null,
+      setSavedSite: (id) => dispatch({ type: "set-saved-site", id }),
     }),
     [state],
   );

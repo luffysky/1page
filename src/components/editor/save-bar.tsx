@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useId } from "react";
+import { useActionState, useEffect, useId } from "react";
 
 import { saveCurrentSite } from "@/app/edit/actions";
 import { useSitePreview } from "@/features/website-engine/preview-context";
@@ -16,16 +16,27 @@ import { useSitePreview } from "@/features/website-engine/preview-context";
  * 唯一會提到帳號的地方。
  *
  * ⚠️ 目前的門檻是**登入**，不是付費：這個專案還沒有任何金流。
- * 真的要收費時，擋的位置就是 saveCurrentSite 這個 action，
+ * 真的要收費時，擋的位置是 saveCurrentSite 這個 action，
  * 不是這裡的按鈕（按鈕擋不住直接打端點的人）。
  *
  * 匯出 JSON 刻意免費也不需登入：那是訪客自己做的東西，
  * 把它扣住當人質不會讓人更想付錢，只會讓人覺得被坑。
  */
-export function SaveBar({ signedIn }: { signedIn: boolean }) {
-  const { config } = useSitePreview();
+export function SaveBar({ signedIn, savedName }: { signedIn: boolean; savedName?: string }) {
+  const { config, editorState, savedSiteId, setSavedSite } = useSitePreview();
   const [state, action, pending] = useActionState(saveCurrentSite, null);
   const nameId = useId();
+
+  /*
+   * 存好之後把 id 記回狀態。
+   *
+   * 少了這一步，第一次存檔會新增一列、第二次存檔又新增一列——
+   * 使用者按兩次就有兩份，而畫面上完全看不出為什麼。
+   */
+  const newId = state?.ok ? state.savedSiteId : undefined;
+  useEffect(() => {
+    if (newId) setSavedSite(newId);
+  }, [newId, setSavedSite]);
 
   const exportJson = () => {
     /*
@@ -51,10 +62,14 @@ export function SaveBar({ signedIn }: { signedIn: boolean }) {
         {signedIn ? (
           <form action={action} className="flex flex-1 flex-wrap items-end gap-3">
             {/*
-             * 整份 config 用 hidden input 帶過去。
+             * 整份編輯器狀態用 hidden input 帶過去。
              * Server Action 拿得到的只有 FormData，而這份設定是 client 狀態。
+             *
+             * 帶的是**輸入**（模板/主題/區塊覆寫），不是算出來的 SiteConfig——
+             * 成品推不回輸入，存成品的那個版本就是因此載不回編輯器的。
              */}
-            <input type="hidden" name="config" value={JSON.stringify(config)} />
+            <input type="hidden" name="draft" value={JSON.stringify(editorState)} />
+            <input type="hidden" name="savedSiteId" value={savedSiteId ?? ""} />
 
             <div className="min-w-[12rem] flex-1">
               <label htmlFor={nameId} className="text-body-sm block font-bold">
@@ -65,7 +80,7 @@ export function SaveBar({ signedIn }: { signedIn: boolean }) {
                 name="name"
                 type="text"
                 maxLength={80}
-                defaultValue={config.brand.name}
+                defaultValue={savedName ?? config.brand.name}
                 className="border-brand-line bg-brand-paper text-body-sm mt-2 w-full rounded-md border px-3 py-2"
               />
             </div>
@@ -75,8 +90,26 @@ export function SaveBar({ signedIn }: { signedIn: boolean }) {
               disabled={pending}
               className="bg-brand-ink text-brand-on-ink text-body-sm rounded-pill px-5 py-3 font-bold disabled:opacity-50"
             >
-              {pending ? "存檔中…" : "存到我的帳號"}
+              {pending ? "存檔中…" : savedSiteId ? "更新這一份" : "存到我的帳號"}
             </button>
+
+            {/*
+             * 「另存新的一份」只在已經有一份的時候出現。
+             *
+             * 還沒存過的時候「存檔」與「另存新檔」是同一件事，
+             * 擺兩顆一樣的按鈕只會讓人停下來想哪一顆才對。
+             */}
+            {savedSiteId ? (
+              <button
+                type="submit"
+                name="saveAsNew"
+                value="1"
+                disabled={pending}
+                className="border-brand-line text-body-sm rounded-pill border px-5 py-3 font-bold disabled:opacity-50"
+              >
+                另存新的一份
+              </button>
+            ) : null}
           </form>
         ) : (
           <p className="text-body-sm text-brand-muted flex-1">

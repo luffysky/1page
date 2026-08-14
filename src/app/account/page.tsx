@@ -140,15 +140,28 @@ export default async function AccountPage() {
                     </p>
                   </div>
 
-                  <form action={removeSavedSite}>
-                    <input type="hidden" name="id" value={site.id} />
-                    <button
-                      type="submit"
-                      className="border-brand-line text-body-sm rounded-pill border px-4 py-2 font-bold"
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/*
+                     * 「編輯」是這一段唯一讓存檔功能有意義的東西。
+                     * 沒有它，這份清單只證明資料存進去了，打不開。
+                     */}
+                    <Link
+                      href={`/edit?draft=${site.id}`}
+                      className="bg-brand-ink text-brand-on-ink text-body-sm rounded-pill px-4 py-2 font-bold"
                     >
-                      刪除
-                    </button>
-                  </form>
+                      編輯
+                    </Link>
+
+                    <form action={removeSavedSite}>
+                      <input type="hidden" name="id" value={site.id} />
+                      <button
+                        type="submit"
+                        className="border-brand-line text-body-sm rounded-pill border px-4 py-2 font-bold"
+                      >
+                        刪除
+                      </button>
+                    </form>
+                  </div>
                 </li>
               ))}
             </ul>
