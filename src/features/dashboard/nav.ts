@@ -69,7 +69,10 @@ export const ADMIN_NAV: NavGroup[] = [
   },
   {
     title: "客戶",
-    items: [{ label: "收件匣", href: "/admin/inbox", hint: "訪客留下的需求" }],
+    items: [
+      { label: "收件匣", href: "/admin/inbox", hint: "訪客留下的需求" },
+      { label: "客戶", href: "/admin/clients", hint: "聯絡人、備註與往來紀錄" },
+    ],
   },
 ];
 

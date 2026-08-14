@@ -1,5 +1,7 @@
 import { listLeads } from "@/features/admin/leads-repository";
 
+import { ConvertLeadButton } from "../clients/client-actions";
+
 /**
  * 收件匣（Phase M 的 MD / CR-004 Phase B BC）
  *
@@ -41,6 +43,14 @@ export default async function AdminInboxPage() {
                   {new Date(lead.createdAt).toLocaleString("zh-TW")}
                 </p>
               </div>
+
+              {/*
+               * lead → client 是一個**明確的動作**，不是自動的。
+               *
+               * 自動轉的話，一堆試填的假詢問會變成一堆假客戶，
+               * 而清掉它們比當初不要自動轉費事得多。
+               */}
+              <ConvertLeadButton leadId={lead.id} converted={lead.clientId !== null} />
 
               {lead.businessDescription ? (
                 <p className="text-body-sm mt-3 whitespace-pre-wrap">{lead.businessDescription}</p>

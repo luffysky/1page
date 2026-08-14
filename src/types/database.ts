@@ -16,11 +16,44 @@ export type PortfolioMediaType = "image" | "video" | "pdf" | "embed" | "external
 export type PortfolioProjectType = "client" | "concept" | "demo" | "internal";
 export type PortfolioStatus = "draft" | "published" | "archived";
 
+export interface ActivitiesRow {
+  id: string;
+  subject_type: string;
+  subject_id: string;
+  kind: string;
+  detail: Json;
+  actor_id: string | null;
+  created_at: string;
+}
+
 export interface AdminUsersRow {
   user_id: string;
   note: string | null;
   created_at: string;
   role: AdminRole;
+}
+
+export interface ClientContactsRow {
+  id: string;
+  client_id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  title: string | null;
+  is_primary: boolean;
+  created_at: string;
+}
+
+export interface ClientsRow {
+  id: string;
+  name: string;
+  kind: string;
+  industry: string | null;
+  status: string;
+  source: string | null;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface CmsDocumentsRow {
@@ -54,6 +87,17 @@ export interface LeadsRow {
   source: string;
   created_at: string;
   updated_at: string;
+  client_id: string | null;
+}
+
+export interface NotesRow {
+  id: string;
+  subject_type: string;
+  subject_id: string;
+  body: string;
+  internal: boolean;
+  author_id: string | null;
+  created_at: string;
 }
 
 export interface PortfolioCategoriesRow {

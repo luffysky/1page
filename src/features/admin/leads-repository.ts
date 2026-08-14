@@ -29,11 +29,13 @@ export interface AdminLead {
   source: string;
   /** 有沒有綁到帳號。綁了的話對方看得到自己的紀錄 */
   hasAccount: boolean;
+  /** 已經轉成哪一個客戶。null 表示還沒轉——那顆按鈕才按得下去 */
+  clientId: string | null;
 }
 
 const SELECT = `
   id, created_at, contact_name, contact_email, contact_phone,
-  business_name, business_industry, business_description, source, profile_id
+  business_name, business_industry, business_description, source, profile_id, client_id
 `;
 
 export async function listLeads(limit = 100): Promise<AdminLead[]> {
@@ -58,6 +60,7 @@ export async function listLeads(limit = 100): Promise<AdminLead[]> {
     businessDescription: row.business_description,
     source: row.source,
     hasAccount: row.profile_id !== null,
+    clientId: row.client_id,
   }));
 }
 
