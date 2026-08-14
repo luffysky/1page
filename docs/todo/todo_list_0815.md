@@ -8,7 +8,7 @@
 > 劃掉的是 0811 之後已經完成的。
 
 **測試總數：420 unit + 214 e2e + 69 db = 703。**（0813 時是 694）
-> 逐項工作紀錄見 `daily_works_0813.md` 與 `daily_works_0814.md`。
+> 逐項工作紀錄見 `docs/worklog/daily_works_0813.md` 與 `daily_works_0814.md`。
 >
 > ⚠️ e2e 目前有 **2 條紅的，而且是刻意的**：R2 bucket 沒有 CORS 設定，
 > 瀏覽器上傳一律送不出去。那是基礎設施沒設好，不是程式壞了——
@@ -252,6 +252,358 @@ year、services 全部進了後台表單。原本只能直接改資料庫——
 ```
 
 需要登入才看得到的入口那一項已由 `authed-reachability.spec.ts` 補上。
+
+---
+
+## 🏗 CMS / CRM / ERP 的設計（CR-004 Phase B）
+
+> 這一節是**設計**，不是願望清單。每一段都要能直接開工。
+> 上位文件是 `docs/cr-004-draft.md`（含五個待裁決的問題）。
+
+### 貫穿三塊的四條規則
+
+```text
+1. 命名從第一天就分開
+   engagements（接案專案）  ≠  portfolio_projects（對外作品）
+   backoffice（我們的 CRM） ≠  crm-builder（訪客自己設計的）
+   員工是 admin_users.role，會員沒有角色
+   → 參考專案兩次踩到「同一個字兩個意思」，兩次都得回頭寫警告
+
+2. 所有新表一律 RLS，而且只給員工
+   alter table <t> enable row level security;
+   create policy "<t>_staff_all" on <t> for all
+     using (is_staff()) with check (is_staff());
+   例外要寫理由（見各段）
+
+3. 每一頁都要進 features/dashboard/nav.ts
+   nav.test.ts 兩個方向都問：磁碟上有沒有哪頁不在導覽裡、
+   導覽裡有沒有哪項連到不存在的頁。做好了進不去就是沒做
+
+4. 每加一張表，audit:wiring【3】會立刻問「這些欄位有沒有人讀」
+   建好表卻還沒接 UI 的那段時間稽核是紅的——那是對的，不要急著加例外
+```
+
+---
+
+### 一、CMS（BH）
+
+**它現在就在痛**：網站文案寫死在程式碼裡，改一句話要走一次 commit 與部署。
+
+```text
+src/config/faq.ts          待辦上「四個空缺」要改程式才補得上
+src/config/pricing.ts      六級價格，而且同時餵給 Agent 的系統提示
+src/config/home-copy.ts    首頁文案
+```
+
+#### 資料表
+
+```sql
+cms_documents (
+  id uuid pk,
+  key text unique not null,        -- 程式碼指定，例如 'faq.list'、'pricing.tiers'
+  title text not null,             -- 給後台看的名字
+  status text not null,            -- draft | published
+  published_at timestamptz,
+  updated_at timestamptz
+)
+
+cms_blocks (
+  id uuid pk,
+  document_id uuid not null references cms_documents on delete cascade,
+  sort_order int not null,
+  content jsonb not null           -- 形狀沿用 SiteSection，重用既有 schema
+)
+
+cms_revisions (
+  id uuid pk,
+  document_id uuid not null references cms_documents on delete cascade,
+  blocks jsonb not null,           -- 發佈當下的整份快照
+  published_by uuid references profiles,
+  published_at timestamptz not null default now()
+)
+```
+
+#### 三條不能省的規則
+
+```text
+key 由程式碼指定，不是使用者自己取
+  → 每一個 key 都保證有讀取端。守衛反過來問兩件事：
+    「資料庫裡有沒有 key 沒有任何程式在讀」
+    「程式讀的 key 有沒有哪個資料庫裡沒有」
+
+不做「任意頁面產生器」
+  → CMS 管既有頁面的既有欄位，不長新路由。
+    新路由沒有對應的元件就只是一個 404，而且會直接撞上 §40
+
+發佈才生效，草稿只有後台看得到
+  → 與作品集同一套心智模型。改到一半重新整理，前台不該跟著變
+```
+
+#### 快取
+
+文案進資料庫，首頁就從靜態變成要查資料庫。用 `revalidateTag`：
+發佈時打掉那個 key 的快取，平常仍是快取命中。**不做「每次請求都查」**——
+首頁載入速度是這個網站的賣點之一，而且有一支效能稽核在盯。
+
+#### ⚠️ 最容易漏的一條：Agent 的系統提示
+
+`config/pricing.ts` 現在**同時**餵給 Agent 的系統提示。
+（Phase 5「模型會自己編價格」那個 bug 的修法，就是把真實價格放進提示。）
+
+價格改成從 CMS 讀之後，那條路徑要跟著改，否則會出現
+**畫面上是新價格、AI 講的是舊價格**——而且沒有任何地方會報錯。
+
+要有一條測試：Agent 系統提示裡的價格，必須與 CMS 讀出來的是同一份。
+
+#### 分段
+
+```text
+BH-1  cms_documents / cms_blocks / cms_revisions + RLS + 後台列表
+BH-2  區塊編輯（重用 CR-003-4 的 widget 編輯器）+ 發佈／回復版本
+BH-3  接 FAQ 與價格兩處（含 Agent 系統提示那條線）
+```
+
+首頁全文案化留到之後——一次全部搬進 CMS 會讓 BH 變成三段以上的量。
+
+---
+
+### 二、CRM（BD / BE）
+
+一頁起家是接案工作室，所以 CRM 的骨架是
+**詢問 → 客戶 → 報價 → 成交**，不是通用的聯絡人管理。
+
+#### 骨架
+
+```text
+leads（訪客說了什麼，不可變）
+  └─ client_id ─→ clients（我們對這個客戶的理解，會一直改）
+                    ├─ client_contacts（一個客戶可以有多個聯絡人）
+                    └─ deals ─→ engagements ─→ invoices
+```
+
+⚠️ **`leads` 不動。** 它是訪客留下的原始記錄——那是**證據**，
+不該被後續編輯覆蓋。只加一個 `leads.client_id`（可為 null）表示
+「這筆詢問已經轉成某個客戶」。
+
+把 lead 直接當客戶來編輯的話，「他當初說的」與「我們後來改的」就分不開了，
+而談價格談到一半時那件事會很重要。
+
+#### BD：客戶與聯絡記錄
+
+```sql
+clients (
+  id uuid pk,
+  name text not null,              -- 公司或個人
+  kind text not null,              -- company | individual
+  industry text,
+  status text not null,            -- prospect | active | past
+  source text,                     -- 從哪來（lead / 介紹 / 自己找上門）
+  created_at, updated_at
+)
+
+client_contacts (
+  id uuid pk,
+  client_id uuid not null references clients on delete cascade,
+  name text not null,
+  email text, phone text, title text,
+  is_primary boolean not null default false
+)
+
+notes (
+  id uuid pk,
+  -- 多型關聯：一則備註可以掛在 client / contact / deal / engagement 上
+  subject_type text not null,      -- 用 check constraint 限定，不用 enum
+  subject_id uuid not null,
+  body text not null,
+  internal boolean not null default true,   -- 內部備註永遠不給客戶看
+  author_id uuid references profiles,
+  created_at
+)
+
+activities (
+  id uuid pk,
+  subject_type text not null, subject_id uuid not null,
+  kind text not null,              -- created | status_changed | note_added | ...
+  detail jsonb not null default '{}',
+  actor_id uuid references profiles,
+  created_at
+)
+```
+
+**`activities` 由 trigger 寫，不靠呼叫端記得寫。**
+靠呼叫端的話，漏掉的那個操作就是時間軸上一段空白，而且沒有人會發現——
+這與 `updated_at` 用 trigger 維護是同一個理由。
+
+**lead → client 的轉換是一個明確的動作**（後台按「建立客戶」），不是自動的。
+自動轉的話，一堆試填的假詢問會變成一堆假客戶。
+
+#### BE：報價與成交
+
+```sql
+deals (
+  id uuid pk,
+  client_id uuid not null references clients,
+  title text not null,
+  stage text not null,             -- inquiry | quoted | negotiating | won | lost
+  amount numeric(12,2),            -- 報價金額
+  currency text not null default 'TWD',
+  expected_close date,
+  lost_reason text,                -- 輸了要寫原因，那是最有用的資料
+  created_at, updated_at
+)
+
+deal_items (
+  id uuid pk,
+  deal_id uuid not null references deals on delete cascade,
+  service_id text,                 -- 對應 config/services.ts
+  description text not null,
+  quantity numeric(10,2) not null default 1,
+  unit_price numeric(12,2) not null,
+  sort_order int not null
+)
+```
+
+```text
+階段用 text + check constraint，不用 enum
+  → enum 加一個值要 migration，而銷售流程的階段一定會被改
+
+金額用 numeric，不是 float
+  → 錢不能用二進位浮點數。這條沒有例外
+
+輸掉要寫原因
+  → 沒有 lost_reason 的 CRM 只是一份聯絡簿
+```
+
+檢視方式做兩種：清單（可排序、可篩階段）與看板（依階段分欄）。
+看板的拖曳沿用 CR-003-4 那一組——**含鍵盤替代路徑**，
+WCAG 2.1 §2.5.7 對後台一樣成立。
+
+---
+
+### 三、ERP（BF / BG）
+
+規模誠實說：這是一間小工作室的「專案與帳務」，不是製造業 ERP。
+不做庫存、不做採購、不做多幣別成本分攤。
+
+#### BF：專案與工時
+
+```sql
+engagements (                      -- 刻意不叫 projects
+  id uuid pk,
+  client_id uuid not null references clients,
+  deal_id uuid references deals,   -- 從哪一筆報價來的
+  title text not null,
+  status text not null,            -- planning | active | paused | delivered | closed
+  started_on date, due_on date, delivered_on date,
+  portfolio_project_id uuid references portfolio_projects,  -- 做完了變成作品
+  created_at, updated_at
+)
+
+milestones (
+  id uuid pk,
+  engagement_id uuid not null references engagements on delete cascade,
+  title text not null,
+  due_on date,
+  done_on date,
+  payment_ratio numeric(5,2)       -- 這個節點對應多少比例的請款
+)
+
+time_entries (
+  id uuid pk,
+  engagement_id uuid not null references engagements on delete cascade,
+  worked_on date not null,
+  minutes int not null,            -- 存分鐘，不是小時的小數
+  note text,
+  actor_id uuid references profiles,
+  created_at
+)
+```
+
+```text
+engagements ≠ portfolio_projects，但接得起來
+  → portfolio_project_id 讓「做完的案子變成作品」是一個明確的動作
+
+工時存分鐘
+  → 小時用小數會出現 0.30 到底是 18 分還是 30 分的問題
+
+先只做手動填，不做計時器
+  → 計時器要處理「忘了停」「跨日」「多裝置同時開」，那是獨立的小專案
+```
+
+#### BG：帳務
+
+⚠️ **這個專案沒有任何金流串接，這一段也不做。**
+`invoices` 與 `payments` 是**記帳**，不是收錢：自己開發票、自己對帳，
+系統只把「誰欠多少、收了沒」記下來。
+
+做成看起來會自動收錢的樣子，比沒有更糟——那是 SMTP 那件事的同一個教訓
+（做一顆按了會 422 的註冊按鈕，比沒有那顆按鈕更糟）。
+
+```sql
+invoices (
+  id uuid pk,
+  client_id uuid not null references clients,
+  engagement_id uuid references engagements,
+  number text unique not null,     -- 自己的請款單編號
+  status text not null,            -- draft | sent | paid | void
+  issued_on date, due_on date,
+  subtotal numeric(12,2) not null,
+  tax numeric(12,2) not null default 0,
+  total numeric(12,2) not null,
+  created_at, updated_at
+)
+
+invoice_lines (
+  id uuid pk,
+  invoice_id uuid not null references invoices on delete cascade,
+  description text not null,
+  quantity numeric(10,2) not null default 1,
+  unit_price numeric(12,2) not null,
+  sort_order int not null
+)
+
+payments (
+  id uuid pk,
+  invoice_id uuid not null references invoices on delete cascade,
+  paid_on date not null,
+  amount numeric(12,2) not null,
+  method text,                     -- 匯款 / 現金 / 其他
+  note text
+)
+```
+
+```text
+total 存下來，不是每次算
+  → 稅率與折扣規則會變，而已開出去的請款單金額不能跟著變
+
+分期收款用多筆 payments，不是改 invoice
+  → 收了一半就把 invoice 改成 paid 的話，帳就對不起來了
+
+編號 unique
+  → 重複的請款單編號是會計上的事故，不是 UI 問題。資料庫擋
+```
+
+---
+
+### 四、前台的 CRM 設計器（CR-003-5）
+
+Luffy：「前台也加上一個可以自己設計 CRM 的模組，一樣套 widget 排版」
+
+**與後台的 CRM 是兩件完全不同的東西**，不共用資料表也不共用命名。
+
+```text
+crm_definitions   使用者設計的結構（zod 驗過的 JSON）
+crm_records       owner_id + definition_id + entity + data jsonb
+```
+
+⚠️ **絕對不拿使用者的定義去下 DDL。** 「他定義一張表，我們就 create table」
+等於把 DDL 權限交給不可信輸入：每個使用者一組表、改欄位＝線上 migration、
+表名來自使用者輸入。一張表配 jsonb，RLS 一條就夠（`owner_id = auth.uid()`）。
+
+重用 CR-003-4 的拖曳、鍵盤上下移、復原／重做、選取狀態、存檔——
+**不是重寫一個編輯器，是換一組 widget**。
+
+定價與網站編輯器一致（免費設計、存檔要帳號），筆數上限用 DB trigger 擋。
 
 ---
 

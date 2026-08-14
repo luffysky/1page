@@ -157,7 +157,7 @@ export function SectionEditor({ signedIn }: { signedIn: boolean }) {
           tabIndex={0}
           role="group"
           aria-label="網站編輯區"
-          className="border-brand-line max-h-[42rem] overflow-y-auto rounded-lg border"
+          className="border-brand-line scrollbar-none max-h-[42rem] overflow-y-auto rounded-lg border"
         >
           <SiteRenderer
             config={config}

@@ -63,7 +63,7 @@ export function SitePreview() {
           tabIndex={0}
           role="group"
           aria-label={`${template.name} 模板預覽`}
-          className="max-h-[34rem] overflow-y-auto rounded-md"
+          className="scrollbar-none max-h-[34rem] overflow-y-auto rounded-md"
         >
           <SiteRenderer config={config} />
         </div>
