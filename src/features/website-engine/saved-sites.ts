@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getMemberIdentity } from "@/features/account/auth";
+import { describeSaveError } from "@/lib/supabase/save-error";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 import { type EditorState, editorStateSchema } from "./editor-state";
@@ -146,7 +147,9 @@ export async function saveSite(
       .eq("id", id)
       .eq("owner_id", identity.userId);
 
-    if (error) return { ok: false, error: "存檔失敗。" };
+    if (error) {
+      return { ok: false, error: describeSaveError("saveSite（更新）", error, "存檔失敗。") };
+    }
     // 0 列被更新＝那一份不存在或不是你的。當作新增比較危險（會偷偷多一份），
     // 直接說找不到。
     if (count === 0) return { ok: false, error: "找不到要更新的那一份草稿。" };
@@ -172,8 +175,8 @@ export async function saveSite(
   });
 
   if (error) {
-    // 每人 20 份的上限由資料庫 trigger 擋，訊息直接轉給使用者
-    return { ok: false, error: error.message.includes("20 份") ? error.message : "存檔失敗。" };
+    // 見 saveCrmDesign 的同一段：上限與已知約束轉人話，其餘記下原始錯誤
+    return { ok: false, error: describeSaveError("saveSite（新增）", error, "存檔失敗。") };
   }
 
   return { ok: true, id: newId };

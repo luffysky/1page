@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getMemberIdentity } from "@/features/account/auth";
+import { describeSaveError } from "@/lib/supabase/save-error";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 import {
@@ -129,7 +130,9 @@ export async function saveCrmDesign(
       .eq("id", id)
       .eq("owner_id", identity.userId);
 
-    if (error) return { ok: false, error: "存檔失敗。" };
+    if (error) {
+      return { ok: false, error: describeSaveError("saveCrmDesign（更新）", error, "存檔失敗。") };
+    }
     // 0 列被更新＝那一份不存在或不是你的。當作新增比較危險（會偷偷多一份）
     if (count === 0) return { ok: false, error: "找不到要更新的那一份設計。" };
 
@@ -146,8 +149,9 @@ export async function saveCrmDesign(
   });
 
   if (error) {
-    // 每人 10 份的上限由資料庫 trigger 擋，訊息直接轉給使用者
-    return { ok: false, error: error.message.includes("10 份") ? error.message : "存檔失敗。" };
+    // 上限訊息（每人 10 份）與已知的約束錯誤由 describeSaveError 轉成人話，
+    // 其餘一律記下原始錯誤再回這句籠統的
+    return { ok: false, error: describeSaveError("saveCrmDesign（新增）", error, "存檔失敗。") };
   }
 
   return { ok: true, id: newId };
@@ -264,10 +268,7 @@ export async function addCrmRecord(
   });
 
   if (error) {
-    return {
-      ok: false,
-      error: error.message.includes("500 筆") ? error.message : "存記錄失敗。",
-    };
+    return { ok: false, error: describeSaveError("addCrmRecord", error, "存記錄失敗。") };
   }
 
   return { ok: true };

@@ -7,7 +7,7 @@
 >
 > 劃掉的是 0811 之後已經完成的。
 
-**測試總數：584 unit + 383 e2e + 56 visual + 78 db = 1101。**（0815 收工時是 946）
+**測試總數：589 unit + 383 e2e + 56 visual + 80 db = 1108。**（0815 收工時是 946）
 > 逐項工作紀錄見 `docs/worklog/daily_works_0813.md`、`daily_works_0814.md`、
 > `daily_works_0815.md` 與 `daily_works_0818.md`。
 >
@@ -493,6 +493,56 @@ text        只有填寫率。硬要分組會得到一堆各 1 筆的「分類�
 
 11 條單元測試（純函式）＋ 2 條 e2e（數字真的接上畫面）。
 兩層都故意改壞驗過。
+
+---
+
+## 🐛 0818 現場修復：管理員帳號存不了任何東西
+
+**症狀**：按「存到我的帳號」→「存檔失敗。」，而且確實已登入。
+
+**原因**：`crm_definitions.owner_id` 外鍵指向 `profiles`，
+而那個帳號建立於 `2026-08-10`——比 `profiles` 與
+`on_auth_user_created` trigger（`20260811000005`）早一天。
+
+trigger 是 `after insert`，對**已經在** `auth.users` 裡的列不會觸發。
+所以那份 migration **上線的當下就已經有一個孤兒帳號**。
+
+⚠️ **九張表外鍵指向 profiles**，所以那個帳號存不了任何東西：
+
+```text
+crm_definitions.owner_id / crm_records.owner_id   CRM 設計與記錄
+saved_sites.owner_id                              網站草稿
+cms_documents.updated_by / cms_revisions.saved_by 後台編任何內容
+notes.author_id / activities.actor_id
+time_entries.actor_id / leads.profile_id
+```
+
+### 為什麼一週都沒發現
+
+```text
+e2e 全綠              每一支測試都自己建新帳號，trigger 會補 profile。
+                      測試涵蓋的永遠是「新使用者」，而唯一的舊使用者沒有人測
+應用層吞掉錯誤         資料庫回的是
+                      `violates foreign key constraint … is not present in
+                      table "profiles"`——講得一清二楚。
+                      而應用層回的是四個字「存檔失敗。」，
+                      伺服器紀錄裡什麼都沒有
+```
+
+### 修了三件
+
+```text
+1. 回填  20260818000016_profiles_backfill.sql
+         欄位邏輯與 handle_new_user() 一字不差——分岔的話，
+         回填出來的名字會與註冊產生的不一樣
+2. 守衛  tests/db/profiles.test.ts「沒有孤兒帳號」
+         反過來問：有沒有哪個 auth.users 沒有 profile。
+         ⚠️ 這件事只有在真資料庫問得出來——單元測試沒有 auth.users，
+         e2e 只涵蓋新帳號
+3. 診斷  src/lib/supabase/save-error.ts
+         原始錯誤一定記進伺服器紀錄，給使用者的那句不含
+         資料表名／欄位名／約束名。已接上 CRM 與網站草稿兩條存檔路徑
+```
 
 ---
 

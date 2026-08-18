@@ -24,6 +24,26 @@ type Probe = { id: string; email: string };
 
 const created: string[] = [];
 
+/**
+ * 直接下 SQL。
+ *
+ * 「有沒有孤兒帳號」這種問題必須跨 `auth` 與 `public` 兩個 schema，
+ * 而 PostgREST 不暴露 auth schema——用 client 問不出來。
+ */
+async function sql(query: string): Promise<Record<string, string>[]> {
+  const response = await fetch(`${url}/pg/query`, {
+    method: "POST",
+    headers: {
+      apikey: serviceKey!,
+      Authorization: `Bearer ${serviceKey!}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ query }),
+  });
+  if (!response.ok) throw new Error(`SQL 失敗：${await response.text()}`);
+  return response.json() as Promise<Record<string, string>[]>;
+}
+
 async function adminFetch(path: string, init?: RequestInit) {
   const response = await fetch(`${url}/auth/v1/admin${path}`, {
     ...init,
@@ -166,5 +186,52 @@ describe("會員 Profile", () => {
     // 而是舊 policy 對新身分的行為沒人檢查過。
     const { data } = await clientA.from("portfolio_projects").select("slug").eq("status", "draft");
     expect(data).toEqual([]);
+  });
+});
+
+describe("沒有孤兒帳號", () => {
+  /*
+   * ── 這一條在守什麼 ────────────────────────────────────────────
+   *
+   * `on_auth_user_created` 是 `after insert`——它守得住**之後**建立的帳號，
+   * 對已經在 `auth.users` 裡的列不會觸發。所以 0811 那份 migration
+   * 上線的當下就已經有一個孤兒（0810 建的管理員帳號），
+   * 而症狀一週後才出現：那個帳號存不了任何東西。
+   *
+   * 九張表的外鍵指向 profiles，所以「沒有 profile」的後果是
+   * 存網站草稿、存 CMS 內容、存 CRM 設計全部撞外鍵——
+   * 而應用層把它吞成一句「存檔失敗。」。
+   *
+   * ⚠️ 形式是**反過來問**：不列「這個帳號要有 profile」，
+   * 而是問「有沒有哪個帳號沒有」。前者每加一個帳號都要記得補，
+   * 後者自己會發現下一次。
+   *
+   * ⚠️ 而且它必須跑在**真的資料庫**上。這件事在單元測試層問不出來——
+   * 那裡沒有 auth.users。e2e 也問不出來，因為每支測試都自己建新帳號，
+   * 涵蓋的永遠是「新使用者」。
+   */
+  it("每一個 auth.users 都有對應的 profile", async () => {
+    const rows = await sql(`
+      select u.id, u.email
+      from auth.users u
+      left join public.profiles p on p.id = u.id
+      where p.id is null
+    `);
+
+    expect(
+      rows,
+      `這幾個帳號沒有 profile，它們存不了任何東西：${rows.map((row) => row.email).join("、")}`,
+    ).toEqual([]);
+  });
+
+  it("profile 的顯示名稱不是空的", async () => {
+    // 空的 display_name 在畫面上是一段空白，而使用者會以為資料壞了。
+    // 回填與 trigger 都用「信箱的 local part」當保底，所以這件事應該成立
+    const rows = await sql(`
+      select id, email from public.profiles
+      where display_name is null or btrim(display_name) = ''
+    `);
+
+    expect(rows.map((row) => row.email)).toEqual([]);
   });
 });
