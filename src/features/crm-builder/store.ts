@@ -4,6 +4,7 @@ import { getMemberIdentity } from "@/features/account/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 import {
+  CRM_LIMITS,
   type CrmDefinition,
   type CrmEntity,
   recordSchemaFor,
@@ -28,6 +29,8 @@ export interface CrmSummary {
   id: string;
   name: string;
   updatedAt: string;
+  /** 這份設計底下有幾筆記錄 */
+  records: number;
 }
 
 export async function listCrmDesigns(): Promise<CrmSummary[]> {
@@ -38,10 +41,38 @@ export async function listCrmDesigns(): Promise<CrmSummary[]> {
     .select("id, name, updated_at")
     .order("updated_at", { ascending: false });
 
-  return (data ?? []).map((row) => ({
+  const designs = data ?? [];
+  if (designs.length === 0) return [];
+
+  /*
+   * 筆數一次查完，不是一份一份查。
+   *
+   * ⚠️ 每一份各查一次是 N+1：十份設計就是十一次往返，
+   * 而這一頁的價值正是「一眼看出哪一份有東西」。
+   *
+   * 只取 id 欄位（`head` 不行——要拿到 definition_id 才分得出是哪一份），
+   * 在記憶體數。上限是 10 份 × 500 筆，最壞情況 5000 個 uuid，
+   * 比十一次往返便宜得多。
+   */
+  const { data: rows } = await supabase
+    .from("crm_records")
+    .select("definition_id")
+    .in(
+      "definition_id",
+      designs.map((row) => row.id as string),
+    );
+
+  const counts = new Map<string, number>();
+  for (const row of rows ?? []) {
+    const key = row.definition_id as string;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+
+  return designs.map((row) => ({
     id: row.id as string,
     name: row.name as string,
     updatedAt: row.updated_at as string,
+    records: counts.get(row.id as string) ?? 0,
   }));
 }
 
@@ -149,6 +180,32 @@ export async function listCrmRecords(definitionId: string, entity: string): Prom
     .eq("entity", entity)
     .order("created_at", { ascending: false })
     .limit(500);
+
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    entity: row.entity as string,
+    data: (row.data ?? {}) as Record<string, unknown>,
+    createdAt: row.created_at as string,
+  }));
+}
+
+/**
+ * 這份設計底下的**全部**記錄（不分類別）。
+ *
+ * Dashboard 用。一次撈回來在記憶體算，而不是每個類別、每個欄位各查一次：
+ * 每份設計最多 500 筆（資料庫的 trigger 擋著），一次查完最省，
+ * 而且各項統計之間保證看到同一份資料——分次查的話，
+ * 中間有人新增一筆，畫面上的數字就會互相對不起來。
+ */
+export async function listAllCrmRecords(definitionId: string): Promise<CrmRecord[]> {
+  const supabase = await createSupabaseServerClient();
+
+  const { data } = await supabase
+    .from("crm_records")
+    .select("id, entity, data, created_at")
+    .eq("definition_id", definitionId)
+    .order("created_at", { ascending: false })
+    .limit(CRM_LIMITS.recordsPerDefinition);
 
   return (data ?? []).map((row) => ({
     id: row.id as string,

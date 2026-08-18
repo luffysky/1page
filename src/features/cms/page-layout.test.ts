@@ -8,7 +8,10 @@ import {
   defaultHomeLayout,
   homeBlockIds,
   HOME_BLOCKS,
+  blockNumbers,
   isLockedBlock,
+  isNumberedBlock,
+  numberedKicker,
   moveBlock,
   moveBlockTo,
   pageLayoutSchema,
@@ -283,5 +286,95 @@ describe("HOME_BLOCKS 與 Spec §4 的 IA 一致", () => {
     // 反過來問：新增區塊時，有沒有人忘了把它寫進 §4。
     // 逐一列「services 要在對照表裡」的話，下次加新區塊又要記得補
     expect([...SPEC_NAME_TO_ID.map(([, id]) => id)].sort()).toEqual([...homeBlockIds()].sort());
+  });
+});
+
+describe("區塊編號依版面位置算出來", () => {
+  /*
+   * ── 這一組在守什麼 ────────────────────────────────────────────
+   *
+   * 編號原本寫死在 `SECTION_COPY` 的 kicker 裡（`"01 / Goals"`），
+   * 而 BJ-2 之後順序是**後台可以拖的**。兩者放在一起等於保證會對不上。
+   *
+   * 0818 依 CR-005 把 services 提前之後就真的發生了：
+   * 畫面上出現「作品之後是 05 / SERVICES」。那不是 bug 被引入，
+   * 是一個一直都在的組合終於被觸發。
+   */
+
+  const layoutOf = (ids: readonly string[], hidden: readonly string[] = []) =>
+    ids.map((id) => ({ id, visible: !hidden.includes(id) }));
+
+  it("編號照渲染順序，從 01 開始", () => {
+    const numbers = blockNumbers(layoutOf(homeBlockIds()));
+
+    expect(numbers.goals).toBe("01");
+    // work 刻意不編號，所以下一個編號的是 services
+    expect(numbers.work).toBeUndefined();
+    expect(numbers.services).toBe("02");
+  });
+
+  it("⚠️ 搬動之後編號跟著換", () => {
+    // 這正是 0818 那個「作品之後是 05 / SERVICES」的情境
+    const rest = homeBlockIds().filter((id) => id !== "services");
+    // services 插到 hero 之後、goals 之前——它就成了第一個要編號的
+    const numbers = blockNumbers(layoutOf([rest[0]!, "services", ...rest.slice(1)]));
+
+    expect(numbers.services).toBe("01");
+    expect(numbers.goals).toBe("02");
+  });
+
+  it("⚠️ 關掉一塊之後，後面的編號要遞補上來", () => {
+    /*
+     * 不遞補的話，畫面上會出現 01、02、04——
+     * 而使用者只會覺得「是不是有一段沒載出來」。
+     */
+    const numbers = blockNumbers(layoutOf(homeBlockIds(), ["goals"]));
+
+    expect(numbers.goals).toBeUndefined();
+    expect(numbers.services).toBe("01");
+  });
+
+  it("首屏、作品與最後那一段不編號", () => {
+    const numbers = blockNumbers(layoutOf(homeBlockIds()));
+
+    for (const id of ["hero", "work", "final-cta"]) {
+      expect(numbers[id], `${id} 不該有編號`).toBeUndefined();
+    }
+  });
+
+  it("每一個編號的區塊都真的拿得到號碼", () => {
+    // 反過來問：有沒有哪一塊標了 numbered 卻算不出號碼
+    const numbers = blockNumbers(layoutOf(homeBlockIds()));
+    const missing = homeBlockIds().filter((id) => isNumberedBlock(id) && !numbers[id]);
+
+    expect(missing, `這幾塊標了要編號卻沒有號碼：${missing.join("、")}`).toEqual([]);
+  });
+});
+
+describe("numberedKicker", () => {
+  it("把號碼冠上去", () => {
+    expect(numberedKicker("Services", "02")).toBe("02 / Services");
+  });
+
+  it("⚠️ 先拔掉既有的號碼再冠", () => {
+    /*
+     * kicker 是 CMS 可編輯的欄位。有人在後台照著舊樣子打了「03 / Services」，
+     * 或資料庫裡還留著搬家前存的那一版——不拔的話會變成
+     * 「02 / 03 / Services」，而那看起來就是壞了。
+     */
+    expect(numberedKicker("03 / Services", "02")).toBe("02 / Services");
+    expect(numberedKicker("3 / Services", "02")).toBe("02 / Services");
+    expect(numberedKicker("  07 /  Services ", "02")).toBe("02 / Services");
+  });
+
+  it("沒有號碼時只回名字", () => {
+    // work 這種不編號的區塊走這條
+    expect(numberedKicker("Selected Work", undefined)).toBe("Selected Work");
+    expect(numberedKicker("01 / Selected Work", undefined)).toBe("Selected Work");
+  });
+
+  it("kicker 是空的也不會產出一個孤零零的斜線", () => {
+    expect(numberedKicker(undefined, "02")).toBe("02");
+    expect(numberedKicker("", undefined)).toBe("");
   });
 });

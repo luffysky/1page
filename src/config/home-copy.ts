@@ -24,21 +24,19 @@ export const HERO_COPY = {
 /**
  * 各 Section 的標題文案。
  *
- * ⚠️ **kicker 裡的編號是寫死的，而版面順序是後台可以排的（BJ-2）。**
+ * ⚠️ **kicker 只放名字，不放編號。**
  *
- * 也就是說：在後台拖動任何一塊，這裡的號碼就與畫面上的位置對不上了。
- * 0818 依 `docs/gptsay.md` 的資訊架構批評把 services 提前之後就發生過一次
- * ——畫面上出現「作品之後是 05 / SERVICES」。
+ * 編號由 `page.tsx` 依實際渲染順序算出來（`blockNumbers`）。
+ * 寫死在這裡的話，後台拖動任何一塊就會對不上——而 BJ-2 之後
+ * 順序正是後台可以排的。0818 依 CR-005 把 services 提前之後
+ * 就發生過一次：畫面上出現「作品之後是 05 / SERVICES」。
  *
- * 正確的做法是由 `page.tsx` 依 `blocks` 的位置算出號碼再傳下去，
- * kicker 本身只留名字。那要動到每一個 section 元件的 props，
- * 列在待辦裡（`todo_list_0815.md`）。
- *
- * 在那之前：**改順序時這裡要跟著改。**
+ * 這也是為什麼 `numberedKicker` 會先把既有的 `NN / ` 拔掉：
+ * 有人在後台照著舊樣子打了編號時，位置仍然說了算。
  */
 export const SECTION_COPY = {
   goals: {
-    kicker: "01 / Goals",
+    kicker: "Goals",
     title: "你今天想完成什麼？",
     lead: "不用先學會網站術語。告訴我們你的目標，我們再把它拆成能執行的工作。",
   },
@@ -48,32 +46,32 @@ export const SECTION_COPY = {
     lead: "Demo、內部產品與真實客戶案會明確標示，不混在一起。",
   },
   template: {
-    kicker: "03 / Template Experience",
+    kicker: "Template Experience",
     title: "不想聊天，也可以自己先試穿。",
     lead: "選產業、換 Theme、切裝置。想讓 AI 接手時再叫它，Agent 不是唯一入口。",
   },
   advisor: {
-    kicker: "04 / AI Website Advisor",
+    kicker: "AI Website Advisor",
     title: "先聊需求，再讓網站長出來。",
     lead: "免費階段負責理解需求、推薦方案與基礎試穿。當 AI 開始替你規劃架構、寫內容、操作網站，就進入可付費的 Website Workshop。",
   },
   philosophy: {
-    kicker: "05 / AI Philosophy",
+    kicker: "AI Philosophy",
     title: "會用 AI，跟能用 AI 做出產品，是兩回事。",
     lead: "我們不隱瞞 AI，也不販賣 AI。你付的不是生成費，而是完成費。",
   },
   services: {
-    kicker: "02 / Services",
+    kicker: "Services",
     title: "需要的是成果，不是一長串工具名稱。",
     lead: "四條產品線依專案組合，不讓首頁變成數位菜市場。",
   },
   pricing: {
-    kicker: "07 / Product Ladder",
+    kicker: "Product Ladder",
     title: "先試，再決定要做到多深。",
     lead: "價格依責任範圍與客製程度，不按「只有一頁」亂算。",
   },
   process: {
-    kicker: "06 / Process",
+    kicker: "Process",
     title: "合作流程，別搞得像解支線任務。",
   },
 } as const;

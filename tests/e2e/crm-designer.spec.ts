@@ -148,6 +148,94 @@ test("存下來、打開、填一筆、看得到", async ({ page }) => {
   await expect(page.getByRole("cell", { name: "阿明" })).toBeVisible();
 });
 
+test("Dashboard 的數字與實際資料對得上", async ({ page }) => {
+  /*
+   * ── Dashboard 最危險的失敗不是壞掉，是說錯話 ──────────────────
+   *
+   * 一個看起來很專業的圖表，數字錯了不會有任何提示，
+   * 而看的人會拿它做決定。所以這一條驗的全部是**數字**：
+   *   - 總筆數與實際填的一致
+   *   - 沒有人選過的選項要出現，而且是 0
+   *   - 空白不算「有填」
+   *
+   * 純邏輯在 `features/crm-builder/stats.test.ts`（11 條）。
+   * 這一條驗的是那些函式真的被接上了畫面。
+   */
+  await signIn(page, "/crm");
+
+  const rows = await sql(`select id from crm_definitions where owner_id = '${memberId}' limit 1`);
+  const definitionId = rows[0]?.id as string | undefined;
+  expect(definitionId, "前面的測試應該已經存過一份").toBeTruthy();
+
+  await page.goto(`/account/crm/${definitionId}`);
+
+  /*
+   * 預設那份設計的「狀態」有三個選項。填兩筆、都選同一個，
+   * 另外兩個選項必須顯示 0——而不是消失。
+   */
+  for (const name of ["統計用的甲", "統計用的乙"]) {
+    await page.getByLabel(/名字/).fill(name);
+    await page.getByLabel(/狀態/).selectOption("還在談");
+    await page.getByRole("button", { name: "儲存" }).click();
+    await expect(page.getByRole("status")).toContainText("記下來了", { timeout: 20_000 });
+  }
+
+  const dashboard = page.locator("section", { has: page.getByRole("heading", { name: /的概況/ }) });
+
+  await expect(dashboard.getByText(/共 \d+ 筆/)).toContainText("共 2 筆");
+
+  const statusCard = dashboard.locator("li", { hasText: "狀態" }).first();
+  await expect(statusCard).toContainText("還在談");
+  await expect(statusCard, "沒有人選過的選項被藏起來了——那往往正是最有用的資訊").toContainText(
+    "已成交",
+  );
+
+  /*
+   * 「聯絡方式」兩筆都沒填。填寫率要說 0 / 2，
+   * 不能把空白當成填了。
+   */
+  const contactCard = dashboard.locator("li", { hasText: "聯絡方式" }).first();
+  await expect(contactCard).toContainText("0 / 2");
+
+  /*
+   * ⚠️ 每一張卡只能說它那個型別的話。
+   *
+   * 「最後聯絡」是日期欄位，而且沒有人填。第一版的條件式
+   * （沒有分布、沒有數字、沒有範圍）對它也成立，於是畫面上出現
+   * 「最後聯絡（日期）：文字欄位不做分組」——那不是壞掉，是說錯話。
+   */
+  const dateCard = dashboard.locator("li", { hasText: "最後聯絡" }).first();
+  await expect(dateCard, "日期欄位被說成文字欄位").not.toContainText("文字欄位不做分組");
+});
+
+test("還沒有資料時不畫一整排 0", async ({ page }) => {
+  /*
+   * 一個全部都是 0 的 dashboard 看起來像壞掉，而它只是還沒開始。
+   * 說出下一步比展示空數字有用。
+   */
+  await signIn(page, "/crm");
+
+  // 另外存一份全新的，確保它是空的
+  await page.getByLabel("這份 CRM 叫什麼").fill("空的統計測試");
+  await page
+    .getByRole("button", { name: "另存新的一份" })
+    .or(page.getByRole("button", { name: "存到我的帳號" }))
+    .first()
+    .click();
+  await expect(page.getByRole("status")).toContainText(/存好了|另存/, { timeout: 20_000 });
+
+  await page.goto("/account/crm");
+  await page
+    .locator("li", { hasText: "空的統計測試" })
+    .getByRole("link", { name: "填資料" })
+    .click();
+
+  await expect(page.getByText("這一類還沒有任何資料")).toBeVisible();
+  // 而清單上也要說「還沒有資料」，不是「0 筆」
+  await page.goto("/account/crm");
+  await expect(page.locator("li", { hasText: "空的統計測試" })).toContainText("還沒有資料");
+});
+
 test("必填沒填就存不進去，而且說得出是哪一欄", async ({ page }) => {
   await signIn(page, "/crm");
 

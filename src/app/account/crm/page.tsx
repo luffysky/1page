@@ -44,6 +44,15 @@ export default async function AccountCrmPage() {
               <div className="min-w-0 flex-1">
                 <p className="text-body font-bold">{design.name}</p>
                 <p className="text-caption text-brand-muted mt-1">
+                  {/*
+                   * 先講筆數再講時間：「有沒有東西」比「什麼時候改的」
+                   * 更能決定要不要點進去。
+                   *
+                   * 0 筆的時候說「還沒有資料」而不是「0 筆」——
+                   * 後者讀起來像一個統計數字，前者才是下一步。
+                   */}
+                  {design.records > 0 ? `${design.records} 筆資料` : "還沒有資料"}
+                  {" · "}
                   最後更新 {new Date(design.updatedAt).toLocaleString("zh-TW")}
                 </p>
               </div>

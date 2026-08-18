@@ -18,7 +18,7 @@ import { getAdminEntry } from "@/features/admin/auth";
 import { SiteFooter } from "@/components/shared/site-footer";
 import { getHomeGoal, parseHomeGoal } from "@/config/home-goals";
 import { mergeGoalCopy } from "@/features/cms/merge";
-import { visibleBlocks } from "@/features/cms/page-layout";
+import { blockNumbers, numberedKicker, visibleBlocks } from "@/features/cms/page-layout";
 import { PageBlock } from "@/components/shared/page-block";
 import { HomeGoalProvider } from "@/features/home/goal-context";
 import { getPortfolioRepository } from "@/features/portfolio";
@@ -96,6 +96,23 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   const blocks = visibleBlocks(layout);
 
   /*
+   * 每一塊的編號**依實際渲染順序算出來**，不寫在文案裡。
+   *
+   * ⚠️ 編號曾經寫死在 `SECTION_COPY` 的 kicker 裡（`"01 / Goals"`），
+   * 而 BJ-2 之後順序是後台可以拖的——兩者放在一起等於保證會對不上。
+   * CR-005 把 services 提前之後就發生過一次：
+   * 畫面上出現「作品之後是 05 / SERVICES」。
+   *
+   * `sectionOf` 把編號冠上去，順便把 kicker 裡既有的 `NN / ` 拔掉
+   * （後台可以編那個欄位，有人照著舊樣子打了編號也不會變成兩層）。
+   */
+  const numbers = blockNumbers(blocks);
+  const sectionOf = <T extends { kicker?: string }>(id: string, section: T): T => ({
+    ...section,
+    kicker: numberedKicker(section.kicker, numbers[id]),
+  });
+
+  /*
    * id → 那一塊的畫面。
    *
    * 用一個 map 而不是一長串 if：`page-layout.test.ts` 會反過來問
@@ -106,14 +123,14 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     hero: <Hero {...hero} />,
 
     goals: (
-      <EditorialSection {...goalsCopy.section}>
+      <EditorialSection {...sectionOf("goals", goalsCopy.section)}>
         <GoalSelector items={mergeGoalCopy(goalsCopy)} />
       </EditorialSection>
     ),
 
     work: (
       <div id="work">
-        <EditorialSection {...workCopy.section}>
+        <EditorialSection {...sectionOf("work", workCopy.section)}>
           <SelectedWork items={featured} />
         </EditorialSection>
       </div>
@@ -121,7 +138,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
 
     template: (
       <div id="templates">
-        <EditorialSection {...templateCopy.section}>
+        <EditorialSection {...sectionOf("template", templateCopy.section)}>
           <TemplateTeaser />
         </EditorialSection>
       </div>
@@ -131,17 +148,17 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       <div id="advisor">
         {/* Spec §31：免費顧問沒有另外的開關，對話區出現就算開啟過 */}
         <TrackPageView event="agent_opened" />
-        <EditorialSection {...advisorCopy.section}>
+        <EditorialSection {...sectionOf("advisor", advisorCopy.section)}>
           <AdvisorSection />
         </EditorialSection>
       </div>
     ),
 
-    philosophy: <EditorialSection {...philosophyCopy.section} />,
+    philosophy: <EditorialSection {...sectionOf("philosophy", philosophyCopy.section)} />,
 
     services: (
       <div id="services">
-        <EditorialSection {...servicesCopy.section}>
+        <EditorialSection {...sectionOf("services", servicesCopy.section)}>
           <ServicesBand lines={servicesCopy.lines} />
         </EditorialSection>
       </div>
@@ -161,7 +178,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
          * 分開的是**在哪裡看的**。
          */}
         <TrackPageView event="pricing_viewed" payload={{ from: "home" }} />
-        <EditorialSection {...pricingCopy.section}>
+        <EditorialSection {...sectionOf("pricing", pricingCopy.section)}>
           <PricingSummary groups={pricing.groups} tiers={pricing.tiers} />
         </EditorialSection>
       </div>
@@ -169,7 +186,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
 
     process: (
       <div id="process">
-        <EditorialSection {...processCopy.section}>
+        <EditorialSection {...sectionOf("process", processCopy.section)}>
           <ProcessSteps steps={processCopy.steps} />
         </EditorialSection>
       </div>

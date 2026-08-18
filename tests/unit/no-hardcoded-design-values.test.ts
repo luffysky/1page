@@ -129,6 +129,12 @@ describe("設計數值只能來自 tokens.css", () => {
       // 與上傳進度條同一類：CSS 類別表達不了連續變化的值。
       // 顏色仍然來自 tokens.css（--color-brand-scrim），只有位置是 inline。
       "src/components/editor/image-editor.tsx": "裁切／模糊框的位置（執行期百分比）",
+      // CRM Dashboard 的長條與柱狀圖：寬高是「這一格佔全部的幾成」，
+      // 每一筆資料都不一樣。與上傳進度條同一類——類別表達不了
+      // 執行期才算得出來的連續值。
+      // ⚠️ 容器的尺寸仍然是 class（h-12），inline 的只有百分比；
+      // 顏色也全部來自 tokens.css。
+      "src/components/crm/crm-dashboard.tsx": "統計長條的百分比（執行期計算）",
       // 一塊的背景是使用者選的顏色、漸層、照片與遮罩濃度——
       // 全部是執行期才知道的值，而且是**被編輯網站**的色值，
       // 不是本站的設計數值。與 site-scope 同一類。

@@ -64,18 +64,71 @@ export const HOME_BLOCKS = [
    * 要拿掉它，得先把 setGoal 接到別的地方（CTA / Project Builder /
    * AI 顧問其中之一）——那是程式工作，不是排版工作。
    */
-  { id: "goals", label: "你今天想完成什麼" },
+  { id: "goals", label: "你今天想完成什麼", numbered: true },
   { id: "work", label: "精選作品" },
-  { id: "services", label: "服務項目" },
-  { id: "template", label: "自己試穿" },
-  { id: "advisor", label: "AI 顧問" },
-  { id: "philosophy", label: "我們怎麼看 AI" },
-  { id: "process", label: "合作流程" },
-  { id: "pricing", label: "價格" },
+  { id: "services", label: "服務項目", numbered: true },
+  { id: "template", label: "自己試穿", numbered: true },
+  { id: "advisor", label: "AI 顧問", numbered: true },
+  { id: "philosophy", label: "我們怎麼看 AI", numbered: true },
+  { id: "process", label: "合作流程", numbered: true },
+  { id: "pricing", label: "價格", numbered: true },
   { id: "final-cta", label: "最後那一段", locked: true },
 ] as const;
 
 export type HomeBlockId = (typeof HOME_BLOCKS)[number]["id"];
+
+/**
+ * 這一塊的 kicker 要不要冠上編號（`01 /`、`02 /` …）。
+ *
+ * ⚠️ 首屏、精選作品與最後那一段刻意不編號：
+ * 前後兩塊是這一頁的開頭與結尾，不是「其中一段」；
+ * 作品那一段的 kicker 是「Selected Work」，加上編號會讓它讀起來
+ * 像流程的一步，而它是證據。
+ */
+export function isNumberedBlock(id: string): boolean {
+  return HOME_BLOCKS.some((block) => block.id === id && "numbered" in block && block.numbered);
+}
+
+/**
+ * 依**實際渲染順序**算出每一塊的編號。
+ *
+ * ── 為什麼不能寫死 ────────────────────────────────────────────
+ *
+ * 編號原本寫在 `config/home-copy.ts` 的 kicker 裡（`"01 / Goals"`），
+ * 而 BJ-2 之後順序是**後台可以拖的**。兩者放在一起等於保證會對不上——
+ * 0818 依 CR-005 把 services 提前之後就發生過一次：
+ * 畫面上出現「作品之後是 05 / SERVICES」。
+ *
+ * ⚠️ 只數「看得見而且要編號」的那些。關掉一塊之後，
+ * 後面的編號要遞補上來——不然畫面上會出現 01、02、04。
+ */
+export function blockNumbers(blocks: readonly LayoutBlock[]): Record<string, string> {
+  const numbers: Record<string, string> = {};
+  let n = 0;
+
+  for (const block of blocks) {
+    if (!block.visible || !isNumberedBlock(block.id)) continue;
+    n += 1;
+    numbers[block.id] = String(n).padStart(2, "0");
+  }
+
+  return numbers;
+}
+
+/**
+ * 把編號冠到 kicker 上。
+ *
+ * ⚠️ 先把既有的 `NN / ` 拔掉再冠。
+ *
+ * kicker 是 CMS 可編輯的欄位——有人在後台照著舊樣子打了「03 / Services」，
+ * 或者資料庫裡還留著搬家前存的那一版，不拔的話會變成「02 / 03 / Services」。
+ * 拔掉之後編號永遠由版面位置決定，不由文字決定。
+ */
+export function numberedKicker(kicker: string | undefined, number: string | undefined): string {
+  const base = (kicker ?? "").replace(/^\s*\d{1,2}\s*\/\s*/, "").trim();
+  if (!number) return base;
+  return base ? `${number} / ${base}` : number;
+}
 
 /**
  * `locked` 的意思是**不能關掉**，不是不能搬。

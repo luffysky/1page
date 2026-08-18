@@ -3,8 +3,10 @@ import { notFound } from "next/navigation";
 
 import { removeCrmRecordAction } from "@/app/crm/actions";
 import { requireMember } from "@/features/account/auth";
+import { CrmDashboard } from "@/components/crm/crm-dashboard";
 import { CRM_LIMITS, type CrmField } from "@/features/crm-builder/schema";
-import { listCrmRecords, loadCrmDesign } from "@/features/crm-builder/store";
+import { recentActivity, summariseEntity } from "@/features/crm-builder/stats";
+import { listAllCrmRecords, loadCrmDesign } from "@/features/crm-builder/store";
 
 import { RecordForm } from "./record-form";
 
@@ -43,7 +45,22 @@ export default async function CrmRecordsPage({
     design.definition.entities.find((item) => item.id === entityId) ??
     design.definition.entities[0]!;
 
-  const records = await listCrmRecords(id, entity.id);
+  /*
+   * 一次撈全部，統計與下面的清單共用同一份資料。
+   *
+   * ⚠️ 分兩次查的話，中間有人新增一筆，dashboard 的數字就會與
+   * 清單的筆數對不起來——而那種不一致沒有人解釋得了。
+   * 每份設計最多 500 筆（資料庫的 trigger 擋著），一次查完最省。
+   */
+  const all = await listAllCrmRecords(id);
+  const records = all.filter((record) => record.entity === entity.id);
+
+  const stats = summariseEntity(entity, all);
+  /*
+   * 「今天」在這裡取，不在 `recentActivity` 裡面——
+   * 那支函式要保持純的，測試才寫得出來（見它的檔頭）。
+   */
+  const activity = recentActivity(records, new Date());
 
   return (
     <>
@@ -79,7 +96,11 @@ export default async function CrmRecordsPage({
         </nav>
       ) : null}
 
-      <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
+      <div className="mt-10">
+        <CrmDashboard stats={stats} activity={activity} />
+      </div>
+
+      <div className="border-brand-line mt-12 grid gap-8 border-t pt-10 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
         <RecordForm definitionId={id} entity={entity} />
 
         <section aria-labelledby="crm-records-heading">
