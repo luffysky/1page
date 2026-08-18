@@ -766,104 +766,33 @@ crm_records       owner_id + definition_id + entity + data jsonb
 
 ---
 
-## 🌐 跨專案：upgrade.md 與 SnowRealm-Platform（Luffy 0815 交辦，尚未開工）
+## ✅ 0818 做掉的：跨專案 upgrade.md 與 SnowRealm-Platform
 
-> 這一節是**還沒做**的事，寫在這裡是為了不要靠記憶。
-> 交辦原文見 0815 的對話：「其他專案的整個專案，如果有想到可以升級
-> 優化的地方，放到他們各自的 docs 資料夾，取名 upgrade.md」。
-
-### 為什麼還沒開工
-
-Luffy 明確排過順序：「等現在這個 1page 專案你可以做的待辦都做完，
-再做我剛剛提到的」。1page 這邊的 CR-004 Phase B 到 BJ 為止已經收尾，
-所以這一節現在是**下一個可以開工的東西**。
-
-### 一、各專案的 `docs/upgrade.md`
-
-八個專案，每一個都要**先讀懂它在做什麼再出手**——
-不讀就寫的升級建議會變成一份通用的最佳實踐清單，那種東西沒有人會看。
+八份 `docs/upgrade.md` 全部寫完並各自 commit + push；
+`D:\SnowRealmRebirth\SnowRealm-Platform` 建起來了（本地 git，**remote 待 Luffy 開**）。
 
 ```text
-D:\SnowRealmRebirth\GLACERA
-D:\SnowRealmRebirth\AI\ai_island_v3
-D:\SnowRealmRebirth\md2deck
-D:\SnowRealmRebirth\snowrealm-insight-engine\insight-engine
-D:\SnowRealmRebirth\snowrealm-pet\MaoTravelBlog
-D:\SnowRealmRebirth\SnowRealmSpace
-D:\SnowRealmRebirth\SnowRealmYukiBoard
-D:\SnowRealmRebirth\tammon_crawler_project
+GLACERA                零測試，而金流與庫存的 RPC 就壓在上面
+                       （付款回調本身寫得好：驗簽、for update、冪等、金額比對）
+ai_island_v3           224 個 SQL 沒編號沒 ledger，資料庫重建不出來
+md2deck                「檔案不上傳」這句話目前由 cdnjs 決定成不成立
+                       （6 支 CDN 腳本、0 個 SRI、CSP 被註解掉、DOMPurify 也是 CDN 來的）
+insight-engine         58 張表零 RLS，而 anon key 是 NEXT_PUBLIC_，
+                       且那把 anon client 整個 src 裡零呼叫點
+MaoTravelBlog          RLS「權威檔」涵蓋 185 張表中的 5 張，套用腳本已被刪。
+                       ⚠️ 沒有 GitHub remote，只能提交在本地
+SnowRealmSpace         全專案 0 行 CSP（其餘工程基礎是八個裡最好的）
+SnowRealmYukiBoard     遠端鍵盤全程明文——而他們自己記過，然後那筆記被埋在 179 份文件裡
+tammon_crawler_project 機密都有開發用預設值，忘了設不會有任何症狀
 ```
 
-每一份 `upgrade.md` 至少要能回答：
+**平台那邊最重要的一個發現**：既有的六份規劃（2026-07 實地調查版）
+列的是**七個**產品，而 `GLACERA` 與 `1page` 在六份裡各出現 **0 次**。
+影響不只是補兩列——Z 幣「4 套合一」漏算了 GLACERA 的訂單金流、
+AI Router「5 套」漏算了 1page 的第 6 套。
 
-```text
-1. 這個專案在做什麼、現在到哪裡      不是複述 README，是讀完程式碼之後的判斷
-2. 最該先修的三件事，附理由          「最該先」要說得出為什麼是它而不是別的
-3. 可以從 1page 搬過去的東西         已經驗證過的做法，不是想法
-4. 不建議做的事                      同樣重要。省下的時間才是最實在的升級
-```
-
-**已經知道可以搬過去的（1page 這邊實際驗證過的）**：
-
-```text
-presign 直傳 + XHR 進度          ai_island 的 /api/upload 讓檔案經過自己的
-                                 伺服器，大檔會佔滿 serverless 的記憶體與時間
-「反過來問」型的守衛             不要列「faq 要有元件」，要問「清單裡有沒有
-                                 哪一個沒人實作」。前者每次新增都要記得補
-故意改壞驗守衛                   每加一個守衛就把程式改壞一次。這次又抓到
-                                 兩個我自己寫的假守衛
-稽核腳本要先去掉註解             同一個原因造成過一次假通過、一次假失敗
-表級的接線稽核                   `from("table")` 從來沒出現過 = migration 跑了
-                                 但功能沒做。1page 靠它抓到三張孤兒表
-```
-
-**特別要處理的兩件事**：
-
-- `ai_island_v3` 的後台密路徑 `Ak83QDhUOVqx` 曾經出現在對話裡，要換掉。
-  這件事寫進它的 `upgrade.md`，但**換的動作要 Luffy 自己做**。
-- `MaoTravelBlog` 沒有 GitHub remote，只有本地的 `gitsafe-backup`。
-  其餘七個都有 remote，寫完各自 commit + push。
-
-### 二、`SnowRealm-Platform/docs` 的總體想法
-
-> 「我們是叫 SnowRealm 的品牌，公司名稱叫斯諾瑞姆企業社，
-> SnowRealm-Platform 是我們企業社所有產品入口」
-
-要先讀完 `SnowRealm-Platform` 現有的那幾份文件再寫，不然會變成
-一份與既有規劃打架的第二套方案。
-
-要寫的東西：
-
-```text
-1. SnowRealm 是什麼          一個品牌下的多個產品，還是一個平台上的多個模組？
-                             這個答案決定後面每一件事，包含要不要抽 SDK
-2. 每個專案的定位與關係       哪些是產品、哪些是內部工具、哪些該收掉
-3. 共用入口                  SSO 是第一個，因為它決定「同一個人」怎麼定義。
-                             1page 的 profiles 已經預留 snowrealm_id 欄位
-                             （目前恆為 null，audit 有具名例外）
-4. 該抽成 SDK 的東西          ⚠️ 抽 SDK 的判準是「已經在兩個以上專案裡
-                             各寫過一次、而且寫法一樣」。只寫過一次的東西
-                             抽出來只會變成一個沒有人敢改的套件
-5. 各專案的升級路線與順序     哪些互相依賴、哪些可以並行
-```
-
-**已經看得出來的共用候選**（都在兩個以上專案出現過）：
-
-```text
-自架 GoTrue 的接法            1page 與 SnowRealmSpace 是同一套
-presign 直傳 R2 + 進度        1page / SnowRealmSpace / ai_island 各寫過一次
-設計 token 與 no-hardcoded 守衛  1page 的 tokens.css + 三條測試
-「反過來問」的接線稽核         目前只有 1page 有，但每個專案都需要
-```
-
-⚠️ **SSO 的 cookie 範圍有一個已知的限制**：R2 自訂網域
-（`1page-r2.snowrealm.pet`）與站台（`1page.snowrealm.pet`）同註冊網域。
-若把 auth cookie 設在 `.snowrealm.pet` 範圍，一個惡意 SVG 被直接開啟時
-就讀得到它。目前 Supabase 的 cookie 是 host-only 所以還安全——
-**做 SSO 時這件事會第一個撞上來**，不是之後再說。
-（見 `src/config/media.ts` 的 `SVG_INTENTIONALLY_EXCLUDED` 說明。）
-
----
+以及 SSO 的 R2 網域／cookie 範圍限制，既有規劃還沒寫到，
+而它會在動工時第一個撞上來。
 
 ## ⏳ 被外部卡住 / 需 Luffy 操作
 

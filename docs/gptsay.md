@@ -1,203 +1,312 @@
+我剛直接把現在的 [一頁起家官網](https://1page.snowrealm.pet/) 從頭看到尾。**你的感覺是對的，而且問題不是「不好看」這麼簡單，是產品氣質跑掉了。**
+
 ## 支持性分析
 
-這份判讀我大致同意，而且抓到的幾個點都不是雞毛蒜皮，是**會直接影響正式版架構與轉換率**的東西。
+現在這版其實**功能規格執行得很完整**。
 
-最重要的前三個我會直接列成阻斷項：
+Goal、作品、Template Experience、AI Advisor、Workshop、Services、六級價格、Process 都真的存在，甚至 Template Experience 已經能選模板、風格、主色與裝置。([一頁起家][1])
 
-* **價格階梯斷層**
-* **Template Experience 在首頁消失**
-* **正式版 Preview 必須改成 SiteConfig 驅動，不能 DOM patch**
+所以工程上沒有走歪。
 
-其中價格那刀最該先修。`990 → 30,000` 真的太像搭電梯突然剪斷鋼索。😂
-正式 Funnel 應該完整恢復成：
+但問題恰恰是：
 
-> Free Advisor
-> → Website Workshop 990+
-> → Template Build 8,800+
-> → Semi-Custom 15,800+
-> → Custom 30,000+
-> → Strategy / 專案報價
+> **太忠實地把 Spec 每一項都「畫成一個 Section」了。**
 
-這樣每一層都有自然升級路徑。
+結果整個首頁讀起來變成：
 
-而 **Website / Template Experience** 我也贊成獨立拉出來，不要完全藏在 Agent 裡。首頁應該讓客戶即使**不想聊天**，也能自己：
+**Goals → Work → Template → AI → Philosophy → Services → Pricing → Process → CTA**
 
-> 看 Template → 選產業 → 換 Theme → 看 Desktop / Mobile → 再決定要不要叫 Agent 幫忙。
+這是一份**漂亮的產品規格展示頁**，不是我們最開始想像的那種「看到就覺得這工作室很會做東西」的接案官網。
 
-Agent 應該是「加速理解與操作」，不是模板體驗唯一入口。
+---
 
-至於視覺，我會改掉 Spec 那句：
+# 我覺得真正跑掉的是 4 件事
 
-> HTML 只作功能概念參考，不沿用視覺設計。
+### 1. 「一頁起家」的主角變成 AI Website Builder 了
 
-改成：
+目前首頁最大的體驗量都集中在 Template Experience + AI Website Advisor + Workshop。光 Template Preview 裡甚至已經有完整 About、Services、作品、流程、Testimonials、CTA。([一頁起家][1])
 
-> **V3 Demo 的品牌色彩、暖白／近黑／Rocket Red 與部分版面語言作為正式 Design Token 起點；正式版重新建立 Grid、Typography、Spacing 與 Section Composition，不直接移植 Demo CSS。**
+客戶第一次進來很可能會理解成：
 
-這比較符合現在實際狀況。
+> 「這是一個 AI 做網站的平台？」
 
-換句話說：
+但我們原本談的是：
 
-**保留靈魂，拆掉骨架重蓋。**
+> **一頁起家是一間 AI-native 數位工作室。**
+
+網站只是第一個拳頭產品。
+
+我們明明還要賣：
+
+**Web / Brand / Design / Content / Growth / AI / Automation**
+
+現在後面三條幾乎變成 Services 區四個文字項目。([一頁起家][1])
+
+這個權重完全不對。
+
+---
+
+### 2. 太多東西在「解釋自己」
+
+例如現在首頁有：
+
+> 「Agent 不是唯一入口」
+> 「有邊界的自由對話，不是免費 ChatGPT 分店」
+> 「聊天免費，開始產生成果時收費」
+> 「會用 AI，跟能用 AI 做出產品，是兩回事」 ([一頁起家][1])
+
+單獨看我都同意。
+
+**全部一起放首頁就開始像在答辯。** 😂
+
+客戶甚至還沒質疑我們，就先被我們拉進會議室聽產品哲學。
+
+我們應該讓他先看到：
+
+> 幹，這網站做得好看。
+> 幹，這些作品不錯。
+> 欸，他們還能幫我自己試。
+> 靠，AI 還可以直接協助。
+
+而不是一進門先理解我們 Agent 的商業邊界。
+
+---
+
+### 3. Template Experience 太巨大
+
+這是我現在最想砍的地方。
+
+功能不要砍，**首頁的體積砍掉 60～70%。**
+
+首頁只需要一個超漂亮的：
+
+**Live Website Playground**
+
+左邊可能只有：
+
+`餐廳 / 個人品牌 / 工作室 / SaaS`
+
+右邊一個巨大網站 Preview。
+
+底下：
+
+`換個感覺`　`讓 AI 幫我改`
+
+就夠了。
+
+真正完整的：
+
+* Template selector
+* brand name
+* industry
+* theme
+* accent
+* desktop/tablet/mobile
+* Agent handoff
+
+全部進：
+
+**`/playground` 或 `/templates`**
+
+首頁不是後台。
+
+---
+
+### 4. 缺少「作品轟炸」
+
+現在 Selected Work 只有三個，而且其中兩個還是「一頁起家」和「AI Website Workshop」。([一頁起家][1])
+
+這對接案站很傷。
+
+因為我們最重要的銷售論證應該不是：
+
+> 「我們有一個很完整的 AI 流程。」
+
+而是：
+
+> **「這些東西都是我們做的。」**
+
+就算初期還沒真實客戶，也可以誠實標：
+
+**CONCEPT / DEMO / INTERNAL PRODUCT**
+
+然後把：
+
+網站、Logo、UI、品牌、社群圖、Landing Page、AI Agent、SnowRealm 自家產品……
+
+全部變成作品牆。
+
+這才符合我們「什麼都能接，但設清楚界線」的打法。
 
 ---
 
 ## 對立性視角
 
-不過我會挑戰其中一點：
+我反而覺得 **現在不要再改 Spec 架構了。**
 
-> 「Demo 視覺完成度其實不低，重畫一次成本不划算。」
+Spec 沒錯。
 
-**如果「重畫」是指全部推翻品牌方向，那確實沒必要。**
+錯的是把：
 
-但如果因此演變成：
+> **產品架構 = 首頁資訊架構**
 
-> 「那就沿用這份 HTML CSS 改成 Next。」
+畫了等號。
 
-我會強烈反對。
+這兩個應該拆開。
 
-因為現在已經出現：
+我們真正需要的首頁，我現在會收斂成：
 
-* CSS patch 疊 patch
-* 重複 selector
-* inline style
-* inline event handler
-* DOM manipulation
-* 無完整 token system
-* responsive navigation 缺失
-* accessibility 欠帳
-* 一堆區塊仍然靠 card 解決
+```text
+NAV
 
-這種 prototype 最危險的就是：
+        從第一頁，
+        開始你的生意。
 
-> **「看起來已經 70% 了，不然直接修到正式版。」**
+   一句非常短的定位
 
-然後三週後發現那 70% 是泥巴做的。☠️
+[ 開始一個專案 ]  [ 看作品 ]
 
-所以正式 Next 版我會採：
 
-> **視覺語言沿用，程式實作 100% 重建。**
+──────── 巨型作品 Showcase ────────
 
-不是把 HTML migrate 成 JSX。
+Web / Brand / UI / Content / AI
+作品像 Editorial Magazine 一樣穿插
 
-### 正式 Phase 1 應該先做這幾件事
 
-先定真正的：
+──────── WHAT WE DO ────────
 
-**Design Tokens**
+網站
+品牌與設計
+內容與成長
+AI 與自動化
 
-* color
-* typography
-* spacing
-* radius
-* shadow
-* container
-* breakpoint
-* motion
+不是四張 SaaS Card
+而是四個巨大 Editorial Row
 
-然後做：
 
-**Navbar / Hero / Editorial Section / Portfolio Layout / Template Experience / Agent Workspace / Pricing Ladder / CTA**
+──────── WEBSITE PLAYGROUND ────────
 
-再接資料與 Engine。
+「你的網站，可以先試穿。」
 
-尤其卡片問題我完全同意。正式版要避免：
+       [ 巨大 Live Preview ]
 
-> Section 標題
-> ↓
-> 六張圓角卡
-> ↓
-> Section 標題
-> ↓
-> 四張圓角卡
-> ↓
-> Section 標題
-> ↓
-> 三張圓角卡
+餐飲  品牌  個人  SaaS
 
-那是 SaaS Dashboard 的文法，不是精品工作室。
+       換個感覺 →
+       讓 AI 接手 →
 
-正式版應該交替：
 
-> **大字 Editorial**
->
-> → 滿版作品
->
-> → split layout
->
-> → interactive canvas
->
-> → whitespace
->
-> → pricing table
->
-> → dark CTA block
+──────── SELECTED PROJECTS ────────
 
-節奏才會出來。
+更多作品
 
----
 
-還有他抓到的 **Goal Selector 沒行為** 我很喜歡，因為這其實可以讓首頁開始「活」。
+──────── AI ────────
 
-例如點：
+AI-assisted.
+Human-reviewed.
 
-> **我要一個網站**
+「會用 AI，跟能用 AI 做出產品，
+ 是兩回事。」
 
-頁面可以同步：
+[ 跟 AI 顧問聊聊 ]
 
-1. Selected Work filter → Web
-2. Template Experience → Web templates
-3. Services → Web highlight
-4. Agent CTA → `initialIntent = website`
 
-點：
+──────── HOW WE WORK ────────
 
-> **我要導入 AI**
+01 Understand
+02 Design
+03 Build
+04 Launch
 
-則全部切成 AI / Agent / Automation 案例。
 
-這樣 Goal Selector 就不是六張漂亮墓碑，是整個首頁的**Context Controller**。
+──────── PRICE ────────
 
-這可以正式寫進 Spec。
+8,800+
+15,800+
+30,000+
+
+「不知道選哪個？
+ 不用選，先告訴我們你要做什麼。」
+
+
+──────── 巨型 FINAL CTA ────────
+
+有東西想做？
+
+我們把它做出來。
+
+          開始一個專案 ↗
+```
+
+注意一個很大的變化：
+
+### **990 Workshop 不再是首頁主角。**
+
+它應該是 AI Advisor 裡的 monetization mechanism。
+
+不是品牌首頁的重要產品。
+
+甚至首頁 Pricing 可以只講：
+
+> **網站 NT$8,800 起**
+
+再把完整六級 Product Ladder 放 `/pricing`。
 
 ---
 
-### 我會直接形成一個 V1 修正清單
+而且我會把首頁最前面的 **「你今天想完成什麼？」整段拿掉。**
 
-**P0**
+不是功能刪掉。
 
-* 恢復完整 6 級價格階梯
-* Template Experience 獨立 Section
-* SiteConfig-based Preview
-* Portfolio data-driven
-* Goal Selector 有 context 行為
-* Hero secondary CTA 改回作品
-* Mobile Nav
-* Accessibility 基線
+Goal Context 可以藏進：
 
-**P1**
+* CTA
+* Project Builder
+* AI Advisor
+* Services
+* URL context
 
-* Editorial typography
-* 減少 Card Density
-* Portfolio Filter
-* `/work/[slug]`
-* Agent ↔ Goal ↔ Portfolio ↔ Template context synchronization
+但首頁第一屏後面立刻丟六個選項，會有一種：
 
-**P2**
+> 「歡迎使用 SnowRealm 服務選擇器，請選擇您的職業。」
 
-* Workshop unlock
-* persistence
-* analytics
-* deeper Agent tools
+的味道。🤣
 
-這樣就很清楚。
+我們最初想做的是**工作室品牌**，不是申辦入口。
 
-一句話總結：
+---
 
-> **V3 Demo 已經找到品牌方向，但還不是正式前端的底。**
+### 我現在對一頁起家的定位反而更清楚了
 
-色彩、氣質、商業流程可以留下。
+**第一層：品牌**
 
-CSS、DOM 操作和目前的版面組織，**正式版該砍就砍，不要惜屍。** 😂
+> 一頁起家是一間能把想法真正做出來的數位工作室。
 
-如果現在讓 Claude Code 開工，我會先把這份 review 直接併回 `1page-v1-spec.md`，做成 **V1.1**，避免它照舊 Spec 做出一個「規格正確但轉換斷掉」的版本。
+**第二層：能力**
+
+> Web · Brand · Content · AI
+
+**第三層：差異化**
+
+> AI-native workflow + Human-reviewed delivery
+
+**第四層：產品化能力**
+
+> Template Engine / Website Playground / AI Advisor / Workshop
+
+第四層很強。
+
+但現在的問題是：
+
+> **我們把第四層搬到門口，把第一層擋住了。**
+
+所以你才會覺得「功能明明都有，怎麼就是跟想的不一樣」。
+
+不是錯覺。
+
+**我們做出了一個很完整的產品，卻暫時弄丟了工作室的氣場。**
+
+我會建議 **不要回滾程式，也不要動 Frozen V1.1 的底層 architecture**。直接重新定義 **Homepage Art Direction / Composition**，現有 Template Engine、SiteConfig、Agent、Portfolio Repository 全部留著，只重新編排「客戶第一眼看到什麼」。這一刀會比繼續修 CSS 有效得多。
+
+[1]: https://1page.snowrealm.pet/ "一頁起家｜AI 輔助數位工作室"
