@@ -124,6 +124,7 @@ describe("設計數值只能來自 tokens.css", () => {
       // ImageResponse（Satori）在伺服器端算圖，完全不處理 Tailwind class，
       // 只認 inline style。這不是選擇，是那個渲染器的唯一輸入方式。
       "src/app/icon.tsx": "ImageResponse 只支援 inline style",
+      "src/app/apple-icon.tsx": "ImageResponse 只支援 inline style",
       "src/app/icon-maskable/route.tsx": "ImageResponse 只支援 inline style",
       // 裁切框與模糊區塊的位置是使用者拖出來的百分比，每一幀都在變。
       // 與上傳進度條同一類：CSS 類別表達不了連續變化的值。
@@ -160,6 +161,7 @@ describe("設計數值只能來自 tokens.css", () => {
       "src/components/website-preview/preview-controls.tsx",
       "src/app/%5Fdev/theme/page.tsx",
       "src/app/icon.tsx",
+      "src/app/apple-icon.tsx",
       "src/app/icon-maskable/route.tsx",
       "src/components/editor/image-editor.tsx",
     ];

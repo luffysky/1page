@@ -162,8 +162,20 @@ export default async function CrmRecordsPage({
              *    畫面上就只剩一排值而不知道是誰的——
              *    使用者得往回捲一次才對得起來。
              *    見下面 `sticky left-0` 的說明。
+             *
+             * 3. **`contain:paint` —— 捲動不要漏出去。**
+             *    只有 `overflow-x-auto` 的話，整頁在 390px 下**仍然推得動
+             *    39px**：表格的溢出寬度會傳到 documentElement 上
+             *    （`html.scrollWidth` 429、`body` 390），而把這個 div 改成
+             *    `overflow-x: hidden` 也擋不住——只有 `contain: paint` 擋得住。
+             *
+             *    ⚠️ 這件事本來有一條測試在守，但那條測試是假的：
+             *    它用 `window.scrollTo(9999, 0)` 然後立刻讀 `scrollX`，
+             *    而站台的 `<html>` 有 `scroll-behavior: smooth`——
+             *    捲動是動畫的，讀到的永遠是 0。改成 `behavior: "instant"`
+             *    之後才看見這 39px（0818 收尾稽核）。
              */
-            <div className="border-brand-line overflow-x-auto rounded-lg border">
+            <div className="border-brand-line overflow-x-auto rounded-lg border [contain:paint]">
               <table className="w-full border-collapse">
                 <thead>
                   <tr className="border-brand-line border-b">

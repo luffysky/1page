@@ -623,9 +623,122 @@ Luffy 看完實際畫面後交辦。**卡片網格保留**，橫列變成第二�
 
 ---
 
+## ✅ 0818 收尾稽核：API / DB / UI / RWD / PWA 全面清查
+
+Luffy 交辦「準備收尾，檢查所有 API DB UI RWD PWA 該接的該建的
+是不是都有接好建好」。清查方式是**逐項去問，不是憑印象**——
+而且每一個新加的守衛都故意改壞驗過會紅。
+
+### 抓到六件事，其中兩件是真的壞的
+
+```text
+① adminListUrl              🔴 一個從 2E 就存在的 Server Action：
+                            **沒有呼叫點、沒有驗身分**，而它回傳的是
+                            後台的密路徑。Server Action 是公開端點，
+                            「沒人叫」不代表「叫不到」。已刪除
+② 記錄頁整頁會橫向捲 39px    🔴 表格的溢出寬度會傳到 documentElement
+                            （html.scrollWidth 429、body 390）。
+                            改成 overflow-x: hidden 也擋不住，
+                            只有 contain: paint 擋得住。已修
+③ sitemap 少了四條          /pricing、/playground、/crm、/edit
+                            全都不在 sitemap 裡——CR-006 把首頁最大的
+                            兩塊搬出去，Google 卻找不到那兩頁
+④ 沒有 apple-touch-icon     layout 宣告了 appleWebApp.capable，
+                            而 iOS **不讀 manifest 的 icons**。
+                            使用者「加到主畫面」拿到的是一張網頁截圖
+⑤ 20 張表的 RLS 沒被驗過     27 張表開了 RLS，db 測試只碰過 7 張
+⑥ 六條公開路由沒有斷點檢查   八斷點的橫向溢出只涵蓋 /、/work、
+                            /work/[slug] 與後台。/pricing、/playground、
+                            /crm、/edit、/start、/login 一個都沒驗過
+```
+
+### ⚠️ 兩個假綠燈，其中一個是我自己剛寫的
+
+```text
+scroll-behavior: smooth   `window.scrollTo(9999, 0)` 之後立刻讀 scrollX
+把捲動檢查全部變成假的    永遠是 0——因為捲動是動畫的，還沒捲完。
+                          故意在 /pricing 塞一個 1600px 寬的東西，
+                          八個斷點全綠。改成 behavior: "instant"
+                          之後紅了七個（1920px 那個本來就不該紅）。
+                          CRM 記錄頁那條「整頁不得橫向捲」也是這樣寫的，
+                          於是它從來沒有擋過任何東西——而它要擋的那件事
+                          **當時就已經在發生了**（那 39px）
+
+429 這個數字是真的         之前把 documentElement.scrollWidth = 429
+                          當成「捲動容器灌水」而略過。灌水是真的，
+                          但那一頁**同時**真的溢出 39px。
+                          兩個原因湊在一起，剛好互相掩護
+```
+
+### 新增五個守衛，問法一律是反過來的
+
+```text
+server-action-wiring       每個 action 都有呼叫點、都驗身分。
+（unit）                   例外要具名並寫明「為什麼公開呼叫是安全的」。
+                           順手抓到 addCrmRecordAction 與
+                           importCrmRecordsAction 只在下一層驗身分——
+                           而那個檔案開頭就寫著「身分要在這裡驗」
+
+rls-coverage               去 pg_tables 問有哪些表開了 RLS，逐一敲。
+（db）                     ⚠️ 兩層：匿名讀不讀得到（會被空表騙過），
+                           以及**政策本身有沒有無條件的 true**（不看資料）。
+                           後者是真的守衛——實測在 invoices 上加一條
+                           `using (true)` 會紅
+
+sitemap-coverage           公開路由清單裡有沒有哪一條不在 sitemap，
+（unit）                   以及 sitemap 有沒有收錄 _dev／後台
+
+public-breakpoints         九條公開路由 × 八斷點 = 72 條，
+（e2e）                    判準是「推得動嗎」而不是那個減法
+
+pwa                        manifest 的每一個圖示都真的拿得到、
+（e2e）                    maskable 在、apple-touch-icon 在、
+                           theme-color 與 manifest 一致
+```
+
+### 順手做的兩件整理
+
+```text
+公開路由清單合併成一份     a11y 掃描有清單也有守衛，八斷點截圖另有一份
+                          **沒有守衛的**清單——於是 CR-006 的兩條新路由
+                          進了前者沒進後者，人工視覺 review 從來沒看過。
+                          現在兩邊讀 tests/support/public-routes.ts
+
+後台的溢出判準也換掉       authed-breakpoints 原本用那個減法。
+                          換成同一個「推得動嗎」之後 58 條仍然全過
+```
+
+### 沒有問題的部分（也記下來，免得下次重問）
+
+```text
+migration        16 個檔案，16 個都套用了
+資料庫欄位        166 個，沒有任何一個是程式碼裡從沒出現過的
+API 端點          只有 /api/agent，audit:wiring【9】驗過有呼叫點
+Server Action     42 個，扣掉刪掉的那個之後全部有呼叫點且驗身分
+Service Worker    刻意沒有。作品集與銷售頁不需要離線，
+                  為會變動的行銷網站做離線快取只會讓訪客看到過期內容
+```
+
+---
+
 ## 🔴 真正還沒做（純程式、沒被外部卡）
 
+### ⚖️ 要 Luffy 裁決：匯入的資料要不要跨頁留著
 
+現在 `/crm` 設計器的匯入**只建結構**，資料要等這份設計存起來、
+有了 id 之後，到記錄頁用**同一個檔案再選一次**。
+
+```text
+現在這樣的代價    同一個檔案要選兩次
+做成一次的代價    設計器與記錄頁之間要保住那份已解析的資料。
+                  存 sessionStorage 的話：一份 500 列的 CSV 解析完
+                  是幾百 KB 的 JSON，而 sessionStorage 的上限大約 5MB，
+                  且它要活過「存檔 → 導頁 → 新的 id」這一整段。
+                  中間任何一步失敗，畫面上會是「資料好像匯進去了」
+                  而其實沒有——那比多選一次檔案糟
+```
+
+**沒有自己決定，因為兩邊都說得通。** 要做的話再說一聲。
 
 ### 時間軸不顯示「誰做的」
 

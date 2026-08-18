@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
+import { PUBLIC_ROUTES, unlistedRoutes } from "../support/public-routes";
 import { VIEWPORTS } from "../visual/viewports";
 
 /**
@@ -22,62 +23,15 @@ import { VIEWPORTS } from "../visual/viewports";
 
 const WCAG_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
-/** 公開路由。後台在 authed-breakpoints.spec.ts（需要登入才進得去） */
-const PUBLIC_ROUTES = [
-  { name: "首頁", path: "/" },
-  { name: "作品列表", path: "/work" },
-  { name: "作品詳細", path: "/work/interior-studio" },
-  { name: "登入", path: "/login" },
-  { name: "Project Builder", path: "/start" },
-  { name: "網站編輯器", path: "/edit" },
-  { name: "CRM 設計器", path: "/crm" },
-  { name: "價格", path: "/pricing" },
-  { name: "試穿", path: "/playground" },
-];
-
-/**
- * 這份清單有沒有跟上磁碟。
- *
- * 【8】路由可達性只問「有沒有入口」——`/edit` 有入口，所以它是綠的，
- * 而這份 a11y 清單漏了它，沒有任何東西會說。掃描漏掉一條路由
- * 跟那條路由壞掉一樣嚴重，只是它更安靜。
- *
- * 需要排除的要寫在這裡並附理由，跟其他每一份例外清單一樣。
- */
-const NOT_SCANNED_HERE: Array<[RegExp, string]> = [
-  [/^\/admin(\/|$)/, "後台在 authed-breakpoints.spec.ts（需要登入）"],
-  [/^\/account(\/|$)/, "會員中心需要登入，同上"],
-  [/^\/_dev(\/|$)/, "開發用頁面"],
-  [/^\/api(\/|$)/, "不是頁面"],
-  [/^\/icon-maskable$/, "不是頁面"],
-  [/^\/work\/\[slug\]$/, "動態路由，已用 interior-studio 這個實例掃過"],
-];
-
-test("這份清單沒有漏掉任何一條公開頁面", async () => {
-  const { readdirSync } = await import("node:fs");
-
-  const found: string[] = [];
-  const walk = (dir: string, urlPath: string) => {
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      const next = `${dir}/${entry.name}`;
-      if (entry.isDirectory()) {
-        const segment = /^[(@]/.test(entry.name) ? "" : `/${decodeURIComponent(entry.name)}`;
-        walk(next, `${urlPath}${segment}`);
-      } else if (/^(page|route)\.tsx?$/.test(entry.name)) {
-        found.push(urlPath === "" ? "/" : urlPath);
-      }
-    }
-  };
-  walk("src/app", "");
-
-  const scanned = new Set(PUBLIC_ROUTES.map((route) => route.path));
-  const missing = found.filter(
-    (route) => !scanned.has(route) && !NOT_SCANNED_HERE.some(([pattern]) => pattern.test(route)),
-  );
-
+test("這份清單沒有漏掉任何一條公開頁面", () => {
+  /*
+   * 清單與排除規則都在 `tests/support/public-routes.ts`——
+   * 八斷點截圖用的是同一份。兩份各自維護的時候，CR-006 新增的
+   * /pricing 與 /playground 進了這裡、沒進截圖那一份。
+   */
   expect(
-    missing,
-    "這些公開路由沒有被 a11y 掃描到。要嘛加進 PUBLIC_ROUTES，要嘛加進 NOT_SCANNED_HERE 並寫理由",
+    unlistedRoutes(),
+    "這些公開路由沒有被掃描到。要嘛加進 PUBLIC_ROUTES，要嘛加進 NOT_PUBLIC 並寫理由",
   ).toEqual([]);
 });
 

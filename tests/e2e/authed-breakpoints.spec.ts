@@ -53,10 +53,29 @@ async function scan(page: Page) {
     }));
 }
 
+/**
+ * 橫向溢出：**推得動嗎**，不是 `scrollWidth - clientWidth`。
+ *
+ * ⚠️ 兩件事都踩過：
+ *
+ *   1. 那個減法會被頁面裡自己有捲軸的容器灌水（CRM 記錄頁的表格
+ *      在 390px 的視窗量出 429），於是它會在一個沒發生的問題上紅。
+ *   2. 但「推推看」也不能直接寫 `window.scrollTo(9999, 0)`——
+ *      站台的 `<html>` 有 `scroll-behavior: smooth`，捲動是動畫的，
+ *      下一行讀到的 `scrollX` 永遠是 0。一個永遠量到 0 的檢查永遠不會紅。
+ *      （0818 收尾稽核：故意在 /pricing 塞一個 1600px 寬的東西，
+ *      用那個寫法全綠；改成 `behavior: "instant"` 之後 8 個斷點紅了 7 個。）
+ *
+ * `tests/e2e/public-breakpoints.spec.ts` 用的是同一個判準。
+ */
 async function horizontalOverflow(page: Page) {
-  return page.evaluate(
-    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-  );
+  return page.evaluate(() => {
+    const y = window.scrollY;
+    window.scrollTo({ left: 9999, top: y, behavior: "instant" });
+    const moved = window.scrollX;
+    window.scrollTo({ left: 0, top: y, behavior: "instant" });
+    return moved;
+  });
 }
 
 async function signIn(page: Page) {

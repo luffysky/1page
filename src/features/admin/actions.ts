@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { toAdminUrl } from "@/config/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 import { getAdminIdentity } from "./auth";
@@ -427,9 +426,4 @@ export async function deleteProject(id: string): Promise<ActionResult> {
 
   revalidateAll(data?.slug);
   return { ok: true };
-}
-
-/** 供表單存檔後導回列表 */
-export async function adminListUrl(): Promise<string> {
-  return toAdminUrl("/admin/portfolio");
 }

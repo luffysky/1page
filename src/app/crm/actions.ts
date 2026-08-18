@@ -77,6 +77,17 @@ export async function addCrmRecordAction(
   _previous: unknown,
   formData: FormData,
 ): Promise<CrmRecordResult> {
+  /*
+   * ⚠️ 身分在**這裡**驗，即使 `addCrmRecord` 底下也會驗一次。
+   *
+   * 這一段本來只靠底層那一次——0818 收尾稽核時
+   * `tests/unit/server-action-wiring.test.ts` 抓到它：
+   * 檔案開頭寫著「身分要在這裡驗」，而這個 action 沒有。
+   * 註解與程式不一致的時候，會過期的是註解。
+   */
+  const identity = await getMemberIdentity();
+  if (!identity) return { ok: false, message: "要先登入才能存記錄。" };
+
   const definitionId = String(formData.get("definitionId") ?? "");
   const entityId = String(formData.get("entity") ?? "");
 
@@ -132,6 +143,9 @@ export async function importCrmRecordsAction(
   _previous: unknown,
   formData: FormData,
 ): Promise<CrmImportResult> {
+  const identity = await getMemberIdentity();
+  if (!identity) return { ok: false, message: "要先登入才能匯入。" };
+
   const definitionId = String(formData.get("definitionId") ?? "");
   const entityId = String(formData.get("entity") ?? "");
   if (!definitionId || !entityId) return { ok: false, message: "參數不正確。" };

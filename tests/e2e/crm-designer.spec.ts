@@ -418,16 +418,21 @@ test("表格橫向捲動時，外框不動、第一欄釘住", async ({ page }) 
    * `documentElement.scrollWidth - clientWidth`。
    *
    * 站上別處的斷點測試都用那個減法，而它們的頁面沒有捲動容器。
-   * 這一頁有——實測 `documentElement.scrollWidth` 會被容器裡的內容
-   * 灌水（390 的視窗量出 429），而 `window.scrollX` 推到 9999 之後
-   * 仍然是 0：整頁根本捲不動。
+   * 這一頁有——`documentElement.scrollWidth` 會被容器裡的內容灌水
+   * （390 的視窗量出 429）。
    *
-   * 用那個減法的話，這一條會在一個**沒有發生的問題**上永遠紅著。
+   * ⚠️ 一定要 `behavior: "instant"`。
+   *
+   * 第一版寫的是 `window.scrollTo(9999, 0)`，而站台的 `<html>` 上有
+   * `scroll-behavior: smooth`——捲動是動畫的，下一行讀到的 scrollX
+   * 永遠是 0。當時把那個 0 當成「整頁捲不動」的證據，實際上它只是
+   * 「還沒捲完」。一個永遠量到 0 的檢查永遠不會紅，而那個 429
+   * 其實是真的在講一件事。
    */
   const scrolledX = await page.evaluate(() => {
-    window.scrollTo(9999, 0);
+    window.scrollTo({ left: 9999, top: 0, behavior: "instant" });
     const x = window.scrollX;
-    window.scrollTo(0, 0);
+    window.scrollTo({ left: 0, top: 0, behavior: "instant" });
     return x;
   });
   expect(scrolledX, "表格的捲動外溢到整頁——整頁被推得動了").toBe(0);

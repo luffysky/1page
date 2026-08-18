@@ -33,6 +33,21 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: absoluteUrl("/work"), changeFrequency: "weekly", priority: 0.8 },
     // Project Builder（Spec §30）。轉換頁，優先度僅次於首頁。
     { url: absoluteUrl("/start"), changeFrequency: "monthly", priority: 0.9 },
+    /*
+     * ⚠️ CR-006 與 CR-003-5 新增的四條，0818 收尾稽核才補進來。
+     *
+     * 白名單比黑名單不容易漏——這句話只在**有人記得加**的時候成立。
+     * `/pricing` 是完整的六級價格、`/playground` 是完整試穿，
+     * 兩條都是首頁瘦身時搬出去的主要內容，而它們在 sitemap 裡
+     * 缺席了整整一段時間，沒有任何東西會說。
+     *
+     * 現在 `tests/unit/sitemap-coverage.test.ts` 會問反過來的問題：
+     * 公開路由清單裡有沒有哪一條不在 sitemap、也沒寫明為什麼不收錄。
+     */
+    { url: absoluteUrl("/pricing"), changeFrequency: "monthly", priority: 0.9 },
+    { url: absoluteUrl("/playground"), changeFrequency: "monthly", priority: 0.7 },
+    { url: absoluteUrl("/crm"), changeFrequency: "monthly", priority: 0.7 },
+    { url: absoluteUrl("/edit"), changeFrequency: "monthly", priority: 0.6 },
     ...projects.map((project) => ({
       url: absoluteUrl(project.href),
       changeFrequency: "monthly" as const,
