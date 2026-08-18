@@ -356,7 +356,67 @@ repository、action、勾選框與 e2e，而待辦上還寫著「還沒做」。
 
 ---
 
+## ✅ 0818 傍晚：首頁 IA 重新編排（CR-005）
+
+依 `docs/gptsay.md` 對線上站的資訊架構評論。**規格升到 V1.5**，
+CR 紀錄在 §47。
+
+```text
+Services 由第 8 位提到第 5 位      「我們能做什麼」是工作室官網的核心論證，
+                                  卻排在 AI 哲學後面
+Template Experience 降到第 6 位    它是首頁體積最大的一塊
+Process 與 Pricing 對調            先講多少錢再講怎麼做，順序反了
+```
+
+### 這次沒採納的兩項（都要先寫程式，見下面「真正還沒做」）
+
+```text
+把 Goal Selector 移出首頁    ⚠️ 它是 work / services / template / advisor
+                            四塊的 context controller，而 setGoal
+                            **只有一個呼叫點**就在它裡面。移出去或關掉
+                            之前要先把那個動作接到別的地方，
+                            否則整個目標情境只剩 ?goal= 觸發得了
+Template Experience 縮小     需要精簡版區塊 + /playground 或 /templates
+```
+
+### 三件過程中發現的事
+
+```text
+1. 順序寫在資料庫活不過 e2e
+   BJ-2 的版面編輯器可以把順序存成 cms_documents 的一列，但
+   admin-layout.spec.ts 的收尾測試會「排回預設並存檔」，
+   而 e2e 打的是同一個資料庫——跑一次 pnpm e2e 就把線上首頁重設了。
+   所以產品的預設編排屬於程式碼與規格，資料庫那一列是臨時調整用的。
+
+2. kicker 的編號是寫死的
+   「01 / Goals」…「07 / Process」在 home-copy.ts 裡。順序一動就全亂，
+   而後台的排序是已上線的功能——使用者拖一次就會看到「作品之後是
+   05 / SERVICES」。這次手動改對了，但真正的修法見下面。
+
+3. ⚠️ 我自己寫了一個假守衛，靠「故意改壞」抓到
+   homepage.spec.ts 的「IA 順序與 Spec §4 一致」原本把預期順序
+   從 HOME_BLOCKS 算出來——而頁面也從 HOME_BLOCKS 渲染，
+   兩邊一起動，調換順序它照樣綠。那是套套邏輯。
+   拆成兩條：e2e 驗「首頁照著 HOME_BLOCKS 渲染」（擋 JSX 寫死順序），
+   新的單元測試驗「HOME_BLOCKS 與 Spec §4 一致」（擋程式與規格分岔）。
+   後者兩個方向都故意改壞驗過會紅。
+```
+
+---
+
 ## 🔴 真正還沒做（純程式、沒被外部卡）
+
+### 首頁區塊的編號應該由版面位置算出來
+
+`home-copy.ts` 的 kicker 寫死「01 / Goals」…「07 / Product Ladder」，
+而 BJ-2 讓順序變成**後台可排的**。兩者放在一起，等於保證會對不上。
+
+正確做法是由 `page.tsx` 依 `blocks` 的位置算出號碼再傳下去，
+kicker 本身只留名字。要動到每一個 section 元件的 props，所以列在這裡。
+
+在那之前：**改順序時 `home-copy.ts` 要跟著改**（檔案裡有警告）。
+
+
 
 ### 時間軸不顯示「誰做的」
 

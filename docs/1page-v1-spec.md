@@ -15,6 +15,7 @@
 
 > V1.2 變更（CR-001）：物件儲存由 Supabase Storage 改為 Cloudflare R2，影響 §1、§8.9、§36。
 > V1.3 變更（CR-002）：開放公開註冊，新增會員帳號與帳號內聯繫功能，影響 §37、§38、§40。
+> V1.5 變更（CR-005）：首頁 IA 重新編排（Services 提前、Template 降位、Process/Pricing 對調），影響 §4。
 > V1.4 變更（CR-003）：解禁 Widget 可拖曳編輯與擴充 Block，新增 AI 客服體驗 Widget，免費／付費的線改畫在「存檔」而非「編輯」，影響 §22、§23、§36、§40。
 >
 > V1.1 變更：§3 視覺沿用政策、§4 IA 補回 Template Experience、§6 Goal Selector 升級為 Context Controller、新增 §8.15 Template Experience Section、§26 補上呈現形式約束、新增 §45 Demo 偏離清單。詳見 §46 Changelog。
@@ -289,9 +290,11 @@ Navbar
 ↓
 Hero
 ↓
-Goal Selector
+Goal Selector                   ← 必須在它控制的四塊之前（見下方約束）
 ↓
 Selected Work / Portfolio
+↓
+Services
 ↓
 Website / Template Experience   ← 獨立 Section，不得併入 Agent
 ↓
@@ -299,18 +302,30 @@ AI Website Advisor
 ↓
 AI Philosophy
 ↓
-Services
+Process
 ↓
 Pricing
-↓
-Process
 ↓
 Final CTA
 ↓
 Footer
 ```
 
+> **V1.5（CR-005）調整**：Services 由第 8 位提到第 5 位、Template Experience
+> 由第 5 位降到第 6 位、Process 與 Pricing 對調。原因見 §47 CR-005。
+
 作品集應在首頁較前面出現，因為它是陌生客戶建立信任的重要證據。
+
+**Goal Selector 必須排在 Selected Work / Services / Template Experience /
+AI Website Advisor 之前，而且不得關閉。**
+
+它是這四塊的 context controller（§6.1），而設定目標的唯一入口就在它裡面。
+排到那四塊後面的話，訪客選了目標之後改變的是他已經捲過去的內容；
+關掉的話，整個目標情境只剩 `?goal=` 的網址參數觸發得了——
+等於一個做好了卻沒有入口的功能（§40 反覆出現的那種毛病）。
+
+要把它移出首頁，必須先把設定目標的動作接到別的地方
+（Final CTA／Project Builder／AI Advisor 其中之一）。那是一次獨立的變更。
 
 **Template Experience 必須是獨立 Section，不可只存在於 Agent 面板內。**
 
@@ -2443,6 +2458,51 @@ P0 與 P1 的區分依據是**「不先做會不會造成重寫」**，不是重
 
 封版後的規格變更一律記錄於此。流程見文件開頭：
 發現問題 → 停止該項實作 → 提 CR → 人工裁決 → 升版本 → 恢復實作。
+
+## CR-005 — 首頁 IA 重新編排
+
+| 項目 | 內容 |
+|---|---|
+| 日期 | 2026-08-18 |
+| 影響章節 | §4 |
+| 原規格 | Hero → Goals → Work → Template → Advisor → Philosophy → Services → Pricing → Process → CTA |
+| 變更為 | Hero → Goals → Work → **Services** → Template → Advisor → Philosophy → **Process → Pricing** → CTA |
+| 裁決 | Luffy 裁決採用 |
+| 版本 | V1.4 → V1.5 |
+
+**動機**：`docs/gptsay.md` 對線上站的資訊架構評論——
+「太忠實地把 Spec 每一項都畫成一個 Section」，結果首頁讀起來是一份
+產品規格展示頁，而不是一間工作室的官網。三個具體的點：
+
+```text
+Template Experience 太巨大   它是首頁上體積最大的一塊，而且排在第 5 位。
+                             體積問題要改程式（精簡版 + /playground），
+                             位置問題這次先解決
+服務被埋在第 8 位             「我們能做什麼」是工作室官網的核心論證，
+                             卻排在 AI 哲學後面
+價格在流程之前               先講多少錢再講怎麼做，順序反了
+```
+
+### 這次**沒有**採納的兩項（都要先寫程式）
+
+```text
+把 Goal Selector 移出首頁     它是四個區塊的 context controller，
+                             而 setGoal 只有一個呼叫點就在它裡面。
+                             移出去之前要先把那個動作接到別的地方，
+                             否則整個目標情境只剩網址參數觸發得了
+Template Experience 縮小 60%  需要一個精簡版區塊，加上 /playground
+                             或 /templates 承接完整控制項。兩條路由都還不存在
+```
+
+### 為什麼改的是 §4 而不是只在後台排一次
+
+BJ-2 的版面編輯器可以把順序存成 `cms_documents` 的一列。但那一列
+**活不過 e2e**——`admin-layout.spec.ts` 的收尾測試會把版面排回預設並存檔，
+而 e2e 打的是同一個資料庫。也就是說跑一次 `pnpm e2e` 就會把線上首頁重設。
+
+所以「產品的預設編排」屬於程式碼與規格，資料庫那一列是給臨時調整用的。
+
+---
 
 ## CR-003 — Widget 編輯器、擴充 Block、AI 客服體驗
 

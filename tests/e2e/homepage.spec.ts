@@ -1,5 +1,8 @@
 import { expect, test } from "@playwright/test";
 
+import { SECTION_COPY } from "@/config/home-copy";
+import { homeBlockIds } from "@/features/cms/page-layout";
+
 /**
  * 1D 的 Gate 第 5 項行為驗證。
  *
@@ -8,29 +11,42 @@ import { expect, test } from "@playwright/test";
  * 也是最容易做成「有選但沒反應」的地方。
  */
 
-test("IA 順序與 Spec §4 一致", async ({ page }) => {
+test("首頁照著 HOME_BLOCKS 的順序渲染", async ({ page }) => {
   await page.goto("/");
 
   const headings = await page.locator("main h1, main h2").allTextContents();
   const flat = headings.join(" | ");
 
-  const expectedOrder = [
-    "從第一頁",
-    "你今天想完成什麼",
-    "不只說我們會做",
-    "自己先試穿",
-    "先聊需求",
-    "會用 AI",
-    "需要的是成果",
-    "先試，再決定",
-    "合作流程",
-    "你不需要",
-  ];
+  /*
+   * ⚠️ 預期順序**從程式碼算出來**，不寫死。
+   *
+   * 前一版把十段標題的文字與順序都寫死在這裡。結果是 0818 依 CR-005
+   * 調整 §4 的 IA 之後，這一條紅了——而它紅的原因不是首頁壞了，
+   * 是這份清單過期了。
+   *
+   * ⚠️ **但這一條驗的不是「與規格一致」**，它驗的是
+   * 「page.tsx 有沒有照著版面資料渲染」。
+   *
+   * 預期值與頁面都來自 HOME_BLOCKS，所以調換 HOME_BLOCKS 的順序時
+   * 兩邊一起動——這條測試不會紅（0818 實測過）。那不是缺陷，
+   * 是它的職責範圍：它擋的是「有人把 JSX 的順序寫死回去」。
+   *
+   * **程式碼與 §4 之間**的一致由 `page-layout.test.ts` 的
+   * 「HOME_BLOCKS 與 Spec §4 的 IA 一致」守著，那一條改壞會紅。
+   *
+   * hero 與 final-cta 不在 SECTION_COPY 裡（它們有自己的文案常數），
+   * 而且它們鎖在頭尾——不列進來不影響這條測試要證明的事。
+   */
+  const expectedOrder = homeBlockIds()
+    .filter((id): id is keyof typeof SECTION_COPY => id in SECTION_COPY)
+    .map((id) => SECTION_COPY[id].title);
+
+  expect(expectedOrder.length, "算不出任何一段標題，後面的比對沒有意義").toBeGreaterThan(5);
 
   let cursor = -1;
-  for (const fragment of expectedOrder) {
-    const index = flat.indexOf(fragment);
-    expect(index, `找不到或順序錯誤：${fragment}`).toBeGreaterThan(cursor);
+  for (const title of expectedOrder) {
+    const index = flat.indexOf(title);
+    expect(index, `找不到或順序錯誤：${title}`).toBeGreaterThan(cursor);
     cursor = index;
   }
 });

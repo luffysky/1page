@@ -45,19 +45,33 @@ import { sectionBackgroundSchema, type SectionBackground } from "@/features/webs
  * 首頁上可以排的區塊。
  *
  * ⚠️ 順序就是預設順序，而且它必須與 Spec §4 的 IA 一致。
+ * **改這裡就是改 §4，要走 §47 的 Change Request**（CR-005 就是這樣來的）。
  * `page-layout.test.ts` 會反過來問：`app/page.tsx` 有沒有渲染
  * 這裡沒有列到的區塊，或列了卻沒有渲染的。
  */
 export const HOME_BLOCKS = [
   { id: "hero", label: "首屏", locked: true },
+  /*
+   * ⚠️ goals 必須排在 work / services / template / advisor **之前**。
+   *
+   * 它是那四塊的 context controller（`useHomeGoal`），而 `setGoal`
+   * 只有一個呼叫點就在這一塊裡面。把它排到那四塊後面的話，
+   * 使用者選了目標之後，會變的是他已經捲過去的內容——
+   * 而畫面上不會有任何提示。
+   *
+   * 也因此**它不能被關掉**（雖然沒有標 locked）：關掉之後
+   * 整套目標選擇只剩 `?goal=` 的網址觸發得了，而那等於沒有入口。
+   * 要拿掉它，得先把 setGoal 接到別的地方（CTA / Project Builder /
+   * AI 顧問其中之一）——那是程式工作，不是排版工作。
+   */
   { id: "goals", label: "你今天想完成什麼" },
   { id: "work", label: "精選作品" },
+  { id: "services", label: "服務項目" },
   { id: "template", label: "自己試穿" },
   { id: "advisor", label: "AI 顧問" },
   { id: "philosophy", label: "我們怎麼看 AI" },
-  { id: "services", label: "服務項目" },
-  { id: "pricing", label: "價格" },
   { id: "process", label: "合作流程" },
+  { id: "pricing", label: "價格" },
   { id: "final-cta", label: "最後那一段", locked: true },
 ] as const;
 

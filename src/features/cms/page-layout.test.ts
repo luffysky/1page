@@ -223,3 +223,65 @@ describe("schema 與輔助函式", () => {
     expect(backgroundOf(blocks, "goals")).toBeUndefined();
   });
 });
+
+describe("HOME_BLOCKS 與 Spec §4 的 IA 一致", () => {
+  /*
+   * ── 為什麼這條要跟規格比，而不是跟自己比 ──────────────────────
+   *
+   * `homepage.spec.ts` 有一條叫「IA 順序與 Spec §4 一致」，
+   * 而它的預期順序是**從 HOME_BLOCKS 算出來的**——頁面也從
+   * HOME_BLOCKS 渲染，所以兩邊一起動，那條測試永遠不可能紅。
+   * 0818 把 HOME_BLOCKS 的順序調換去驗它，它照樣綠。
+   *
+   * 那是套套邏輯，不是守衛。真正要釘住的是**程式碼與規格之間**：
+   * `page-layout.ts` 的檔頭寫著「改這裡就是改 §4，要走 §47 的 CR」，
+   * 而這條測試就是那句話的執行者。
+   *
+   * 少了它，有人改順序卻沒改規格時，唯一的後果是規格悄悄變成假的——
+   * 而規格是這個專案唯一的來源。
+   */
+  const SPEC = readFileSync("docs/1page-v1-spec.md", "utf8");
+
+  /** §4 的 IA 用的是人看的名字，這裡是它與 block id 的對照 */
+  const SPEC_NAME_TO_ID: Array<[string, string]> = [
+    ["Hero", "hero"],
+    ["Goal Selector", "goals"],
+    ["Selected Work / Portfolio", "work"],
+    ["Services", "services"],
+    ["Website / Template Experience", "template"],
+    ["AI Website Advisor", "advisor"],
+    ["AI Philosophy", "philosophy"],
+    ["Process", "process"],
+    ["Pricing", "pricing"],
+    ["Final CTA", "final-cta"],
+  ];
+
+  it("§4 的區塊順序與 HOME_BLOCKS 相同", () => {
+    const section = SPEC.slice(SPEC.indexOf("# 4. Homepage IA"));
+    const open = section.indexOf("```text");
+    const ia = section.slice(open, section.indexOf("```", open + 7));
+
+    /*
+     * 依「在 §4 那段文字裡出現的位置」排序。
+     * ⚠️ Navbar / Footer 不是可排的區塊，不列進對照表。
+     */
+    const fromSpec = SPEC_NAME_TO_ID.map(([name, id]) => {
+      const at = ia.indexOf(name);
+      expect(at, `§4 的 IA 裡找不到「${name}」——規格改了但這份對照表沒跟上`).toBeGreaterThan(-1);
+      return { id, at };
+    })
+      .sort((a, b) => a.at - b.at)
+      .map((entry) => entry.id);
+
+    expect(
+      homeBlockIds(),
+      "HOME_BLOCKS 與 Spec §4 的 IA 不一致。改順序要同時走 §47 的 Change Request",
+    ).toEqual(fromSpec);
+  });
+
+  it("對照表涵蓋每一個 block，沒有漏掉的", () => {
+    // 反過來問：新增區塊時，有沒有人忘了把它寫進 §4。
+    // 逐一列「services 要在對照表裡」的話，下次加新區塊又要記得補
+    expect([...SPEC_NAME_TO_ID.map(([, id]) => id)].sort()).toEqual([...homeBlockIds()].sort());
+  });
+});

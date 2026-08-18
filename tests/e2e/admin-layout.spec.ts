@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { HOME_BLOCKS } from "@/features/cms/page-layout";
+
 import { createMember, deleteMember, sql } from "./helpers/member";
 
 /**
@@ -56,13 +58,20 @@ const editorOrder = (page: Page) =>
     .getByRole("group")
     .evaluateAll((els) => els.map((el) => el.getAttribute("aria-label")?.split("（")[0] ?? ""));
 
+/**
+ * 編輯器顯示的是標籤（「價格」），首頁上的是 id（`pricing`）。
+ * 對照表**從程式碼算出來**，不寫死——寫死的話新增區塊時它會安靜地漏掉那一塊。
+ */
+const idOfLabel = (label: string): string | undefined =>
+  HOME_BLOCKS.find((block) => block.label === label)?.id;
+
 /** 首頁上那幾個錨點的實際順序。這是「真的變了嗎」的唯一證據 */
 const homeAnchors = (page: Page) =>
   page
     .locator("main [id]")
     .evaluateAll((els) => els.map((el) => el.id).filter((id) => id.length > 0));
 
-test("用鍵盤把價格搬到服務前面，首頁真的照著換了順序", async ({ page }) => {
+test("用鍵盤搬一塊，首頁真的照著編輯器的順序排", async ({ page }) => {
   await openLayout(page);
 
   const before = await editorOrder(page);
@@ -85,10 +94,39 @@ test("用鍵盤把價格搬到服務前面，首頁真的照著換了順序", as
   await page.goto("/");
   const anchors = await homeAnchors(page);
 
+  /*
+   * ⚠️ 斷言的是「首頁的順序 == 編輯器的順序」，不是
+   * 「pricing 跑到 services 前面了」。
+   *
+   * 前一版釘的是後者，而那句話只在**預設順序剛好是
+   * services→pricing 相鄰**的時候才成立。0818 依 docs/gptsay.md
+   * 的資訊架構批評把 services 提前之後，這一條就紅了——
+   * 而它紅的原因與它的名字（「首頁真的照著換了順序」）無關。
+   *
+   * 這是這個專案記過很多次的那件事：**斷言要釘不會過期的事實**。
+   * 「首頁照著編輯器排」永遠成立；「pricing 在 services 前面」
+   * 下一次改版面就不成立了。
+   *
+   * 只比對兩邊都有的那幾塊——有些區塊（goals / template /
+   * philosophy）在首頁上沒有 id 錨點。
+   */
+  const editorIds = after
+    .map((label) => idOfLabel(label))
+    .filter((id): id is string => Boolean(id));
+  const shared = editorIds.filter((id) => anchors.includes(id));
+
+  expect(shared.length, "首頁上找不到任何一個編輯器裡的區塊，後面的比對沒有意義").toBeGreaterThan(
+    2,
+  );
+
   expect(
-    anchors.indexOf("pricing"),
-    "後台排好了，首頁卻沒有跟著換——版面資料沒有任何讀取端",
-  ).toBeLessThan(anchors.indexOf("services"));
+    anchors.filter((id) => shared.includes(id)),
+    "後台排好了，首頁卻沒有照著排——版面資料沒有任何讀取端",
+  ).toEqual(shared);
+
+  // 而且「往上移」真的往上了：在共用的那幾塊裡，pricing 的位置比之前前面
+  const beforeIds = before.map((label) => idOfLabel(label)).filter((id) => shared.includes(id!));
+  expect(shared.indexOf("pricing")).toBeLessThan(beforeIds.indexOf("pricing"));
 });
 
 test("拖曳與鍵盤得到一樣的結果", async ({ page }) => {
