@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import { startingDefinition } from "./ops";
 import { type CrmEntity } from "./schema";
-import { recentActivity, summariseEntity, summariseField } from "./stats";
+import {
+  headlineStats,
+  MIN_RECORDS_FOR_CHARTS,
+  recentActivity,
+  summariseEntity,
+  summariseField,
+} from "./stats";
 
 /**
  * CRM Dashboard 的統計（CR-003-5）
@@ -155,5 +161,54 @@ describe("最近的活動", () => {
 
     expect(days).toHaveLength(3);
     expect(days.every((day) => day.count === 0)).toBe(true);
+  });
+});
+
+describe("頂部的三個數字", () => {
+  const today = new Date("2026-08-18T10:00:00Z");
+
+  const records = [
+    { entity: "thing-1", createdAt: "2026-08-18T00:00:00Z", data: { status: "還在談" } },
+    { entity: "thing-1", createdAt: "2026-08-17T00:00:00Z", data: { status: "還在談" } },
+    { entity: "thing-1", createdAt: "2026-01-01T00:00:00Z", data: { status: "已成交" } },
+    { entity: "別的類", createdAt: "2026-08-18T00:00:00Z", data: { status: "還在談" } },
+  ];
+
+  it("本週只算七天內、而且是這一類的", () => {
+    // 混進別類的話，數字會比清單上看到的多——而他不會知道多的是什麼
+    const headline = headlineStats(summariseEntity(entity, records), records, today);
+
+    expect(headline.total).toBe(3);
+    expect(headline.thisWeek).toBe(2);
+  });
+
+  it("最常見的那個從 select 算出來", () => {
+    const headline = headlineStats(summariseEntity(entity, records), records, today);
+
+    expect(headline.top).toEqual({ fieldLabel: "狀態", label: "還在談", count: 2 });
+  });
+
+  it("⚠️ 沒有 select 欄位時不給「最常見的」，而不是拿文字欄位湊", () => {
+    /*
+     * 文字欄位的「最多」幾乎一定是 1，那不是洞察是雜訊。
+     * 硬湊一個出來，畫面上會出現「最常見的名字：阿明（1）」——
+     * 看起來像分析，實際上什麼都沒說。
+     */
+    const noSelect: CrmEntity = {
+      ...entity,
+      fields: entity.fields.filter((f) => f.type !== "select"),
+    };
+    const rows = [{ entity: "thing-1", createdAt: "2026-08-18T00:00:00Z", data: { name: "阿明" } }];
+
+    expect(headlineStats(summariseEntity(noSelect, rows), rows, today).top).toBeUndefined();
+  });
+
+  it("有 select 但沒有人選過時也不給", () => {
+    const rows = [{ entity: "thing-1", createdAt: "2026-08-18T00:00:00Z", data: { name: "阿明" } }];
+    expect(headlineStats(summariseEntity(entity, rows), rows, today).top).toBeUndefined();
+  });
+
+  it("門檻是 3——兩筆只能是 50/50 或 100/0，看不出比例", () => {
+    expect(MIN_RECORDS_FOR_CHARTS).toBe(3);
   });
 });

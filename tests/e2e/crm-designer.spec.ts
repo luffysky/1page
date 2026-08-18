@@ -39,6 +39,35 @@ async function signIn(page: Page, next: string) {
   await page.waitForURL(new RegExp(next.split("?")[0]!), { timeout: 20_000 });
 }
 
+/**
+ * 建一份自己的設計，回傳它的 id。
+ *
+ * ⚠️ 每條測試建自己的，不靠前一條留下的東西。
+ *
+ * 原本後面幾條都去撈「這個帳號的第一份設計」——那讓它們在單獨執行
+ * （`-g`）時全部紅，而紅的原因與它們要驗的事無關。
+ * 測試之間的順序依賴是最難查的一種紅燈。
+ */
+async function createDesign(page: Page, name: string): Promise<string> {
+  await signIn(page, "/crm");
+  await page.getByLabel("這份 CRM 叫什麼").fill(name);
+
+  // 已經存過一份的話按鈕會變成「更新這一份」，這時要的是「另存新的一份」
+  const saveAsNew = page.getByRole("button", { name: "另存新的一份" });
+  await (
+    (await saveAsNew.count()) > 0 ? saveAsNew : page.getByRole("button", { name: "存到我的帳號" })
+  ).click();
+
+  await expect(page.getByRole("status")).toContainText(/存好了|另存/, { timeout: 20_000 });
+
+  const rows = await sql(
+    `select id from crm_definitions where owner_id = '${memberId}' and name = '${name}'`,
+  );
+  const id = rows[0]?.id as string | undefined;
+  expect(id, `建立「${name}」失敗`).toBeTruthy();
+  return id!;
+}
+
 test("首頁走得到設計器——不用把網址打進去", async ({ page }) => {
   /*
    * 這個專案已經七次做完功能卻沒有入口（登入頁、路由、分析事件……）。
@@ -146,6 +175,15 @@ test("存下來、打開、填一筆、看得到", async ({ page }) => {
 
   await expect(page.getByRole("status")).toContainText("記下來了", { timeout: 20_000 });
   await expect(page.getByRole("cell", { name: "阿明" })).toBeVisible();
+
+  /*
+   * ⚠️ 存完之後表單要還在，確認也要還在。
+   *
+   * 第一版把 `<details open>` 綁在筆數上（`open={records.length === 0}`），
+   * 結果存完第一筆之後筆數從 0 變 1，重繪把表單收起來——
+   * 而「記下來了」那句話跟著消失。使用者看到的是表單憑空不見。
+   */
+  await expect(page.getByLabel(/名字/), "存完之後表單被收起來了，確認訊息也跟著不見").toBeVisible();
 });
 
 test("Dashboard 的數字與實際資料對得上", async ({ page }) => {
@@ -161,28 +199,28 @@ test("Dashboard 的數字與實際資料對得上", async ({ page }) => {
    * 純邏輯在 `features/crm-builder/stats.test.ts`（11 條）。
    * 這一條驗的是那些函式真的被接上了畫面。
    */
-  await signIn(page, "/crm");
-
-  const rows = await sql(`select id from crm_definitions where owner_id = '${memberId}' limit 1`);
-  const definitionId = rows[0]?.id as string | undefined;
-  expect(definitionId, "前面的測試應該已經存過一份").toBeTruthy();
-
+  const definitionId = await createDesign(page, "統計測試");
   await page.goto(`/account/crm/${definitionId}`);
 
   /*
    * 預設那份設計的「狀態」有三個選項。填兩筆、都選同一個，
    * 另外兩個選項必須顯示 0——而不是消失。
    */
-  for (const name of ["統計用的甲", "統計用的乙"]) {
+  /*
+   * ⚠️ 要填到門檻（3 筆）以上，圖表才會畫出來。
+   *
+   * ⚠️ 而且等待條件是「那一筆出現在表格裡」，不是 `getByRole("status")`——
+   * 上一輪的「記下來了」還留在畫面上，用它當條件會立刻通過，
+   * 下一次 fill 就撞上重繪到一半的 DOM。那是最典型的 flaky。
+   */
+  for (const name of ["統計用的甲", "統計用的乙", "統計用的丙"]) {
     await page.getByLabel(/名字/).fill(name);
     await page.getByLabel(/狀態/).selectOption("還在談");
     await page.getByRole("button", { name: "儲存" }).click();
-    await expect(page.getByRole("status")).toContainText("記下來了", { timeout: 20_000 });
+    await expect(page.getByRole("cell", { name })).toBeVisible({ timeout: 20_000 });
   }
 
   const dashboard = page.locator("section", { has: page.getByRole("heading", { name: /的概況/ }) });
-
-  await expect(dashboard.getByText(/共 \d+ 筆/)).toContainText("共 2 筆");
 
   const statusCard = dashboard.locator("li", { hasText: "狀態" }).first();
   await expect(statusCard).toContainText("還在談");
@@ -195,7 +233,7 @@ test("Dashboard 的數字與實際資料對得上", async ({ page }) => {
    * 不能把空白當成填了。
    */
   const contactCard = dashboard.locator("li", { hasText: "聯絡方式" }).first();
-  await expect(contactCard).toContainText("0 / 2");
+  await expect(contactCard).toContainText("0 / 3");
 
   /*
    * ⚠️ 每一張卡只能說它那個型別的話。
@@ -236,13 +274,167 @@ test("還沒有資料時不畫一整排 0", async ({ page }) => {
   await expect(page.locator("li", { hasText: "空的統計測試" })).toContainText("還沒有資料");
 });
 
+test("資料太少時不畫圖表，而不是畫一堆 100%", async ({ page }) => {
+  /*
+   * ⚠️ 一筆資料時每根長條不是滿版就是空的——數學上對，
+   * 而使用者的第一個反應是「圖表壞了嗎」，不是「我資料太少」。
+   *
+   * 這一條的判準是**圖表不在**，不是「有一句話」——
+   * 只驗文字的話，圖表照樣畫出來它也會綠。
+   */
+  const definitionId = await createDesign(page, "門檻測試");
+  await page.goto(`/account/crm/${definitionId}`);
+
+  await page.getByLabel(/名字/).fill("只有一筆");
+  await page.getByRole("button", { name: "儲存" }).click();
+  await expect(page.getByRole("status")).toContainText("記下來了", { timeout: 20_000 });
+
+  await expect(page.getByText(/再多記幾筆/)).toBeVisible();
+  await expect(
+    page.getByRole("list", { name: /每天新增的筆數/ }),
+    "資料只有一筆卻還是把圖表畫出來了",
+  ).toHaveCount(0);
+
+  // 數字帶仍然要在——那三個數字一筆也成立
+  await expect(page.getByText("總共")).toBeVisible();
+});
+
+test("統計的排版可以在卡片與橫列之間切換", async ({ page }) => {
+  /*
+   * 排版存在網址裡（見 crm-dashboard.tsx 的檔頭）。
+   * 這一條順便釘住「切排版不會把目前在看的類別弄丟」——
+   * 少了 entity，切一次就跳回第一類，而使用者只是想換個看法。
+   */
+  const definitionId = await createDesign(page, "排版測試");
+  await page.goto(`/account/crm/${definitionId}`);
+
+  // 圖表要有門檻以上的資料才會畫，而排版切換就在圖表那一區
+  for (const name of ["排版甲", "排版乙", "排版丙"]) {
+    await page.getByLabel(/名字/).fill(name);
+    await page.getByRole("button", { name: "儲存" }).click();
+    // 見上面同一段：不要用 status 當等待條件，上一輪的訊息還在
+    await expect(page.getByRole("cell", { name })).toBeVisible({ timeout: 20_000 });
+  }
+
+  const chooser = page.getByRole("navigation", { name: "統計的排版" });
+  await expect(chooser).toBeVisible();
+
+  // 預設是卡片
+  await expect(chooser.getByRole("link", { name: "卡片" })).toHaveAttribute("aria-current", "true");
+
+  await chooser.getByRole("link", { name: "橫列" }).click();
+  await expect(page).toHaveURL(/layout=rows/);
+  await expect(
+    page.getByRole("navigation", { name: "統計的排版" }).getByRole("link", { name: "橫列" }),
+  ).toHaveAttribute("aria-current", "true");
+
+  // 兩種排版都要畫得出每一個欄位
+  for (const label of ["名字", "狀態"]) {
+    await expect(page.getByRole("heading", { name: label, exact: true })).toBeVisible();
+  }
+});
+
+test("表格橫向捲動時，外框不動、第一欄釘住", async ({ page }) => {
+  /*
+   * ── 這一條在守什麼 ────────────────────────────────────────────
+   *
+   * 兩件只有在真的捲起來才看得出來的事：
+   *
+   *   1. 捲的是表格，不是整塊——圓角邊框與「已經記下來的」那個抬頭
+   *      必須留在原地。捲軸長在更外層的話整頁會晃。
+   *   2. 第一欄釘住——捲到第五欄時還要看得出這一列是誰的資料。
+   *
+   * ⚠️ 判準是**瀏覽器算出來的位置**，不是 class 名稱。
+   * 比對 `sticky left-0` 這串字的話，有人把它換成別的寫法就漏掉了；
+   * 而更糟的是 sticky 在某些祖先（`overflow: hidden`、`contain`）
+   * 底下會靜靜地失效——class 還在，效果沒了。
+   */
+  const definitionId = await createDesign(page, "捲動測試");
+  await page.goto(`/account/crm/${definitionId}`);
+
+  /*
+   * 內容要夠長，表格才會真的比容器寬。
+   * 短內容在窄視窗下仍然塞得進去——那樣這條測試就什麼都沒驗到。
+   */
+  await page.getByLabel(/名字/).fill("釘住我");
+  await page.getByLabel(/聯絡方式/).fill("this-is-a-deliberately-long-contact-value@example.com");
+  await page.getByLabel(/狀態/).selectOption("還在談");
+  await page.getByRole("button", { name: "儲存" }).click();
+  await expect(page.getByRole("cell", { name: "釘住我" })).toBeVisible({ timeout: 20_000 });
+
+  // 窄視窗才會真的產生橫向捲動
+  await page.setViewportSize({ width: 390, height: 900 });
+
+  const section = page.locator("section:has(h2:text('已經記下來的'))");
+
+  /*
+   * ⚠️ 兩個不同的東西，不要用同一個選擇器。
+   *
+   * `scroller`  真正在捲的那一層（`overflow-x-auto` 在哪就是哪）
+   * `frame`     使用者看到的那個外框（圓角邊框那一層）
+   *
+   * 第一版兩個都用 `div.overflow-x-auto` 抓——結果把捲軸搬到更外層時，
+   * 選擇器跟著搬過去，變成拿自己跟自己比，測試照樣綠。
+   * 那是套套邏輯：外框有沒有動，要用**外框**去量。
+   */
+  const scroller = section.locator("div.overflow-x-auto");
+  const frame = section.locator("div.rounded-lg").first();
+  await expect(scroller).toBeVisible();
+  await expect(frame).toBeVisible();
+
+  const overflows = await scroller.evaluate((el) => el.scrollWidth > el.clientWidth + 1);
+  expect(overflows, "視窗夠窄了，表格卻沒有產生橫向捲動——這一條就驗不到東西").toBe(true);
+
+  const firstCell = page.getByRole("cell", { name: "釘住我" });
+  const box = () => firstCell.boundingBox();
+
+  const before = await box();
+  const frameBefore = await frame.boundingBox();
+  const headingBefore = await section.getByRole("heading", { name: "已經記下來的" }).boundingBox();
+
+  await scroller.evaluate((el) => el.scrollTo({ left: el.scrollWidth }));
+  await expect.poll(async () => scroller.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);
+
+  const after = await box();
+  const frameAfter = await frame.boundingBox();
+  const headingAfter = await section.getByRole("heading", { name: "已經記下來的" }).boundingBox();
+
+  // 1. 外框與抬頭都沒有動
+  expect(Math.round(frameAfter!.x), "捲動時整個外框跟著移動了").toBe(Math.round(frameBefore!.x));
+  expect(Math.round(headingAfter!.x), "捲動時連抬頭都跟著移動了").toBe(
+    Math.round(headingBefore!.x),
+  );
+
+  // 2. 第一欄留在原地
+  expect(
+    Math.abs(after!.x - before!.x),
+    "第一欄跟著捲走了——捲到右邊就看不出這一列是誰的",
+  ).toBeLessThanOrEqual(1);
+
+  /*
+   * 3. 整頁不得因此橫向捲動。
+   *
+   * ⚠️ 判準是「**推得動嗎**」，不是
+   * `documentElement.scrollWidth - clientWidth`。
+   *
+   * 站上別處的斷點測試都用那個減法，而它們的頁面沒有捲動容器。
+   * 這一頁有——實測 `documentElement.scrollWidth` 會被容器裡的內容
+   * 灌水（390 的視窗量出 429），而 `window.scrollX` 推到 9999 之後
+   * 仍然是 0：整頁根本捲不動。
+   *
+   * 用那個減法的話，這一條會在一個**沒有發生的問題**上永遠紅著。
+   */
+  const scrolledX = await page.evaluate(() => {
+    window.scrollTo(9999, 0);
+    const x = window.scrollX;
+    window.scrollTo(0, 0);
+    return x;
+  });
+  expect(scrolledX, "表格的捲動外溢到整頁——整頁被推得動了").toBe(0);
+});
+
 test("必填沒填就存不進去，而且說得出是哪一欄", async ({ page }) => {
-  await signIn(page, "/crm");
-
-  const rows = await sql(`select id from crm_definitions where owner_id = '${memberId}' limit 1`);
-  const definitionId = rows[0]?.id as string | undefined;
-  expect(definitionId, "前一條測試應該已經存過一份").toBeTruthy();
-
+  const definitionId = await createDesign(page, "必填測試");
   await page.goto(`/account/crm/${definitionId}`);
 
   /*

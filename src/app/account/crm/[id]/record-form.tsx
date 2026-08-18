@@ -31,9 +31,14 @@ export function RecordForm({ definitionId, entity }: { definitionId: string; ent
       <input type="hidden" name="definitionId" value={definitionId} />
       <input type="hidden" name="entity" value={entity.id} />
 
-      <h2 className="text-heading-1">新增一筆「{entity.name}」</h2>
-
-      <div className="mt-5 flex flex-col gap-4">
+      {/*
+       * ⚠️ 這裡沒有標題。
+       *
+       * 表單收在 `<details>` 裡，而 `<summary>` 已經寫著
+       * 「新增一筆「客戶」」——再放一個一模一樣的 h2，
+       * 螢幕閱讀器會把同一句話唸兩次。
+       */}
+      <div className="flex flex-col gap-4">
         {entity.fields.map((field) => {
           const name = `field:${field.id}`;
 

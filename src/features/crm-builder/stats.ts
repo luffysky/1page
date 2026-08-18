@@ -163,3 +163,70 @@ export function recentActivity(
 
   return [...buckets].map(([date, count]) => ({ date, count }));
 }
+
+/**
+ * 少於幾筆就不畫圖表。
+ *
+ * ── 為什麼要有這個門檻 ────────────────────────────────────────
+ *
+ * 一筆資料時，每一根長條不是 100% 就是 0%——數學上完全正確，
+ * 而畫面上看起來像壞掉。使用者的第一個反應是「圖表是不是有問題」，
+ * 而不是「我資料太少」。
+ *
+ * ⚠️ 這不是美化，是誠實：**一筆資料沒有分布可言**。
+ * 硬畫出來的圖表在說一件它證明不了的事。
+ *
+ * 3 是「看得出比例」的最小值：兩筆只能是 50/50 或 100/0。
+ */
+export const MIN_RECORDS_FOR_CHARTS = 3;
+
+export interface Headline {
+  total: number;
+  /** 最近 7 天新增幾筆 */
+  thisWeek: number;
+  /**
+   * 最常見的那個選項。
+   *
+   * ⚠️ 只有在**真的有 select 欄位而且有人選過**時才給。
+   * 沒有的話回 undefined，畫面上就少一格——不編造一個看起來像洞察的東西。
+   */
+  top?: { fieldLabel: string; label: string; count: number };
+}
+
+/**
+ * 打開這一頁最想知道的三個數字。
+ *
+ * ⚠️ `today` 由呼叫端傳進來，理由與 `recentActivity` 相同：
+ * 在這裡叫 `new Date()` 會讓這支函式不再是純的。
+ */
+export function headlineStats(
+  stats: EntityStats,
+  records: readonly { entity: string; createdAt: string }[],
+  today: Date,
+): Headline {
+  const weekAgo = new Date(today);
+  weekAgo.setDate(weekAgo.getDate() - 7);
+
+  const thisWeek = records.filter(
+    (record) => record.entity === stats.entity.id && new Date(record.createdAt) >= weekAgo,
+  ).length;
+
+  /*
+   * 「最常見的」只看 select 欄位——那是唯一有固定選項、
+   * 因此「最多的那個」才有意義的型別。
+   *
+   * 文字欄位的「最多」幾乎一定是 1，而那不是洞察，是雜訊。
+   */
+  let top: Headline["top"];
+  for (const summary of stats.fields) {
+    if (summary.field.type !== "select") continue;
+
+    const best = [...summary.buckets].sort((a, b) => b.count - a.count)[0];
+    if (!best || best.count === 0) continue;
+
+    top = { fieldLabel: summary.field.label, label: best.label, count: best.count };
+    break;
+  }
+
+  return { total: stats.total, thisWeek, top };
+}
