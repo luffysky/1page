@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 
+import { measureImage } from "@/components/editor/upload";
 import { ACCEPT_ATTRIBUTE, ALLOWED_MEDIA, formatBytes } from "@/config/media";
 import {
   createMediaUploadUrl,
@@ -99,6 +100,15 @@ export function MediaManager({ projectId, media }: { projectId: string; media: M
       return;
     }
 
+    /*
+     * 尺寸在上傳成功之後才量，而不是之前。
+     *
+     * 量不出來只是「這張圖沒有尺寸資料」（公開頁面有 fallback），
+     * 而上傳失敗是真的失敗——先量的話，一個 measureImage 的意外
+     * 會擋掉一次本來會成功的上傳。
+     */
+    const size = await measureImage(file);
+
     const saved = await saveMediaRecord({
       projectId,
       url: presigned.publicUrl,
@@ -106,6 +116,7 @@ export function MediaManager({ projectId, media }: { projectId: string; media: M
       alt,
       role,
       filename: file.name,
+      ...(size ?? {}),
     });
 
     if (!saved.ok) {

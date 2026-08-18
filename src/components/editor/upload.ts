@@ -74,3 +74,35 @@ export function putWithProgress(
     xhr.send(file);
   });
 }
+
+/**
+ * 量出圖片的原始像素尺寸。
+ *
+ * ── 為什麼在瀏覽器量，而不是在伺服器 ──────────────────────────
+ *
+ * 檔案是**直傳 R2 的**，從來不經過我們的伺服器（那正是 presign 直傳的重點）。
+ * 要在伺服器量就得再把檔案抓回來一次，為了兩個整數下載一支 8MB 的圖。
+ * 而瀏覽器這一側檔案已經在手上了。
+ *
+ * ⚠️ **量不出來就回 null，不猜。**
+ * 猜一個尺寸的話，next/image 會依那個比例留位置，圖片載入後再跳一次——
+ * 那比完全不給尺寸更糟，因為不給的時候渲染端知道要走 fallback。
+ *
+ * 非圖片（影片、PDF）一律回 null：`createImageBitmap` 對它們會丟錯，
+ * 而那是預期內的，不是失敗。
+ */
+export async function measureImage(file: File): Promise<{ width: number; height: number } | null> {
+  if (!file.type.startsWith("image/")) return null;
+
+  try {
+    const bitmap = await createImageBitmap(file);
+    const size = { width: bitmap.width, height: bitmap.height };
+    // ImageBitmap 佔的是解碼後的記憶體（4 bytes/px）。一張 4000×3000 就是 48MB，
+    // 連傳十張不關掉會讓分頁被系統殺掉
+    bitmap.close();
+
+    return size.width > 0 && size.height > 0 ? size : null;
+  } catch {
+    return null;
+  }
+}

@@ -85,6 +85,19 @@ const saveSchema = z.object({
   alt: z.string().trim().max(300),
   role: z.enum(["cover", "gallery", "mobile", "desktop", "before", "after", "document"]),
   filename: z.string().max(255).optional(),
+  /**
+   * 原始像素尺寸，由瀏覽器在上傳前量出來。
+   *
+   * ⚠️ **成對，或都不給。** 資料庫的 `media_dimensions_paired` 是真正的
+   * 邊界，這裡先擋是為了說人話。只有一邊的話長寬比是算不出來的，
+   * 而 next/image 需要的正是長寬比——半套資料會讓它留出一個錯的框，
+   * 比沒有資料更糟（沒有資料時渲染端知道要走 fallback）。
+   *
+   * 上限 20000：這不是防駭，是防「量錯了」。真的有這麼大的圖片時
+   * 它也不該進圖廊。
+   */
+  width: z.number().int().positive().max(20000).optional(),
+  height: z.number().int().positive().max(20000).optional(),
 });
 
 export type SimpleResult = { ok: true } | { ok: false; message: string };
@@ -95,7 +108,13 @@ export async function saveMediaRecord(input: unknown): Promise<SimpleResult> {
   const parsed = saveSchema.safeParse(input);
   if (!parsed.success) return { ok: false, message: "媒體資料不正確" };
 
-  const { projectId, url, type, alt, role, filename } = parsed.data;
+  const { projectId, url, type, alt, role, filename, width, height } = parsed.data;
+
+  // 成對檢查。資料庫也擋，但那句話是 `violates check constraint
+  // "media_dimensions_paired"`——看得懂那句話的人不需要這個系統
+  if ((width === undefined) !== (height === undefined)) {
+    return { ok: false, message: "圖片尺寸要嘛兩個都給，要嘛都不給" };
+  }
 
   // 只接受指向我們自己 bucket 的網址。否則有人可以把任意外部網址
   // 寫進資料庫，讓公開頁面去載入它。
@@ -126,6 +145,8 @@ export async function saveMediaRecord(input: unknown): Promise<SimpleResult> {
     alt: alt || null,
     caption: filename ? sanitizeFilename(filename) : null,
     role,
+    width: width ?? null,
+    height: height ?? null,
     sort_order: (existing?.sort_order ?? -1) + 1,
   });
 

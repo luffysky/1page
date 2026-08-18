@@ -36,7 +36,7 @@ const DETAIL_SELECT = `
   case_study_json, links_json, ai_disclosure_json,
   portfolio_project_categories ( portfolio_categories ( slug ) ),
   portfolio_project_tags ( portfolio_tags ( name ) ),
-  portfolio_media ( id, type, url, thumbnail_url, alt, caption, role, sort_order )
+  portfolio_media ( id, type, url, width, height, alt, caption, role, sort_order )
 `;
 
 type CategoryJoin = { portfolio_categories: { slug: string } | null }[] | null;
@@ -253,7 +253,8 @@ export const supabasePortfolioRepository: PortfolioRepository = {
         id: string;
         type: PortfolioMedia["type"];
         url: string;
-        thumbnail_url: string | null;
+        width: number | null;
+        height: number | null;
         alt: string | null;
         caption: string | null;
         role: PortfolioMedia["role"];
@@ -309,7 +310,8 @@ export const supabasePortfolioRepository: PortfolioRepository = {
           id: media.id,
           type: media.type,
           url: media.url,
-          thumbnailUrl: media.thumbnail_url ?? undefined,
+          width: media.width ?? undefined,
+          height: media.height ?? undefined,
           alt: media.alt!,
           caption: media.caption ?? undefined,
           role: media.role,

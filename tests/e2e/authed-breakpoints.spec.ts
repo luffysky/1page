@@ -304,21 +304,65 @@ test.describe("會員 dashboard", () => {
     await page.waitForURL(/\/account/, { timeout: 20_000 });
   });
 
-  // 四個區段都掃，最窄與最寬兩端。側欄在窄螢幕收成抽屜，
+  /*
+   * ⚠️ 從磁碟列舉，不寫死清單。
+   *
+   * 後台那一段（上面）原本寫死三條路由，之後加的六個頁面一條都沒被掃過，
+   * 而測試的名字說它在檢查後台。0815 才修掉。
+   *
+   * 會員區這一份當時沒動——**因為它剛好還是完整的**，
+   * 而「剛好還對」與「不會過期」是兩回事。0818 加了「我的 CRM」
+   * 之後它就會開始漏，所以現在改成同一套。
+   */
+  const memberRoutes = (() => {
+    const walk = (dir: string, urlPath: string): string[] => {
+      const found: string[] = [];
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const next = `${dir}/${entry.name}`;
+        if (entry.isDirectory()) {
+          const part = /^[(@]/.test(entry.name) ? "" : `/${entry.name}`;
+          found.push(...walk(next, `${urlPath}${part}`));
+        } else if (/^page\.tsx?$/.test(entry.name)) {
+          found.push(urlPath);
+        }
+      }
+      return found;
+    };
+
+    return walk("src/app/account", "/account");
+  })();
+
+  /** 動態路由要有一筆真的資料才進得去。每一條都要寫明誰在掃它 */
+  const MEMBER_DYNAMIC_COVERED: Array<[string, string]> = [
+    ["/account/crm/[id]", "crm-designer.spec.ts 會存一份真的設計再打開它"],
+  ];
+
+  const memberExcused = new Set(MEMBER_DYNAMIC_COVERED.map(([route]) => route));
+  const memberSkipped = memberRoutes.filter(
+    (route) => route.includes("[") && !memberExcused.has(route),
+  );
+
+  test("每一條會員區動態路由都說得出是誰在掃它", () => {
+    expect(
+      memberSkipped,
+      `這幾條動態路由沒有任何地方檢查 RWD 與 a11y：${memberSkipped.join("、")}`,
+    ).toEqual([]);
+
+    for (const [route, who] of MEMBER_DYNAMIC_COVERED) {
+      expect(who.trim().length, `${route} 沒有寫是誰在掃`).toBeGreaterThan(0);
+    }
+  });
+
+  // 最窄與最寬兩端。側欄在窄螢幕收成抽屜，
   // 而「收起來」與「用 CSS 藏起來」的差別正是這裡要驗的東西。
-  const pages = [
-    ["總覽", "/account"],
-    ["我的網站", "/account/sites"],
-    ["我的詢問", "/account/inquiries"],
-    ["帳號設定", "/account/settings"],
-  ] as const;
+  const pages = memberRoutes.filter((route) => !route.includes("["));
 
   const [narrow] = VIEWPORTS;
   const wide = VIEWPORTS[VIEWPORTS.length - 1]!;
 
-  for (const [label, path] of pages) {
+  for (const path of pages) {
     for (const viewport of [narrow, wide]) {
-      test(`${label} @ ${viewport.name}px 無違規且無橫向捲動`, async ({ page }) => {
+      test(`${path} @ ${viewport.name}px 無違規且無橫向捲動`, async ({ page }) => {
         await page.setViewportSize({ width: viewport.width, height: viewport.height });
         await page.goto(path);
 

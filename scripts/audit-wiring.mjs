@@ -176,7 +176,6 @@ const IGNORED_COLUMNS = [
 
 const ignored = new Set(IGNORED_COLUMNS.map(([name]) => name));
 
-const allSource = sources.map((path) => readFileSync(path, "utf8")).join("\n");
 /*
  * ⚠️ 這一段原本是 `!allSource.includes(name)`——一個**整份原始碼的
  * 子字串比對**，而那是一個假通過。

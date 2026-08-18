@@ -132,3 +132,55 @@ describe("非自家儲存的網址不會讓頁面崩潰", () => {
     `);
   });
 });
+
+describe("圖片尺寸（0818：取代 thumbnail_url）", () => {
+  /*
+   * ── 這一組在守什麼 ────────────────────────────────────────────
+   *
+   * `thumbnail_url` 從 0810 建表起就兩端都沒有：沒有人寫，也沒有人畫。
+   * 待辦上原本寫「要接一條產生縮圖的路徑」，但真的接了會疊出第二套
+   * 更差的機制——next/image 的最佳化器本來就會依 sizes 產出對的尺寸。
+   *
+   * 它掩蓋掉的真問題是相簿沒有留位置（CLS）。所以改存原始尺寸。
+   *
+   * 尺寸**必須成對**：只有一邊的話長寬比算不出來，next/image 會依一個
+   * 錯的比例留位置，圖片載入後再跳一次——那比完全不給更糟，
+   * 因為不給的時候渲染端知道要走 fallback。
+   */
+
+  it("只給寬不給高，資料庫直接擋下來", async () => {
+    await expect(
+      sql(`
+        update public.portfolio_media
+        set width = 1200, height = null
+        where project_id = '${projectId}'
+      `),
+    ).rejects.toThrow(/media_dimensions_paired/);
+  });
+
+  it("成對寫入之後，公開端拿得到那組尺寸", async () => {
+    await sql(`
+      update public.portfolio_media
+      set width = 1200, height = 800
+      where project_id = '${projectId}'
+    `);
+
+    const project = await repo.getBySlug(SLUG);
+    expect(project?.media[0]?.width).toBe(1200);
+    expect(project?.media[0]?.height).toBe(800);
+  });
+
+  it("沒有尺寸的舊資料照樣讀得回來——不是把它濾掉", async () => {
+    // 0818 之前上傳的媒體沒有尺寸。把它們當成壞資料濾掉的話，
+    // 升級的當下所有既有作品的相簿會一起消失
+    await sql(`
+      update public.portfolio_media
+      set width = null, height = null
+      where project_id = '${projectId}'
+    `);
+
+    const project = await repo.getBySlug(SLUG);
+    expect(project?.media).toHaveLength(1);
+    expect(project?.media[0]?.width).toBeUndefined();
+  });
+});

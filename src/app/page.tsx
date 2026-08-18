@@ -49,6 +49,7 @@ const NAV_LINKS: NavLink[] = [
   { label: "流程", href: "#process" },
   // 編輯器是一條真的路由，不是首頁的錨點——它是訪客自己動手的入口
   { label: "自己排版", href: "/edit" },
+  { label: "設計 CRM", href: "/crm" },
 ];
 
 export default async function Home({ searchParams }: PageProps<"/">) {

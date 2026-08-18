@@ -2,6 +2,7 @@ import { TrackPageView } from "@/components/analytics/page-view";
 import { ProjectJsonLd } from "@/components/seo/structured-data";
 import { TrackedExternalLink } from "@/components/analytics/tracked-external-link";
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -195,8 +196,36 @@ export default async function WorkDetailPage({ params }: PageProps<"/work/[slug]
             <ul className="grid gap-4 md:grid-cols-2">
               {gallery.map((media) => (
                 <li key={media.id} className="border-brand-line overflow-hidden rounded-lg border">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={media.url} alt={media.alt} className="w-full" />
+                  {/*
+                   * ⚠️ 尺寸決定用哪一條路徑，而不是用哪一種樣式。
+                   *
+                   * 知道原始尺寸 → 照它的長寬比留位置，圖片載入時不會把
+                   * 下面的內容推開，也不會裁到任何東西。
+                   *
+                   * 不知道（0818 之前上傳的，或量不出來的）→ 退回固定比例的框
+                   * 加 object-contain。**不用 object-cover**：作品圖是設計稿，
+                   * 裁掉的那一塊很可能正是要看的地方。留白比裁掉好。
+                   */}
+                  {media.width && media.height ? (
+                    <Image
+                      src={media.url}
+                      alt={media.alt}
+                      width={media.width}
+                      height={media.height}
+                      sizes="(max-width: 768px) 100vw, 50vw"
+                      className="h-auto w-full"
+                    />
+                  ) : (
+                    <div className="bg-brand-cream relative aspect-[4/3] w-full">
+                      <Image
+                        src={media.url}
+                        alt={media.alt}
+                        fill
+                        sizes="(max-width: 768px) 100vw, 50vw"
+                        className="object-contain"
+                      />
+                    </div>
+                  )}
                   {media.caption ? (
                     <p className="text-caption text-brand-muted p-4">{media.caption}</p>
                   ) : null}

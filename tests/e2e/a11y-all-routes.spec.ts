@@ -30,6 +30,7 @@ const PUBLIC_ROUTES = [
   { name: "登入", path: "/login" },
   { name: "Project Builder", path: "/start" },
   { name: "網站編輯器", path: "/edit" },
+  { name: "CRM 設計器", path: "/crm" },
 ];
 
 /**

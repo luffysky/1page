@@ -2,6 +2,8 @@
 
 import { createContext, useContext, useEffect, useMemo, useReducer, useRef } from "react";
 
+import { moveInOrder } from "@/lib/reorder";
+
 import {
   ACCENT_IDS,
   type AccentId,
@@ -269,16 +271,18 @@ function baseReducer(state: PreviewState, action: PreviewAction): PreviewState {
      */
     case "move-section": {
       const current = sectionsOf(state);
-      const index = current.findIndex((section) => section.id === action.id);
-      if (index === -1) return state;
 
-      const target = action.direction === "up" ? index - 1 : index + 1;
-      // 已經在頭或尾就是沒事發生。不要繞回另一端——
-      // 那會讓「一直按下移」把區塊從最底下跳到最上面。
-      if (target < 0 || target >= current.length) return state;
-
-      const order = current.map((section) => section.id);
-      [order[index], order[target]] = [order[target]!, order[index]!];
+      /*
+       * 搬動一格的規則本身抽在 `lib/reorder`，因為 CR-003-5 的 CRM
+       * 設計器要用同一套。已經在頭尾時回 null（＝什麼都不做），
+       * 而不是繞到另一端。
+       */
+      const order = moveInOrder(
+        current.map((section) => section.id),
+        action.id,
+        action.direction,
+      );
+      if (!order) return state;
 
       const result = reorderSections(configOf(state), order);
       return result.ok ? { ...state, sections: result.config.sections } : state;

@@ -71,6 +71,25 @@ export interface CmsRevisionsRow {
   saved_by: string | null;
 }
 
+export interface CrmDefinitionsRow {
+  id: string;
+  owner_id: string;
+  name: string;
+  definition: Json;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CrmRecordsRow {
+  id: string;
+  owner_id: string;
+  definition_id: string;
+  entity: string;
+  data: Json;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface DealItemsRow {
   id: string;
   deal_id: string;
@@ -194,12 +213,13 @@ export interface PortfolioMediaRow {
   project_id: string;
   type: PortfolioMediaType;
   url: string;
-  thumbnail_url: string | null;
   alt: string | null;
   caption: string | null;
   role: PortfolioMediaRole;
   sort_order: number;
   created_at: string;
+  width: number | null;
+  height: number | null;
 }
 
 export interface PortfolioProjectCategoriesRow {

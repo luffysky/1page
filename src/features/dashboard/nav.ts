@@ -45,6 +45,7 @@ export const MEMBER_NAV: NavGroup[] = [
     items: [
       { label: "總覽", href: "/account", hint: "你在這裡做過的事" },
       { label: "我的網站", href: "/account/sites", hint: "存下來的排版，可以接著改" },
+      { label: "我的 CRM", href: "/account/crm", hint: "自己設計的結構，照著它填資料" },
       { label: "我的詢問", href: "/account/inquiries", hint: "你留給我們的需求" },
       { label: "帳號設定", href: "/account/settings", hint: "顯示名稱與登出" },
     ],

@@ -13,7 +13,18 @@ export interface PortfolioMedia {
   id: string;
   type: "image" | "video" | "pdf" | "embed" | "external";
   url: string;
-  thumbnailUrl?: string;
+  /**
+   * 原始像素尺寸。**兩個一起有或一起沒有**（資料庫的 media_dimensions_paired
+   * 保證這件事），所以渲染端只要判斷其中一個。
+   *
+   * 用途只有一個：讓 `next/image` 在圖片載入前就知道要留多大的位置。
+   * 沒有它的話圖片載入時會把下面的內容往下推（CLS），而那是
+   * `audit:perf` 在盯的數字之一。
+   *
+   * 舊資料沒有尺寸（這個欄位是 0818 才加的），所以渲染端必須有 fallback。
+   */
+  width?: number;
+  height?: number;
   /**
    * ⚠️ 必填。Spec §35。
    * 與 `PortfolioCard.cover` 同樣的型別設計：讓「有媒體但沒有替代文字」
