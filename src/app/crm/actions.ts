@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { getMemberIdentity } from "@/features/account/auth";
 import {
   addCrmRecord,
+  addCrmRecords,
   deleteCrmDesign,
   deleteCrmRecord,
   saveCrmDesign,
@@ -108,6 +109,74 @@ export async function addCrmRecordAction(
 
   revalidatePath(`/account/crm/${definitionId}`);
   return { ok: true, message: "記下來了。" };
+}
+
+export interface CrmImportResult {
+  ok: boolean;
+  message: string;
+  /** 沒匯進去的那幾列。畫面上要逐列列出來，不能只說「有幾列失敗」 */
+  problems?: { line: number; message: string }[];
+}
+
+/**
+ * 匯入很多筆記錄。
+ *
+ * ⚠️ 送過來的是**值**，不是定義——與 addCrmRecordAction 同一條規則。
+ *
+ * ⚠️ 檔案在瀏覽器裡解析，這裡收到的是已經對應好的 JSON。
+ * 那不是為了省事，是為了不必接收檔案：少一條上傳路徑，
+ * 就少一整類「有人送一個 2GB 的檔案上來」的問題。
+ * 代價是相信不了瀏覽器送來的東西——所以 `addCrmRecords` 每一筆都重驗。
+ */
+export async function importCrmRecordsAction(
+  _previous: unknown,
+  formData: FormData,
+): Promise<CrmImportResult> {
+  const definitionId = String(formData.get("definitionId") ?? "");
+  const entityId = String(formData.get("entity") ?? "");
+  if (!definitionId || !entityId) return { ok: false, message: "參數不正確。" };
+
+  let rows: unknown;
+  try {
+    rows = JSON.parse(String(formData.get("rows") ?? ""));
+  } catch {
+    return { ok: false, message: "這份資料讀不出來，請重新選一次檔案。" };
+  }
+
+  if (!Array.isArray(rows)) return { ok: false, message: "這份資料讀不出來。" };
+
+  /*
+   * 先擋數量再說。
+   *
+   * 上限是 500，而一個超過 500 筆的請求連驗都不必驗——
+   * 讓它跑完只是白花伺服器的時間，而結果一定是同一句話。
+   */
+  if (rows.length > 500) {
+    return { ok: false, message: "一次最多匯入 500 筆，請把檔案拆小一點。" };
+  }
+
+  const prepared = rows.map((row, index) => {
+    const item = (row ?? {}) as { line?: unknown; values?: unknown };
+    return {
+      line: typeof item.line === "number" ? item.line : index + 2,
+      values: item.values,
+    };
+  });
+
+  const result = await addCrmRecords(definitionId, entityId, prepared);
+  if (!result.ok) return { ok: false, message: result.error };
+
+  revalidatePath(`/account/crm/${definitionId}`);
+
+  /*
+   * 部分成功也是成功，但一定要把失敗的那幾列講出來。
+   * 只說「匯入了 118 筆」的話，使用者不會發現少了 2 筆。
+   */
+  const message = result.problems.length
+    ? `匯入了 ${result.inserted} 筆，有 ${result.problems.length} 列沒進去。`
+    : `匯入了 ${result.inserted} 筆。`;
+
+  return { ok: true, message, problems: result.problems };
 }
 
 export async function removeCrmDesignAction(formData: FormData): Promise<void> {

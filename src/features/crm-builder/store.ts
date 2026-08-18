@@ -274,6 +274,109 @@ export async function addCrmRecord(
   return { ok: true };
 }
 
+/**
+ * 一次寫入很多筆（匯入用）。
+ *
+ * ── 為什麼不是「呼叫 addCrmRecord 三百次」 ────────────────────
+ *
+ * 三百次來回慢是其次，真正的問題是**中途失敗會留下一半**：
+ * 第 180 筆撞到上限的話，前面 179 筆已經進去了，而使用者看到的是
+ * 一個失敗訊息——他不會知道要去刪那 179 筆。
+ *
+ * 一次 insert 是一個交易：要嘛整批進去，要嘛一筆都沒有。
+ *
+ * ── 上限先算，不要讓 trigger 去擋 ────────────────────────────
+ *
+ * 資料庫的 trigger 是最後一道，但它的訊息是給我們看的。
+ * 這裡先算「還放得下幾筆」，才有辦法說出「只匯得進 120 筆，
+ * 剩下的 180 筆要先刪掉一些舊記錄」這種使用者做得到的下一步。
+ */
+export async function addCrmRecords(
+  definitionId: string,
+  entityId: string,
+  rows: readonly { line: number; values: unknown }[],
+): Promise<
+  | { ok: true; inserted: number; problems: { line: number; message: string }[] }
+  | { ok: false; error: string }
+> {
+  const identity = await getMemberIdentity();
+  if (!identity) return { ok: false, error: "要先登入才能匯入。" };
+
+  if (rows.length === 0) return { ok: false, error: "這個檔案裡沒有可以匯入的資料。" };
+
+  const design = await loadCrmDesign(definitionId);
+  if (!design.ok) return { ok: false, error: design.error };
+
+  const entity = design.definition.entities.find((item) => item.id === entityId);
+  if (!entity) return { ok: false, error: "這份設計裡沒有這一類。" };
+
+  /*
+   * ⚠️ 每一筆都要在伺服器端再驗一次。
+   *
+   * 瀏覽器那邊已經驗過了，而那**不算數**——這是一個公開端點，
+   * 送什麼過來由對方決定。用的是與手動新增同一份 `recordSchemaFor`，
+   * 兩條路徑不可能有不同的鬆緊。
+   */
+  const schema = recordSchemaFor(entity);
+  const valid: Record<string, unknown>[] = [];
+  const problems: { line: number; message: string }[] = [];
+
+  for (const row of rows) {
+    const parsed = schema.safeParse(row.values);
+    if (parsed.success) {
+      valid.push(parsed.data);
+      continue;
+    }
+    const issue = parsed.error.issues[0];
+    const label = entity.fields.find((field) => field.id === issue?.path[0])?.label;
+    problems.push({
+      line: row.line,
+      message: label ? `「${label}」${issue?.message ?? "格式不對"}` : "這一列的格式不對",
+    });
+  }
+
+  if (valid.length === 0) {
+    return { ok: false, error: "每一列都有問題，一筆都匯不進去。" };
+  }
+
+  const supabase = await createSupabaseServerClient();
+
+  const { count } = await supabase
+    .from("crm_records")
+    .select("id", { count: "exact", head: true })
+    .eq("definition_id", definitionId);
+
+  const room = CRM_LIMITS.recordsPerDefinition - (count ?? 0);
+  if (room <= 0) {
+    return {
+      ok: false,
+      error: `這份 CRM 已經有 ${CRM_LIMITS.recordsPerDefinition} 筆記錄了，要先刪掉一些才匯得進去。`,
+    };
+  }
+
+  if (valid.length > room) {
+    return {
+      ok: false,
+      error: `這份 CRM 只剩 ${room} 個位子，而檔案裡有 ${valid.length} 筆。請先刪掉一些舊記錄，或把檔案拆小一點。`,
+    };
+  }
+
+  // owner_id 一樣不送——由 trigger 從 definition 抄過來（見 addCrmRecord）
+  const { error } = await supabase.from("crm_records").insert(
+    valid.map((data) => ({
+      definition_id: definitionId,
+      entity: entityId,
+      data,
+    })),
+  );
+
+  if (error) {
+    return { ok: false, error: describeSaveError("addCrmRecords", error, "匯入失敗。") };
+  }
+
+  return { ok: true, inserted: valid.length, problems };
+}
+
 export async function deleteCrmRecord(recordId: string): Promise<void> {
   const supabase = await createSupabaseServerClient();
   await supabase.from("crm_records").delete().eq("id", recordId);

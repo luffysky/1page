@@ -12,6 +12,8 @@ import { CRM_LIMITS, type CrmField } from "@/features/crm-builder/schema";
 import { headlineStats, recentActivity, summariseEntity } from "@/features/crm-builder/stats";
 import { listAllCrmRecords, loadCrmDesign } from "@/features/crm-builder/store";
 
+import { ImportRecords } from "@/components/crm/import-records";
+
 import { RecordForm } from "./record-form";
 
 /**
@@ -270,6 +272,25 @@ export default async function CrmRecordsPage({
 
           <div className="mt-6 max-w-xl">
             <RecordForm definitionId={id} entity={entity} />
+          </div>
+        </details>
+
+        {/*
+         * 匯入收在另一個 `<details>`，而且預設收起來。
+         *
+         * 與新增一筆分開：兩件事的步驟數差很多（一步 vs 選檔案、對應、確認），
+         * 擺在同一個框裡會讓「填一筆」看起來很複雜。
+         *
+         * 預設收起來的理由與上面那個相反——這是偶爾做一次的事，
+         * 而上面那個是每天都要做的事。
+         */}
+        <details className="mt-6">
+          <summary className="border-brand-line text-body-sm rounded-pill hover:bg-brand-ink hover:text-brand-on-ink inline-flex cursor-pointer border px-5 py-2.5 font-bold transition-colors">
+            用 Excel／CSV 匯入「{entity.name}」
+          </summary>
+
+          <div className="max-w-2xl">
+            <ImportRecords definitionId={id} entity={entity} />
           </div>
         </details>
       </section>

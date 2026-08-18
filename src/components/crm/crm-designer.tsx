@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useId, useReducer, useState } from "react";
 
 import { CrmPreview } from "@/components/crm/crm-preview";
+import { ImportDesign } from "@/components/crm/import-design";
 import { FieldRow } from "@/components/crm/field-row";
 import { CrmSaveBar } from "@/components/crm/crm-save-bar";
 import {
@@ -385,6 +386,21 @@ export function CrmDesigner({
               ))}
             </div>
           </div>
+
+          {/*
+           * 從檔案建一類。
+           *
+           * 擺在欄位下面而不是最上面：先讓人看到「這裡在設計什麼」，
+           * 再給捷徑。擺最上面的話，第一次來的人會以為一定要有檔案才能用。
+           */}
+          <ImportDesign
+            definition={definition}
+            onImported={(next) => {
+              // 走 apply 這條路，所以復原／重做、跳到新那一類全都自動成立
+              apply({ ok: true, definition: next });
+              setSelectedFieldId(null);
+            }}
+          />
 
           {/* 選取的欄位 */}
           {selectedField ? (
