@@ -5,7 +5,8 @@ import Link from "next/link";
 import { PortfolioFilter } from "@/components/portfolio/portfolio-filter";
 import { PortfolioLayout } from "@/components/portfolio/portfolio-layout";
 import { DarkCtaBlock } from "@/components/shared/dark-cta-block";
-import { Navbar, type NavLink } from "@/components/shared/navbar";
+import { Navbar } from "@/components/shared/navbar";
+import { PUBLIC_NAV } from "@/config/nav";
 import { getAccountEntry } from "@/features/account/auth";
 import { getAdminEntry } from "@/features/admin/auth";
 import { SiteFooter } from "@/components/shared/site-footer";
@@ -39,16 +40,6 @@ export const metadata: Metadata = {
  * 資料來自 `PortfolioRepository`。目前是 in-memory 實作，
  * 2D 換成 Supabase 時本檔一行都不用改。
  */
-
-const NAV_LINKS: NavLink[] = [
-  { label: "作品", href: "/work" },
-  { label: "自己排版", href: "/edit" },
-  { label: "設計 CRM", href: "/crm" },
-  { label: "AI 顧問", href: "/#advisor" },
-  { label: "服務", href: "/#services" },
-  { label: "價格", href: "/#pricing" },
-  { label: "流程", href: "/#process" },
-];
 
 export default async function WorkPage({ searchParams }: PageProps<"/work">) {
   const params = await searchParams;
@@ -106,7 +97,7 @@ export default async function WorkPage({ searchParams }: PageProps<"/work">) {
       <Navbar
         adminEntry={adminEntry}
         accountEntry={accountEntry}
-        links={NAV_LINKS}
+        links={[...PUBLIC_NAV]}
         cta={{ label: "開始一個專案 ↗", href: "/#contact" }}
       />
 

@@ -7,7 +7,7 @@
 >
 > 劃掉的是 0811 之後已經完成的。
 
-**測試總數：552 unit + 384 e2e/visual + 78 db = 1014。**（0815 收工時是 946）
+**測試總數：564 unit + 381 e2e + 56 visual + 78 db = 1079。**（0815 收工時是 946）
 > 逐項工作紀錄見 `docs/worklog/daily_works_0813.md`、`daily_works_0814.md`、
 > `daily_works_0815.md` 與 `daily_works_0818.md`。
 >
@@ -356,10 +356,12 @@ repository、action、勾選框與 e2e，而待辦上還寫著「還沒做」。
 
 ---
 
-## ✅ 0818 傍晚：首頁 IA 重新編排（CR-005）
+## ✅ 0818 傍晚：首頁重新編排與瘦身（CR-005 + CR-006）
 
-依 `docs/gptsay.md` 對線上站的資訊架構評論。**規格升到 V1.5**，
-CR 紀錄在 §47。
+依 `docs/gptsay.md` 對線上站的資訊架構評論。**規格升到 V1.6**，
+兩份 CR 記在 §47。
+
+### CR-005 — 順序
 
 ```text
 Services 由第 8 位提到第 5 位      「我們能做什麼」是工作室官網的核心論證，
@@ -368,41 +370,83 @@ Template Experience 降到第 6 位    它是首頁體積最大的一塊
 Process 與 Pricing 對調            先講多少錢再講怎麼做，順序反了
 ```
 
-### 這次沒採納的兩項（都要先寫程式，見下面「真正還沒做」）
+### CR-006 — 體積
 
 ```text
-把 Goal Selector 移出首頁    ⚠️ 它是 work / services / template / advisor
-                            四塊的 context controller，而 setGoal
-                            **只有一個呼叫點**就在它裡面。移出去或關掉
-                            之前要先把那個動作接到別的地方，
-                            否則整個目標情境只剩 ?goal= 觸發得了
-Template Experience 縮小     需要精簡版區塊 + /playground 或 /templates
+/pricing 新路由      完整六級搬過去。首頁只留「免費 / 8,800 起」+ 一個連結
+/playground 新路由   完整試穿搬過去（Theme / Accent / 裝置）。
+                    首頁只留「挑一套 + 大張預覽 + 兩個出口」
+services 改成四列    §3.1 本來就禁止全站卡片網格，這一改是往規格靠
+導覽收成一份        六個公開頁各寫一份 NAV_LINKS，而且內容都不一樣
+                    （/work 七條、/work/[slug] 五條、/edit 四條）。
+                    收進 `config/nav.ts`，並補上這個專案缺的
+                    「反過來問」守衛：磁碟上有沒有哪條公開路由沒有入口
 ```
 
-### 三件過程中發現的事
+⚠️ **§26.1 的原意沒有變**。原文的理由是「缺了承接點，升級路徑等同
+從 990 直接跳 30,000」——那個顧慮是「階梯有缺口」，不是「階梯在哪一頁」。
+所以 `/pricing` 必須完整，而首頁那段**必須把人帶過去**：
+藏起來就等於缺了那幾級。有三條 e2e 盯著這件事。
+
+### 四件過程中發現的事
 
 ```text
-1. 順序寫在資料庫活不過 e2e
-   BJ-2 的版面編輯器可以把順序存成 cms_documents 的一列，但
-   admin-layout.spec.ts 的收尾測試會「排回預設並存檔」，
-   而 e2e 打的是同一個資料庫——跑一次 pnpm e2e 就把線上首頁重設了。
-   所以產品的預設編排屬於程式碼與規格，資料庫那一列是臨時調整用的。
+1. 起價寫死會讓兩個地方講不一樣的價錢
+   PricingSummary 的每一個數字都從 tiers 算出來，連「完整 N 級」的 N 也是。
+   兩個方向都故意改壞驗過會紅。
 
-2. kicker 的編號是寫死的
-   「01 / Goals」…「07 / Process」在 home-copy.ts 裡。順序一動就全亂，
-   而後台的排序是已上線的功能——使用者拖一次就會看到「作品之後是
-   05 / SERVICES」。這次手動改對了，但真正的修法見下面。
+2. 導覽守衛第一次跑就抓到我自己漏的兩條
+   例外清單原本逐一列 /_dev/primitives 與 /_dev/theme，
+   而磁碟上還有 /_dev/templates 與 /_dev/tokens。改成前綴例外。
 
-3. ⚠️ 我自己寫了一個假守衛，靠「故意改壞」抓到
-   homepage.spec.ts 的「IA 順序與 Spec §4 一致」原本把預期順序
-   從 HOME_BLOCKS 算出來——而頁面也從 HOME_BLOCKS 渲染，
-   兩邊一起動，調換順序它照樣綠。那是套套邏輯。
-   拆成兩條：e2e 驗「首頁照著 HOME_BLOCKS 渲染」（擋 JSX 寫死順序），
-   新的單元測試驗「HOME_BLOCKS 與 Spec §4 一致」（擋程式與規格分岔）。
-   後者兩個方向都故意改壞驗過會紅。
+3. TemplatePicker 塞進窄欄會變成一個字一行
+   它自己是 lg:grid-cols-4 的橫排，放進 22rem 的左欄後每張卡剩約 5rem。
+   程式全綠、build 過、測試過——只有截圖看得出來。
+
+4. ⚠️ 又一個我自己寫的假守衛（CR-005 那時）
+   homepage.spec.ts 的「IA 順序與 Spec §4 一致」把預期順序從 HOME_BLOCKS
+   算出來，而頁面也從 HOME_BLOCKS 渲染——兩邊一起動，永遠不會紅。
+   拆成兩條：e2e 驗「首頁照著 HOME_BLOCKS 渲染」，
+   新的單元測試驗「HOME_BLOCKS 與 Spec §4 一致」（兩個方向都驗過會紅）。
 ```
 
----
+### 兩個分析事件現在帶 `from`
+
+`pricing_viewed` 與 `template_viewed` 在首頁與新頁面都會發，
+一個人從首頁點過去就會被算兩次。不另外開事件
+（`ANALYTICS_EVENTS` 是「Spec §31 列出的，一個不多一個不少」，
+加事件要動規格），改成帶 `{ from: "home" | "pricing-page" | "playground" }`。
+
+⚠️ 順手修掉一個我自己弄出來的：「換個感覺」那個連結原本發
+`template_to_agent_clicked`，而它去的是 `/playground` 不是 AI 顧問——
+那會讓「去找顧問」的數字混進「去試穿頁」，而報表看起來完全正常。
+拿掉了；那一頁進站時本來就會發 `template_viewed { from: "playground" }`。
+
+### ⚠️ e2e 之間會透過 CMS 快取互相汙染
+
+`admin-cms` 的收尾用 SQL 刪資料，而 CMS 讀取端有快取、快取只在 action
+存檔時失效——所以它寫進去的測試值會留在快取裡最多一小時，
+把後面每一支測試都汙染掉。
+
+實際發生過：`homepage` 的「首頁呈現入口價」紅了，它在找「免費」，
+而快取裡是 `admin-cms` 寫的「NT$ 111」。**症狀出現在一支無辜的測試上。**
+
+已修（那一條測試改成走存檔路徑把值改回去）。但**同樣的形狀還在**：
+`home.hero`、`home.process`、`login.intro` 幾份也是「改了 → SQL 刪」。
+目前沒有造成問題，因為沒有別的測試在驗那幾段的內容。
+
+真正的解法是一條「從外部讓內容立刻生效」的路徑（帶密鑰的 revalidate 端點），
+那條同時也解掉「直接改資料庫前台不跟著變」那一項。
+
+### `docs/gptsay.md` 還沒處理的兩項——都不是程式工作
+
+```text
+「太多東西在解釋自己」   philosophy / advisor / workshop 那幾段的文案。
+                        全部是 CMS 可編輯的，屬於文字取捨，要 Luffy 定調
+「作品轟炸」            現在只有三件，其中兩件是一頁起家自己的。
+                        要更多作品進資料庫，誠實標 CONCEPT / DEMO /
+                        INTERNAL。後台已經填得進去（分類與標籤也能編）
+```
 
 ## 🔴 真正還沒做（純程式、沒被外部卡）
 

@@ -106,17 +106,26 @@ test("篩選後沒有作品時給出誠實說明，不偷偷顯示全部", async
   await expect(page.getByRole("link", { name: "AI Website Workshop" })).toBeHidden();
 });
 
-test("完整六級價格呈現於首頁（Spec §26.1）", async ({ page }) => {
+test("首頁呈現入口價，並把人帶到完整階梯（Spec §26.1 / CR-006）", async ({ page }) => {
+  /*
+   * ⚠️ CR-006 之前這條驗的是「六級全部出現在首頁」。
+   *
+   * 完整階梯搬到 `/pricing` 之後，那句話不再成立——但 §26.1 的**原意**
+   * 一個字都沒變：「缺了承接點，升級路徑等同從 990 直接跳 30,000」。
+   * 那個顧慮是階梯有缺口，不是階梯放在哪一頁。
+   *
+   * 所以首頁這一段要驗的變成兩件事：**看得到起價**，而且**走得過去**。
+   * 六級完整由 `pricing-playground.spec.ts` 驗，那裡是它的新住所。
+   */
   await page.goto("/");
-  for (const tier of [
-    "AI Advisor",
-    "Website Workshop",
-    "Template Build",
-    "Semi-Custom",
-    "Custom",
-  ]) {
-    await expect(page.getByRole("heading", { name: tier, exact: true })).toBeVisible();
-  }
+
+  const summary = page.locator("#pricing");
+  await expect(summary.getByText("免費")).toBeVisible();
+  await expect(summary.getByText(/NT\$/)).toBeVisible();
+
+  const link = summary.getByRole("link", { name: /看完整 \d+ 級/ });
+  await expect(link, "首頁沒有往完整階梯的路——那就等於缺了那幾級").toBeVisible();
+  await expect(link).toHaveAttribute("href", "/pricing");
 });
 
 test("作品皆標示來源類型，Demo 不冒充客戶案例（Spec §8.2 / §29）", async ({ page }) => {

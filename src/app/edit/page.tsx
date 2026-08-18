@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 
 import { SaveBar } from "@/components/editor/save-bar";
 import { SectionEditor } from "@/components/editor/section-editor";
-import { Navbar, type NavLink } from "@/components/shared/navbar";
+import { Navbar } from "@/components/shared/navbar";
+import { PUBLIC_NAV } from "@/config/nav";
 import { SiteFooter } from "@/components/shared/site-footer";
 import { PreviewControls } from "@/components/website-preview/preview-controls";
 import { TemplatePicker } from "@/components/website-preview/template-picker";
@@ -29,13 +30,6 @@ export const metadata: Metadata = {
   title: "編輯你的網站",
   description: "挑一套版型，然後把區塊排成你要的樣子。不用登入，也不用付費。",
 };
-
-const NAV_LINKS: NavLink[] = [
-  { label: "作品", href: "/work" },
-  { label: "自己排版", href: "/edit" },
-  { label: "設計 CRM", href: "/crm" },
-  { label: "開始一個專案", href: "/start" },
-];
 
 export default async function EditPage({ searchParams }: PageProps<"/edit">) {
   const params = await searchParams;
@@ -66,7 +60,7 @@ export default async function EditPage({ searchParams }: PageProps<"/edit">) {
       <Navbar
         adminEntry={adminEntry}
         accountEntry={accountEntry}
-        links={NAV_LINKS}
+        links={[...PUBLIC_NAV]}
         cta={{ label: "回首頁", href: "/" }}
       />
 

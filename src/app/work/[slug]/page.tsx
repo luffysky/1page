@@ -8,7 +8,8 @@ import { notFound } from "next/navigation";
 
 import { PortfolioLayout } from "@/components/portfolio/portfolio-layout";
 import { DarkCtaBlock } from "@/components/shared/dark-cta-block";
-import { Navbar, type NavLink } from "@/components/shared/navbar";
+import { Navbar } from "@/components/shared/navbar";
+import { PUBLIC_NAV } from "@/config/nav";
 import { getAdminEntry } from "@/features/admin/auth";
 import { SiteFooter } from "@/components/shared/site-footer";
 import { readCmsDocument } from "@/features/cms/read";
@@ -28,14 +29,6 @@ import { PROJECT_TYPE_LABELS } from "@/features/portfolio/project-type";
  * 這兩條規則在本頁都是硬性的：每一個區塊渲染前都先檢查資料是否存在，
  * 沒有資料就整段不出現——而不是留一個標題配空白。
  */
-
-const NAV_LINKS: NavLink[] = [
-  { label: "作品", href: "/work" },
-  { label: "AI 顧問", href: "/#advisor" },
-  { label: "服務", href: "/#services" },
-  { label: "價格", href: "/#pricing" },
-  { label: "流程", href: "/#process" },
-];
 
 export async function generateMetadata({ params }: PageProps<"/work/[slug]">): Promise<Metadata> {
   const { slug } = await params;
@@ -104,7 +97,7 @@ export default async function WorkDetailPage({ params }: PageProps<"/work/[slug]
       />
       <Navbar
         adminEntry={adminEntry}
-        links={NAV_LINKS}
+        links={[...PUBLIC_NAV]}
         cta={{ label: "開始一個專案 ↗", href: "/#contact" }}
       />
 

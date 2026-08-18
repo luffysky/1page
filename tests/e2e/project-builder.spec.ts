@@ -23,9 +23,10 @@ test("送出前不需要填滿，但至少要有聯絡方式", async ({ page }) 
 });
 
 test("從 Template 過來時帶入品牌與產業（Spec §30）", async ({ page }) => {
-  await page.goto("/");
+  // ⚠️ CR-006：完整控制項搬到 /playground 了，這裡跟著搬。
+  // 仍然是真的操作，不是直接寫 storage——那正是這條測試的意義。
+  await page.goto("/playground");
 
-  // 在首頁把預覽調成自己的樣子——這是真的操作，不是直接寫 storage。
   await page.getByLabel("品牌名稱").fill("南方麵包店");
   await page.getByLabel("產業").fill("烘焙坊");
 
@@ -38,7 +39,7 @@ test("從 Template 過來時帶入品牌與產業（Spec §30）", async ({ page
 
 test("Agent 問到的需求優先於預覽帶入的值", async ({ page }) => {
   // 他親口對 AI 說過的話，比他在預覽裡隨手打的更接近真的需求。
-  await page.goto("/");
+  await page.goto("/playground");
   await page.getByLabel("品牌名稱").fill("預覽裡打的");
 
   await page.evaluate(() => {

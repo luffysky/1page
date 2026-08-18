@@ -31,6 +31,8 @@ const PUBLIC_ROUTES = [
   { name: "Project Builder", path: "/start" },
   { name: "網站編輯器", path: "/edit" },
   { name: "CRM 設計器", path: "/crm" },
+  { name: "價格", path: "/pricing" },
+  { name: "試穿", path: "/playground" },
 ];
 
 /**

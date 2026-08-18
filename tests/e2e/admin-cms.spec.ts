@@ -93,20 +93,61 @@ test("還沒在後台改過時，用的是程式碼裡的預設內容", async ({
   ).toBeVisible();
 });
 
-test("改了價格，首頁跟著變", async ({ page }) => {
+test("改了價格，首頁與 /pricing 都跟著變", async ({ page }) => {
+  /*
+   * ── CR-006 之後這條要驗兩端 ──────────────────────────────────
+   *
+   * 完整六級搬到 `/pricing`，首頁只留入口價。所以：
+   *   - `summary` 只有 /pricing 畫得出來
+   *   - `price` 兩邊都畫（首頁畫每一組的第一級）
+   *
+   * 原本這條只改 `tiers[0].summary` 再去首頁找它——CR-006 之後
+   * 首頁本來就不渲染 summary，那會紅在一個與「CMS 有沒有生效」
+   * 無關的原因上。
+   *
+   * 改成兩個欄位各驗一端，涵蓋的是同一條路徑的兩個出口。
+   */
   await openCmsRaw(page, "pricing.tiers");
 
   const textarea = page.getByLabel("內容（JSON）");
-  const current = JSON.parse((await textarea.inputValue()) || "{}");
+  const original = (await textarea.inputValue()) || "{}";
+  const current = JSON.parse(original);
 
+  const markedPrice = "NT$ 111";
   current.tiers[0].summary = MARKER;
+  current.tiers[0].price = markedPrice;
   await textarea.fill(JSON.stringify(current, null, 2));
 
   await page.getByRole("button", { name: "儲存" }).click();
   await expect(page.getByRole("status")).toContainText("存好了");
 
-  await page.goto("/");
+  // /pricing：完整階梯，summary 在這裡
+  await page.goto("/pricing");
   await expect(page.getByText(MARKER)).toBeVisible();
+  await expect(page.getByText(markedPrice).first()).toBeVisible();
+
+  // 首頁：入口價。改了 CMS 而首頁沒跟著變 = 兩個地方講不一樣的價錢
+  await page.goto("/");
+  await expect(page.getByText(markedPrice).first(), "後台改了價格，首頁還在顯示舊的").toBeVisible();
+
+  /*
+   * ⚠️ 在這裡把值改回去，**而且要走存檔那條路**。
+   *
+   * `afterAll` 用 SQL 刪掉那一列——但 CMS 的讀取端有快取，
+   * 而快取由 tag 失效，**tag 只在 action 存檔時被打掉**。
+   * 所以 SQL 刪除之後，前台最長一小時內還是「NT$ 111」。
+   *
+   * 實際發生過：這一條跑完之後，`homepage.spec.ts` 的
+   * 「首頁呈現入口價」紅了——它在找「免費」，而快取裡是 111。
+   * 那不是它的問題，是這一條沒有收乾淨。
+   *
+   * 改回去之後快取裡的值 == 程式碼的預設值，afterAll 再刪掉那一列，
+   * 兩邊就都乾淨了。
+   */
+  await openCmsRaw(page, "pricing.tiers");
+  await page.getByLabel("內容（JSON）").fill(original);
+  await page.getByRole("button", { name: "儲存" }).click();
+  await expect(page.getByRole("status")).toContainText("存好了");
 });
 
 test("壞掉的 JSON 存不進去，而且說得出哪裡不對", async ({ page }) => {

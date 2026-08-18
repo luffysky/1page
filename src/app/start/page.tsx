@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
-import { Navbar, type NavLink } from "@/components/shared/navbar";
+import { Navbar } from "@/components/shared/navbar";
+import { PUBLIC_NAV } from "@/config/nav";
 import { SiteFooter } from "@/components/shared/site-footer";
 import { absoluteUrl } from "@/config/site";
 import { getAccountEntry } from "@/features/account/auth";
@@ -23,13 +24,6 @@ export const metadata: Metadata = {
   alternates: { canonical: absoluteUrl("/start") },
 };
 
-const NAV_LINKS: NavLink[] = [
-  { label: "作品", href: "/work" },
-  { label: "自己排版", href: "/edit" },
-  { label: "設計 CRM", href: "/crm" },
-  { label: "首頁", href: "/" },
-];
-
 export default async function StartPage({ searchParams }: PageProps<"/start">) {
   const params = await searchParams;
   const [adminEntry, accountEntry, intro] = await Promise.all([
@@ -49,7 +43,7 @@ export default async function StartPage({ searchParams }: PageProps<"/start">) {
       <Navbar
         adminEntry={adminEntry}
         accountEntry={accountEntry}
-        links={NAV_LINKS}
+        links={[...PUBLIC_NAV]}
         cta={{ label: "回首頁", href: "/" }}
       />
 

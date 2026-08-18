@@ -96,6 +96,26 @@ export const PROCESS_STEPS = [
  * 搬出來之後兩邊各自可編輯：它們本來就可能想講不同的話，
  * 只是不該「以為改了一個就等於改了兩個」。
  */
+/**
+ * `/pricing` 的頁首（CR-006）。
+ *
+ * 與 `SECTION_COPY.pricing`（首頁那段精簡入口）刻意分開：
+ * 首頁那句是「先試，再決定要做到多深」——一句邀請；
+ * 這一頁的讀者已經決定要看價錢了，要的是責任範圍怎麼分。
+ */
+export const PRICING_COPY = {
+  kicker: "Product Ladder",
+  title: "價格依責任範圍，不按頁數算。",
+  lead: "從免費的需求釐清，到我們把整件事扛下來。六級之間沒有斷層——這正是它們存在的理由。",
+} as const;
+
+/** `/playground` 的頁首（CR-006）。首頁那段是預告，這一頁才是完整的試穿間 */
+export const PLAYGROUND_COPY = {
+  kicker: "Website Playground",
+  title: "你的網站，可以先試穿。",
+  lead: "換版型、換配色、換裝置，都在這裡。不用登入，也不用先跟任何人講話。",
+} as const;
+
 export const WORK_COPY = {
   kicker: "Selected Work",
   title: "不只說我們會做，直接給你看。",

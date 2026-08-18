@@ -83,6 +83,13 @@ test.describe("預覽裡的客服體驗", () => {
 
   test("展開後不會溢出預覽框，最窄的裝置也一樣", async ({ page }) => {
     /*
+     * ⚠️ CR-006：裝置切換搬到 /playground 了（首頁只留挑模板 + 預覽）。
+     * 這一條需要真的切裝置，所以自己過去——beforeEach 的首頁沒有那組按鈕。
+     * 驗的東西完全沒變：兩邊共用同一個 SiteRenderer（§8.15）。
+     */
+    await page.goto("/playground");
+
+    /*
      * SiteScope 的 base 帶了 `@container`（container-type: inline-size），
      * 那會對行內軸做尺寸內縮——包著泡泡的那層就**不再依內容撐開**。
      * 量出來 width: 0，整個對話框溢出到預覽框外面，蓋住我們自己的頁面。

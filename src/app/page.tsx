@@ -5,13 +5,14 @@ import { GoalSelector } from "@/components/landing/goal-selector";
 import { Hero } from "@/components/landing/hero";
 import { ProcessSteps } from "@/components/landing/process-steps";
 import { SelectedWork } from "@/components/landing/selected-work";
-import { TemplateExperienceSection } from "@/components/landing/template-experience-section";
-import { PricingLadder } from "@/components/pricing/pricing-ladder";
+import { TemplateTeaser } from "@/components/landing/template-teaser";
+import { PricingSummary } from "@/components/pricing/pricing-summary";
 import { readCmsDocument } from "@/features/cms/read";
 import { ServicesBand } from "@/components/services/services-band";
 import { DarkCtaBlock } from "@/components/shared/dark-cta-block";
 import { EditorialSection } from "@/components/shared/editorial-section";
-import { Navbar, type NavLink } from "@/components/shared/navbar";
+import { Navbar } from "@/components/shared/navbar";
+import { homeNav } from "@/config/nav";
 import { getAccountEntry } from "@/features/account/auth";
 import { getAdminEntry } from "@/features/admin/auth";
 import { SiteFooter } from "@/components/shared/site-footer";
@@ -40,17 +41,6 @@ import { listTemplates } from "@/features/website-engine/templates";
  * 本路由因讀取 searchParams 而為動態渲染。Phase 1 無資料庫，成本可忽略；
  * Phase 2 接 Supabase 後需重新評估快取策略。
  */
-
-const NAV_LINKS: NavLink[] = [
-  { label: "作品", href: "#work" },
-  { label: "AI 顧問", href: "#advisor" },
-  { label: "服務", href: "#services" },
-  { label: "價格", href: "#pricing" },
-  { label: "流程", href: "#process" },
-  // 編輯器是一條真的路由，不是首頁的錨點——它是訪客自己動手的入口
-  { label: "自己排版", href: "/edit" },
-  { label: "設計 CRM", href: "/crm" },
-];
 
 export default async function Home({ searchParams }: PageProps<"/">) {
   const params = await searchParams;
@@ -132,7 +122,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     template: (
       <div id="templates">
         <EditorialSection {...templateCopy.section}>
-          <TemplateExperienceSection />
+          <TemplateTeaser />
         </EditorialSection>
       </div>
     ),
@@ -159,10 +149,20 @@ export default async function Home({ searchParams }: PageProps<"/">) {
 
     pricing: (
       <div id="pricing">
-        {/* Spec §31 */}
-        <TrackPageView event="pricing_viewed" />
+        {/*
+         * Spec §31。
+         *
+         * ⚠️ 帶 `from`：CR-006 之後 `/pricing` 也會發同一個事件，
+         * 而一個人從首頁點過去就會被算兩次。不加來源的話，
+         * 那個數字會慢慢變成「首頁載入次數 + 價格頁載入次數」，
+         * 而沒有人記得它曾經是別的意思。
+         *
+         * 不另外開一個事件，是因為「看過價格」本來就是同一件事——
+         * 分開的是**在哪裡看的**。
+         */}
+        <TrackPageView event="pricing_viewed" payload={{ from: "home" }} />
         <EditorialSection {...pricingCopy.section}>
-          <PricingLadder groups={pricing.groups} tiers={pricing.tiers} />
+          <PricingSummary groups={pricing.groups} tiers={pricing.tiers} />
         </EditorialSection>
       </div>
     ),
@@ -199,7 +199,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
           <Navbar
             adminEntry={adminEntry}
             accountEntry={accountEntry}
-            links={NAV_LINKS}
+            links={homeNav()}
             cta={{ label: "開始一個專案 ↗", href: "/start" }}
           />
 

@@ -3,10 +3,20 @@
 import { useHomeGoal } from "@/features/home/goal-context";
 
 /**
- * Services（Spec §7 / Plan §6.1）
+ * Services（Spec §7 / §3.1 / Plan §6.1 / CR-006）
  *
  * 四條產品線。選定 goal 後 highlight 對應的那一條——
  * 這是 Goal Selector 必須同步的四處之一。
+ *
+ * ── 為什麼從四張卡改成四列（CR-006）─────────────────────────
+ *
+ * §3.1 明文禁止全站卡片網格，而 `docs/gptsay.md` 指得更具體：
+ *
+ * > 不是四張 SaaS Card，而是四個巨大 Editorial Row
+ *
+ * 四張等寬卡把「網站」與「AI 與自動化」講得一樣重、一樣淺，
+ * 讀起來像功能表。橫列有左右欄可以分工：左邊是名字（大字），
+ * 右邊是它實際交付什麼——那才是接案工作室要傳達的東西。
  *
  * ⚠️ 內容從 CMS 讀，但**哪一條要 highlight 仍由程式碼決定**
  * （`HOME_GOALS[].serviceId`）。後台改了某條產品線的 id，
@@ -20,24 +30,31 @@ export function ServicesBand({
   const { definition } = useHomeGoal();
 
   return (
-    <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <ul className="flex flex-col">
       {lines.map((service) => {
         const highlighted = service.id === definition.serviceId;
+
         return (
           <li
             key={service.id}
             aria-current={highlighted ? "true" : undefined}
-            className={`rounded-lg border p-6 transition-colors ${
-              highlighted
-                ? "border-brand-accent bg-brand-paper"
-                : "border-brand-line bg-brand-paper/60"
+            className={`border-brand-line grid gap-3 border-t py-8 md:grid-cols-[minmax(0,18rem)_minmax(0,1fr)] md:items-baseline md:gap-12 ${
+              highlighted ? "border-brand-accent border-t-2" : ""
             }`}
           >
-            {highlighted ? (
-              <p className="text-caption text-brand-accent-strong mb-2 font-black">為你推薦</p>
-            ) : null}
-            <h3 className="text-heading-2">{service.name}</h3>
-            <p className="text-body-sm text-brand-muted mt-2">{service.summary}</p>
+            <div>
+              <h3 className="text-display-2">{service.name}</h3>
+              {highlighted ? (
+                /*
+                 * 標記放在標題底下而不是上面：上面的話，四列裡只有一列
+                 * 多一行，整排的基線就對不齊了——而那看起來像排版壞掉，
+                 * 不像「這一條被推薦」。
+                 */
+                <p className="text-caption text-brand-accent-strong mt-2 font-black">為你推薦</p>
+              ) : null}
+            </div>
+
+            <p className="text-lead text-brand-muted max-w-prose">{service.summary}</p>
           </li>
         );
       })}

@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { CrmDesigner } from "@/components/crm/crm-designer";
-import { Navbar, type NavLink } from "@/components/shared/navbar";
+import { Navbar } from "@/components/shared/navbar";
+import { PUBLIC_NAV } from "@/config/nav";
 import { SiteFooter } from "@/components/shared/site-footer";
 import { getAccountEntry } from "@/features/account/auth";
 import { getAdminEntry } from "@/features/admin/auth";
@@ -25,13 +26,6 @@ export const metadata: Metadata = {
   title: "設計你自己的 CRM",
   description: "要記哪些東西自己決定。不用登入，也不用付費。",
 };
-
-const NAV_LINKS: NavLink[] = [
-  { label: "作品", href: "/work" },
-  { label: "自己排版", href: "/edit" },
-  { label: "設計 CRM", href: "/crm" },
-  { label: "開始一個專案", href: "/start" },
-];
 
 export default async function CrmPage({ searchParams }: PageProps<"/crm">) {
   const params = await searchParams;
@@ -56,7 +50,7 @@ export default async function CrmPage({ searchParams }: PageProps<"/crm">) {
       <Navbar
         adminEntry={adminEntry}
         accountEntry={accountEntry}
-        links={NAV_LINKS}
+        links={[...PUBLIC_NAV]}
         cta={{ label: "回首頁", href: "/" }}
       />
 

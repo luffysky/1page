@@ -5,6 +5,8 @@ import {
   FINAL_CTA_COPY,
   HERO_COPY,
   PROCESS_STEPS,
+  PLAYGROUND_COPY,
+  PRICING_COPY,
   SECTION_COPY,
   START_COPY,
   WORK_COPY,
@@ -290,6 +292,8 @@ export type LoginDocument = z.infer<typeof loginSchema>;
 export const CMS_PAGES = {
   home: { label: "首頁", path: "/" },
   work: { label: "作品頁", path: "/work" },
+  pricing: { label: "價格頁", path: "/pricing" },
+  playground: { label: "試穿頁", path: "/playground" },
   start: { label: "開始一個專案", path: "/start" },
   login: { label: "登入頁", path: "/login" },
   shared: { label: "全站共用", path: null },
@@ -431,6 +435,22 @@ export const CMS_DOCUMENTS = {
   } satisfies CmsDocumentDefinition<PageLayout>,
 
   /* ── 其他頁 ────────────────────────────────────────────── */
+
+  "pricing.intro": {
+    label: "價格頁頁首",
+    page: "pricing",
+    affects: "/pricing 最上方的小字、標題與說明。價格本身在「價格階梯」那一份",
+    schema: introSchema,
+    fallback: { section: asSection(PRICING_COPY) },
+  } satisfies CmsDocumentDefinition<IntroDocument>,
+
+  "playground.intro": {
+    label: "試穿頁頁首",
+    page: "playground",
+    affects: "/playground 最上方的小字、標題與說明",
+    schema: introSchema,
+    fallback: { section: asSection(PLAYGROUND_COPY) },
+  } satisfies CmsDocumentDefinition<IntroDocument>,
 
   "work.intro": {
     label: "作品頁頁首",
